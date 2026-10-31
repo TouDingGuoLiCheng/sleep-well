@@ -1,0 +1,25 @@
+# Gradle
+.gradle/
+build/
+out/
+run/
+run-data/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+bin/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Mod artifacts kept on purpose
+!releases/
+
+# Local fallback jars (see libs/README.md) — too large to track
+libs/*.jar
