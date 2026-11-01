@@ -1,5 +1,6 @@
 package com.sleepwell.config;
 
+import com.sleepwell.fire.CampfireFleePolicy;
 import net.minecraftforge.common.ForgeConfigSpec;
 
 /**
@@ -17,6 +18,11 @@ public final class SleepWellConfig {
     public static final ForgeConfigSpec.IntValue SLEEP_FALLBACK_SECONDS;
     /** Fallback teleports allowed per nap (0..5). */
     public static final ForgeConfigSpec.IntValue SLEEP_FALLBACK_MAX_TELEPORTS;
+
+    /** Enable "a maid burned by a campfire runs away from it". */
+    public static final ForgeConfigSpec.BooleanValue CAMPFIRE_FLEE_ENABLED;
+    /** How far the safe-spot search reaches, in blocks (2..12). */
+    public static final ForgeConfigSpec.IntValue CAMPFIRE_FLEE_RADIUS;
 
     static {
         ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
@@ -49,6 +55,31 @@ public final class SleepWellConfig {
                         "每次入睡最多兜底传送几次。0 等于关闭（开关不用动）。"
                 )
                 .defineInRange("sleepFallbackMaxTeleports", 2, 0, 5);
+        builder.pop();
+
+        builder.comment(
+                "A maid that gets burned by a campfire runs a few blocks away from it.",
+                "女仆被篝火烫到就跑开。"
+        );
+        builder.push("campfireFlee");
+        CAMPFIRE_FLEE_ENABLED = builder
+                .comment(
+                        "Whether a maid burned by a campfire tries to run away from it.",
+                        "Vanilla campfires deal plain fire damage while she stands in them, so she keeps burning",
+                        "until something moves her. This makes her pick a safe standing spot 3..radius blocks away",
+                        "and walk there (navigated, not teleported), for up to 5 seconds per burn.",
+                        "女仆被篝火烫到后是否尝试跑开。",
+                        "原版篝火对她只造成普通火焰伤害：站在里面会一直掉血，没人管就不动。",
+                        "开启后她会挑一个 3..半径 格外的安全落点走过去（是走路，不是传送），每次最多 5 秒。"
+                )
+                .define("campfireFleeEnabled", true);
+        CAMPFIRE_FLEE_RADIUS = builder
+                .comment(
+                        "How far the search for a safe standing spot reaches.",
+                        "寻找安全落点的搜索半径（格）。"
+                )
+                .defineInRange("campfireFleeRadius", CampfireFleePolicy.DEFAULT_RADIUS,
+                        CampfireFleePolicy.MIN_RADIUS, CampfireFleePolicy.MAX_RADIUS);
         builder.pop();
 
         SPEC = builder.build();

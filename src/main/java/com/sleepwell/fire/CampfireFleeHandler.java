@@ -1,0 +1,159 @@
+package com.sleepwell.fire;
+
+import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
+import com.sleepwell.SleepWellMod;
+import com.sleepwell.config.SleepWellConfig;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.tags.DamageTypeTags;
+import net.minecraft.world.entity.ai.memory.MemoryModuleType;
+import net.minecraft.world.entity.ai.memory.WalkTarget;
+import net.minecraft.world.entity.ai.behavior.BlockPosTracker;
+import net.minecraft.world.level.block.CampfireBlock;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.event.entity.living.LivingDamageEvent;
+import net.minecraftforge.event.entity.living.LivingEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.ArrayList;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * Campfire flee: a maid that gets burned by a campfire runs a few blocks away from it instead of standing in
+ * the flames until she dies.
+ * <p>
+ * Trigger: {@link LivingDamageEvent} on an {@code EntityMaid} with a fire-typed source while a lit campfire is
+ * in her feet column (vanilla campfires deal plain {@code inFire} damage, so the block has to confirm it).
+ * Response: pick a safe standing spot 3..{@code campfireFleeRadius} blocks away, then keep re-issuing that walk
+ * target for up to 5 seconds — the maid's own task may overwrite it every tick, so we push it back every tick
+ * and also drive the navigation directly.
+ */
+@Mod.EventBusSubscriber(modid = SleepWellMod.MOD_ID)
+public final class CampfireFleeHandler {
+    private static final Logger LOGGER = LoggerFactory.getLogger("sleep_well/campfireFlee");
+    /** A bit above a walking maid so the escape reads as running. */
+    private static final float FLEE_SPEED = 1.3F;
+    /** Let the vanilla walk-target sink stop on the neighbouring block instead of the exact spot. */
+    private static final int CLOSE_ENOUGH = 1;
+    /** Per-maid flee state; dropped when the flee ends or the maid disappears. */
+    private static final Map<UUID, Flee> FLEES = new ConcurrentHashMap<>();
+
+    private CampfireFleeHandler() {
+    }
+
+    @SubscribeEvent
+    public static void onLivingDamage(LivingDamageEvent event) {
+        if (!(event.getEntity() instanceof EntityMaid maid) || !(maid.level() instanceof ServerLevel level)) {
+            return;
+        }
+        if (event.getAmount() <= 0.0F) {
+            return;
+        }
+        boolean enabled = SleepWellConfig.CAMPFIRE_FLEE_ENABLED.get();
+        boolean fireDamage = event.getSource().is(DamageTypeTags.IS_FIRE);
+        boolean standingOnCampfire = onLitCampfire(level, maid.blockPosition());
+        if (!CampfireFleePolicy.eligible(enabled, maid.isAlive(), maid.isSleeping(),
+                maid.isPassenger() || maid.isVehicle(), fireDamage, standingOnCampfire)) {
+            if (!enabled) {
+                FLEES.remove(maid.getUUID());
+            }
+            return;
+        }
+        int radius = CampfireFleePolicy.clampRadius(SleepWellConfig.CAMPFIRE_FLEE_RADIUS.get());
+        Flee flee = FLEES.computeIfAbsent(maid.getUUID(), key -> new Flee(maid, radius));
+        flee.radius = radius;
+        flee.ticksLeft = CampfireFleePolicy.FLEE_TICKS;
+        flee.ticksOnTarget = 0;
+        flee.target = CampfireFleeSpot.find(level, maid, radius).orElse(null);
+        if (flee.target == null) {
+            FLEES.remove(maid.getUUID());
+            LOGGER.debug("Campfire flee: no safe spot for maid {} near {}", maid.getUUID(), maid.blockPosition());
+            return;
+        }
+        LOGGER.debug("Campfire flee: maid {} burned at {}, running to {}", maid.getUUID(), maid.blockPosition(), flee.target);
+        drive(maid, flee.target);
+    }
+
+    @SubscribeEvent
+    public static void onLivingTick(LivingEvent.LivingTickEvent event) {
+        if (event.getEntity().level().isClientSide()) {
+            return;
+        }
+        if (!(event.getEntity() instanceof EntityMaid maid)) {
+            return;
+        }
+        Flee flee = FLEES.get(maid.getUUID());
+        if (flee == null) {
+            return;
+        }
+        if (maid.isRemoved() || !maid.isAlive() || maid.isSleeping()
+                || !(maid.level() instanceof ServerLevel level)
+                || !SleepWellConfig.CAMPFIRE_FLEE_ENABLED.get()
+                || flee.target == null) {
+            stop(maid);
+            return;
+        }
+        if (CampfireFleePolicy.arrived(maid.position().distanceToSqr(flee.target))) {
+            stop(maid);
+            return;
+        }
+        if (--flee.ticksLeft <= 0) {
+            stop(maid);
+            return;
+        }
+        if (CampfireFleePolicy.needsRetarget(++flee.ticksOnTarget)) {
+            flee.ticksOnTarget = 0;
+            Vec3 next = CampfireFleeSpot.find(level, maid, flee.radius).orElse(null);
+            if (next == null) {
+                stop(maid);
+                return;
+            }
+            flee.target = next;
+        }
+        drive(maid, flee.target);
+    }
+
+    /** Push the walk target back and steer the navigation directly, so a busy task cannot keep her in the fire. */
+    private static void drive(EntityMaid maid, Vec3 target) {
+        maid.getNavigation().moveTo(target.x, target.y, target.z, FLEE_SPEED);
+        maid.getBrain().setMemory(MemoryModuleType.WALK_TARGET,
+                new WalkTarget(new BlockPosTracker(BlockPos.containing(target)), FLEE_SPEED, CLOSE_ENOUGH));
+        maid.getLookControl().setLookAt(target.x, target.y, target.z);
+    }
+
+    private static void stop(EntityMaid maid) {
+        FLEES.remove(maid.getUUID());
+        maid.getNavigation().stop();
+        maid.getBrain().eraseMemory(MemoryModuleType.WALK_TARGET);
+    }
+
+    /** A lit campfire in the maid's feet column: the block she is inside, or the one right under her. */
+    static boolean onLitCampfire(ServerLevel level, BlockPos feet) {
+        return isLitCampfire(level, feet) || isLitCampfire(level, feet.below());
+    }
+
+    private static boolean isLitCampfire(ServerLevel level, BlockPos pos) {
+        BlockState state = level.getBlockState(pos);
+        return state.getBlock() instanceof CampfireBlock;
+    }
+
+    /** Mutable per-maid flee state. */
+    private static final class Flee {
+        private final EntityMaid maid;
+        private int radius;
+        private int ticksLeft;
+        private int ticksOnTarget;
+        private Vec3 target;
+
+        private Flee(EntityMaid maid, int radius) {
+            this.maid = maid;
+            this.radius = radius;
+        }
+    }
+}

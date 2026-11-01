@@ -68,7 +68,7 @@ public final class SleepLandingSpot {
      * Walks down from {@code start} while the block is not something a maid can stand in, until solid
      * ground is reached. Returns null when nothing within {@link #MAX_DROP} blocks qualifies.
      */
-    static BlockPos groundBelow(ServerLevel level, BlockPos start) {
+    public static BlockPos groundBelow(ServerLevel level, BlockPos start) {
         BlockPos.MutableBlockPos cursor = start.mutable();
         for (int drop = 0; drop <= MAX_DROP; drop++) {
             if (cursor.getY() <= level.getMinBuildHeight()) {
@@ -86,7 +86,7 @@ public final class SleepLandingSpot {
         return null;
     }
 
-    static boolean canStandAt(ServerLevel level, EntityMaid maid, BlockPos feet) {
+    public static boolean canStandAt(ServerLevel level, EntityMaid maid, BlockPos feet) {
         if (!level.isEmptyBlock(feet) || !level.isEmptyBlock(feet.above())) {
             return false;
         }
