@@ -34,11 +34,11 @@ public final class SleepWellMaidTab {
     private static final int FIRST_EXTERNAL_TAB_X = 194;
     private static final int TAB_W = 24;
     private static final int TAB_H = 26;
-    /** Source texture is a 64x64 wine fox icon; it is drawn at TLM's own 16x16 tab-icon size. */
+    /** Source is a 64x64 wine fox icon, drawn as large as the 24x26 tab plate allows. */
     private static final int ICON_SRC = 64;
-    private static final int ICON_DRAW = 16;
-    private static final int ICON_INSET_X = 4;
-    private static final int ICON_INSET_Y = 6;
+    private static final int ICON_DRAW = 24;
+    private static final int ICON_INSET_X = 0;
+    private static final int ICON_INSET_Y = 1;
     private static final int SIDE_SELECTED_U = 107;
     private static final int SIDE_SELECTED_V = 21;
 
