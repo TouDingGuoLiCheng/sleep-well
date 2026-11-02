@@ -1,6 +1,7 @@
 package com.sleepwell.mixin;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
+import com.github.tartaricacid.touhoulittlemaid.config.subconfig.MaidConfig;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.SchedulePos;
 import com.sleepwell.winter.WinterSkipHandler;
 import net.minecraft.core.BlockPos;
@@ -26,9 +27,11 @@ public abstract class SchedulePosMixin {
             return;
         }
         SchedulePos self = (SchedulePos) (Object) this;
-        BlockPos idlePos = self.getIdlePos();
-        if (idlePos != null) {
-            maid.restrictTo(idlePos, Math.round(maid.getRestrictRadius()));
+        // Rest spot, never the work point: idle when there is one, otherwise her sleep spot.
+        BlockPos rest = self.getIdlePos() != null ? self.getIdlePos() : self.getSleepPos();
+        if (rest != null) {
+            // Same range TLM uses for the idle branch, so she is not yanked around by a stale radius.
+            maid.restrictTo(rest, MaidConfig.MAID_IDLE_RANGE.get());
         }
         ci.cancel();
     }

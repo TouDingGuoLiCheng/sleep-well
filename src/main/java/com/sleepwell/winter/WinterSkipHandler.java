@@ -65,6 +65,15 @@ public final class WinterSkipHandler {
         // Once per in-game day (the day counter rolls over at 06:00) and once after a player joins.
         long day = level.getDayTime() / DAY_LENGTH;
         Long lastDay = LAST_DAY.get(id);
+        if (lastDay == null) {
+            // First sight this session: the parked marker lives in her NBT, the hot flag does not.
+            // Without this she keeps her idle task (so no work) while TLM points her back at the
+            // work point, which is exactly the "idle maid still teleports to work" report.
+            MaidSettings persisted = MaidCapabilities.of(maid);
+            if (persisted != null && !persisted.savedTaskId().isEmpty()) {
+                WinterSkipState.mark(id);
+            }
+        }
         if (lastDay != null && lastDay == day) {
             return;
         }
@@ -138,7 +147,19 @@ public final class WinterSkipHandler {
 
     /** Called from {@code SchedulePosMixin}: keep her "home" on the idle spot instead of the work point. */
     public static boolean shouldSuppressWorkPoint(EntityMaid maid) {
-        return maid != null && WinterSkipState.isSkipping(maid);
+        if (maid == null) {
+            return false;
+        }
+        if (WinterSkipState.isSkipping(maid)) {
+            return true;
+        }
+        // Survive a save reload even if this runs before the tick handler re-hydrated the flag.
+        MaidSettings settings = MaidCapabilities.of(maid);
+        if (settings != null && !settings.savedTaskId().isEmpty()) {
+            WinterSkipState.mark(maid.getUUID());
+            return true;
+        }
+        return false;
     }
 
     private record SeasonCache(long day, boolean winter) {
