@@ -20,13 +20,15 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
     private static final int ROW_X = 96;
     private static final int ROW_W = 144;
     private static final int ROW_H = 20;
-    private static final int FIRST_ROW_Y = 44;
-    private static final int ROW_STEP = 30;
+    private static final int FIRST_ROW_Y = 48;
+    private static final int ROW_STEP = 24;
     private static final int TITLE_Y = 32;
     private static final int TITLE_COLOR = 0xF2EEE4;
-    /** PixelLab-generated wooden board with a quilted bottom edge. */
-    private static final ResourceLocation PANEL =
-            new ResourceLocation(SleepWellMod.MOD_ID, "textures/gui/sleep_well_panel.png");
+    private static final int FOX_W = 112;
+    private static final int FOX_H = 48;
+    /** PixelLab art: the wine fox asleep under a quilt, transparent background. */
+    private static final ResourceLocation FOX =
+            new ResourceLocation(SleepWellMod.MOD_ID, "textures/gui/sleepy_fox.png");
 
     private final boolean[] state = new boolean[3];
 
@@ -66,8 +68,12 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
     @Override
     protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
         super.renderBg(graphics, partialTick, mouseX, mouseY);
-        graphics.blit(PANEL, this.leftPos + PANEL_X, this.topPos + PANEL_Y,
-                0, 0, PANEL_W, PANEL_H, 256, 256);
+        graphics.fill(this.leftPos + PANEL_X, this.topPos + PANEL_Y,
+                this.leftPos + PANEL_X + PANEL_W, this.topPos + PANEL_Y + PANEL_H, 0xC00F1220);
+        graphics.blit(FOX,
+                this.leftPos + PANEL_X + (PANEL_W - FOX_W) / 2,
+                this.topPos + PANEL_Y + PANEL_H - FOX_H,
+                0, 0, FOX_W, FOX_H, 256, 256);
     }
 
     @Override
