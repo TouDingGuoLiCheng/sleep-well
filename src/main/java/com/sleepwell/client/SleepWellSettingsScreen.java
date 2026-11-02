@@ -1,12 +1,14 @@
 package com.sleepwell.client;
 
 import com.github.tartaricacid.touhoulittlemaid.client.gui.entity.maid.AbstractMaidContainerGui;
+import com.sleepwell.SleepWellMod;
 import com.sleepwell.gui.SleepWellContainer;
 import com.sleepwell.network.SaveSettingPacket;
 import com.sleepwell.network.SleepWellNetwork;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
 
 /** The Sleep Well page inside the maid GUI: three switches, two global and one per maid. */
@@ -14,13 +16,17 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
     private static final int PANEL_X = 80;
     private static final int PANEL_Y = 28;
     private static final int PANEL_W = 176;
-    private static final int PANEL_H = 137;
+    private static final int PANEL_H = 136;
     private static final int ROW_X = 96;
     private static final int ROW_W = 144;
     private static final int ROW_H = 20;
     private static final int FIRST_ROW_Y = 44;
     private static final int ROW_STEP = 30;
     private static final int TITLE_Y = 32;
+    private static final int TITLE_COLOR = 0xF2EEE4;
+    /** PixelLab-generated wooden board with a quilted bottom edge. */
+    private static final ResourceLocation PANEL =
+            new ResourceLocation(SleepWellMod.MOD_ID, "textures/gui/sleep_well_panel.png");
 
     private final boolean[] state = new boolean[3];
 
@@ -60,13 +66,13 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
     @Override
     protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
         super.renderBg(graphics, partialTick, mouseX, mouseY);
-        graphics.fill(this.leftPos + PANEL_X, this.topPos + PANEL_Y,
-                this.leftPos + PANEL_X + PANEL_W, this.topPos + PANEL_Y + PANEL_H, 0xC0101018);
+        graphics.blit(PANEL, this.leftPos + PANEL_X, this.topPos + PANEL_Y,
+                0, 0, PANEL_W, PANEL_H, 256, 256);
     }
 
     @Override
     protected void renderLabels(GuiGraphics graphics, int mouseX, int mouseY) {
         graphics.drawString(this.font, Component.translatable("gui.sleep_well.title"),
-                ROW_X, TITLE_Y, 0x404040, false);
+                ROW_X, TITLE_Y, TITLE_COLOR, false);
     }
 }

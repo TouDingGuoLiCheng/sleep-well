@@ -16,7 +16,12 @@ import net.minecraftforge.fml.common.Mod;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.Level;
 
 /**
  * Winter work skip.
@@ -29,8 +34,10 @@ import java.util.UUID;
 @Mod.EventBusSubscriber(modid = SleepWellMod.MOD_ID)
 public final class WinterSkipHandler {
     private static final Logger LOGGER = LoggerFactory.getLogger("sleep_well/winterSkip");
-    /** Season checks are cheap but not free; one look per second is plenty. */
-    private static final int CHECK_INTERVAL_TICKS = 20;
+    /** One tick per in-game day (06:00, dayTime % 24000 == 0) is the only moment we look at the season. */
+    private static final long DAY_LENGTH = 24000L;
+    /** Season state per dimension, cached for the current in-game day so a herd of maids costs one lookup. */
+    private static final Map<ResourceKey<Level>, SeasonCache> SEASON_CACHE = new ConcurrentHashMap<>();
 
     private WinterSkipHandler() {
     }
@@ -45,14 +52,16 @@ public final class WinterSkipHandler {
             WinterSkipState.clear(id);
             return;
         }
-        if (maid.tickCount % CHECK_INTERVAL_TICKS != 0) {
+        // Once per in-game day at 06:00 instead of every second: the season cannot change inside a day,
+        // and a work task chosen at dawn is what the player actually sees.
+        if (level.getDayTime() % DAY_LENGTH != 0L) {
             return;
         }
 
         MaidSettings settings = MaidCapabilities.of(maid);
         String idleUid = idleTaskUid();
         String currentUid = taskUid(maid);
-        boolean winter = SeasonBridge.isWinter(level);
+        boolean winter = winterOf(level);
         boolean enabled = settings.winterSkip();
 
         if (WinterSkipState.isSkipping(id)) {
@@ -103,8 +112,23 @@ public final class WinterSkipHandler {
         return TaskManager.getIdleTask().getUid().toString();
     }
 
+    /** Season lookup, shared by every maid of the same dimension within one in-game day. */
+    private static boolean winterOf(ServerLevel level) {
+        long day = level.getDayTime() / DAY_LENGTH;
+        SeasonCache cached = SEASON_CACHE.get(level.dimension());
+        if (cached != null && cached.day == day) {
+            return cached.winter;
+        }
+        boolean winter = SeasonBridge.isWinter(level);
+        SEASON_CACHE.put(level.dimension(), new SeasonCache(day, winter));
+        return winter;
+    }
+
     /** Called from {@code SchedulePosMixin}: keep her "home" on the idle spot instead of the work point. */
     public static boolean shouldSuppressWorkPoint(EntityMaid maid) {
         return maid != null && WinterSkipState.isSkipping(maid);
+    }
+
+    private record SeasonCache(long day, boolean winter) {
     }
 }
