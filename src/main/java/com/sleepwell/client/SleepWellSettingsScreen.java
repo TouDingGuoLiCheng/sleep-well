@@ -1,12 +1,14 @@
 package com.sleepwell.client;
 
 import com.github.tartaricacid.touhoulittlemaid.client.gui.entity.maid.AbstractMaidContainerGui;
+import com.sleepwell.SleepWellMod;
 import com.sleepwell.gui.SleepWellContainer;
 import com.sleepwell.network.SaveSettingPacket;
 import com.sleepwell.network.SleepWellNetwork;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
 
 /** The Sleep Well page inside the maid GUI: three switches, two global and one per maid. */
@@ -18,10 +20,15 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
     private static final int ROW_X = 96;
     private static final int ROW_W = 144;
     private static final int ROW_H = 20;
-    private static final int FIRST_ROW_Y = 44;
-    private static final int ROW_STEP = 30;
+    private static final int FIRST_ROW_Y = 48;
+    private static final int ROW_STEP = 24;
     private static final int TITLE_Y = 32;
     private static final int TITLE_COLOR = 0xF2EEE4;
+    /** PixelLab art: the wine fox asleep under a quilt, transparent background, her legs are the footer. */
+    private static final ResourceLocation FOX =
+            new ResourceLocation(SleepWellMod.MOD_ID, "textures/gui/sleepy_fox.png");
+    private static final int FOX_W = 112;
+    private static final int FOX_H = 48;
 
     private final boolean[] state = new boolean[3];
 
@@ -62,7 +69,11 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
     protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
         super.renderBg(graphics, partialTick, mouseX, mouseY);
         graphics.fill(this.leftPos + PANEL_X, this.topPos + PANEL_Y,
-                this.leftPos + PANEL_X + PANEL_W, this.topPos + PANEL_Y + PANEL_H, 0xC0101018);
+                this.leftPos + PANEL_X + PANEL_W, this.topPos + PANEL_Y + PANEL_H, 0xC00F1220);
+        graphics.blit(FOX,
+                this.leftPos + PANEL_X + (PANEL_W - FOX_W) / 2,
+                this.topPos + PANEL_Y + PANEL_H - FOX_H,
+                FOX_W, FOX_H, 0, 0, 112, 48, 112, 48);
     }
 
     @Override
