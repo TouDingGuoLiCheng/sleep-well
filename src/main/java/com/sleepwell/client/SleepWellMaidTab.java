@@ -34,9 +34,9 @@ public final class SleepWellMaidTab {
     private static final int FIRST_EXTERNAL_TAB_X = 194;
     private static final int TAB_W = 24;
     private static final int TAB_H = 26;
-    private static final int ICON_INSET_X = 4;
-    private static final int ICON_INSET_Y = 6;
-    private static final int ICON_DRAW = 16;
+    /** Source texture size: the untouched PixelLab art, never cropped or downscaled on disk. */
+    private static final int ICON_SRC_W = 176;
+    private static final int ICON_SRC_H = 136;
     private static final int SIDE_SELECTED_U = 107;
     private static final int SIDE_SELECTED_V = 21;
 
@@ -82,8 +82,11 @@ public final class SleepWellMaidTab {
                 graphics.blit(SIDE, this.getX(), this.getY(), SIDE_SELECTED_U, SIDE_SELECTED_V,
                         TAB_W, TAB_H, 256, 256);
             }
-            graphics.blit(ICON, this.getX() + ICON_INSET_X, this.getY() + ICON_INSET_Y,
-                    ICON_DRAW, ICON_DRAW, 0, 0, 32, 32, 32, 32);
+            // Fit the whole drawing inside the tab: width-bound, aspect kept, vertically centred.
+            int w = TAB_W;
+            int h = Math.max(1, Math.round(w * (float) ICON_SRC_H / ICON_SRC_W));
+            graphics.blit(ICON, this.getX(), this.getY() + (TAB_H - h) / 2,
+                    0, 0, w, h, ICON_SRC_W, ICON_SRC_H);
         }
     }
 }
