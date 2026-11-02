@@ -34,12 +34,21 @@ import net.minecraft.world.level.Level;
 @Mod.EventBusSubscriber(modid = SleepWellMod.MOD_ID)
 public final class WinterSkipHandler {
     private static final Logger LOGGER = LoggerFactory.getLogger("sleep_well/winterSkip");
-    /** One tick per in-game day (06:00, dayTime % 24000 == 0) is the only moment we look at the season. */
+    /** Season and task are looked at once per in-game day, plus once right after a player joins. */
     private static final long DAY_LENGTH = 24000L;
+    /** Last in-game day each maid was evaluated on; cleared on login so joining always re-checks. */
+    private static final Map<UUID, Long> LAST_DAY = new ConcurrentHashMap<>();
     /** Season state per dimension, cached for the current in-game day so a herd of maids costs one lookup. */
     private static final Map<ResourceKey<Level>, SeasonCache> SEASON_CACHE = new ConcurrentHashMap<>();
 
     private WinterSkipHandler() {
+    }
+
+    /** A fresh session should not inherit yesterday's decision, so joining re-evaluates every maid once. */
+    @SubscribeEvent
+    public static void onPlayerJoin(net.minecraftforge.event.entity.player.PlayerEvent.PlayerLoggedInEvent event) {
+        LAST_DAY.clear();
+        SEASON_CACHE.clear();
     }
 
     @SubscribeEvent
@@ -50,13 +59,16 @@ public final class WinterSkipHandler {
         UUID id = maid.getUUID();
         if (maid.isRemoved() || !maid.isAlive()) {
             WinterSkipState.clear(id);
+            LAST_DAY.remove(id);
             return;
         }
-        // Once per in-game day at 06:00 instead of every second: the season cannot change inside a day,
-        // and a work task chosen at dawn is what the player actually sees.
-        if (level.getDayTime() % DAY_LENGTH != 0L) {
+        // Once per in-game day (the day counter rolls over at 06:00) and once after a player joins.
+        long day = level.getDayTime() / DAY_LENGTH;
+        Long lastDay = LAST_DAY.get(id);
+        if (lastDay != null && lastDay == day) {
             return;
         }
+        LAST_DAY.put(id, day);
 
         MaidSettings settings = MaidCapabilities.of(maid);
         String idleUid = idleTaskUid();

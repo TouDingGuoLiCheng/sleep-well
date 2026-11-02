@@ -1,5 +1,7 @@
 {
   "modmenu.nameTranslation.sleep_well": "Sleep Well",
+  "gui.touhou_little_maid.button.sleep_well": "Sleep Well",
+  "gui.touhou_little_maid.button.sleep_well.desc": "Sleep path fix, campfire escape, no outdoor work in winter",
   "gui.sleep_well.tab": "Sleep Well",
   "gui.sleep_well.title": "Sleep Well",
   "gui.sleep_well.sleep_fallback": "Sleep path fix",

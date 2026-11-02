@@ -1,5 +1,7 @@
 {
   "modmenu.nameTranslation.sleep_well": "睡个好觉",
+  "gui.touhou_little_maid.button.sleep_well": "睡个好觉",
+  "gui.touhou_little_maid.button.sleep_well.desc": "睡觉寻路修复、篝火伤害避免、冬天不外出打工",
   "gui.sleep_well.tab": "睡个好觉",
   "gui.sleep_well.title": "睡个好觉",
   "gui.sleep_well.sleep_fallback": "睡觉寻路修复",
