@@ -34,9 +34,11 @@ public final class SleepWellMaidTab {
     private static final int FIRST_EXTERNAL_TAB_X = 194;
     private static final int TAB_W = 24;
     private static final int TAB_H = 26;
-    /** Source texture size: the untouched PixelLab art, never cropped or downscaled on disk. */
-    private static final int ICON_SRC_W = 176;
-    private static final int ICON_SRC_H = 136;
+    /** Source texture is a 32x32 icon; it is drawn at TLM's own 16x16 tab-icon size. */
+    private static final int ICON_SRC = 32;
+    private static final int ICON_DRAW = 16;
+    private static final int ICON_INSET_X = 4;
+    private static final int ICON_INSET_Y = 6;
     private static final int SIDE_SELECTED_U = 107;
     private static final int SIDE_SELECTED_V = 21;
 
@@ -82,12 +84,9 @@ public final class SleepWellMaidTab {
                 graphics.blit(SIDE, this.getX(), this.getY(), SIDE_SELECTED_U, SIDE_SELECTED_V,
                         TAB_W, TAB_H, 256, 256);
             }
-            // Fit the whole drawing inside the tab: width-bound, aspect kept, vertically centred.
-            // Note the 11-arg overload: destination size first, then the source rect.
-            int w = TAB_W;
-            int h = Math.max(1, Math.round(w * (float) ICON_SRC_H / ICON_SRC_W));
-            graphics.blit(ICON, this.getX(), this.getY() + (TAB_H - h) / 2,
-                    w, h, 0, 0, ICON_SRC_W, ICON_SRC_H, ICON_SRC_W, ICON_SRC_H);
+            // Same inset as TLM's own tabs: a 16x16 icon in the upper middle of the 24x26 plate.
+            graphics.blit(ICON, this.getX() + ICON_INSET_X, this.getY() + ICON_INSET_Y,
+                    ICON_DRAW, ICON_DRAW, 0, 0, ICON_SRC, ICON_SRC, ICON_SRC, ICON_SRC);
         }
     }
 }
