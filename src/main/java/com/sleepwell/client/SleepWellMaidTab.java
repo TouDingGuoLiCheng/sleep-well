@@ -83,10 +83,11 @@ public final class SleepWellMaidTab {
                         TAB_W, TAB_H, 256, 256);
             }
             // Fit the whole drawing inside the tab: width-bound, aspect kept, vertically centred.
+            // Note the 11-arg overload: destination size first, then the source rect.
             int w = TAB_W;
             int h = Math.max(1, Math.round(w * (float) ICON_SRC_H / ICON_SRC_W));
             graphics.blit(ICON, this.getX(), this.getY() + (TAB_H - h) / 2,
-                    0, 0, w, h, ICON_SRC_W, ICON_SRC_H);
+                    w, h, 0, 0, ICON_SRC_W, ICON_SRC_H, ICON_SRC_W, ICON_SRC_H);
         }
     }
 }
