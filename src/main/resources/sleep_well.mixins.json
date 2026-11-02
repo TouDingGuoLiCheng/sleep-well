@@ -1,0 +1,13 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.sleepwell.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "sleep_well.refmap.json",
+  "mixins": [
+    "SchedulePosMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

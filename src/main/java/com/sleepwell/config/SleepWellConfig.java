@@ -3,6 +3,8 @@ package com.sleepwell.config;
 import com.sleepwell.fire.CampfireFleePolicy;
 import net.minecraftforge.common.ForgeConfigSpec;
 
+import java.util.List;
+
 /**
  * Common config for Sleep Well.
  * <p>
@@ -23,6 +25,11 @@ public final class SleepWellConfig {
     public static final ForgeConfigSpec.BooleanValue CAMPFIRE_FLEE_ENABLED;
     /** How far the safe-spot search reaches, in blocks (2..12). */
     public static final ForgeConfigSpec.IntValue CAMPFIRE_FLEE_RADIUS;
+
+    /** Default for the per-maid "do not work in winter" switch. */
+    public static final ForgeConfigSpec.BooleanValue WINTER_SKIP_DEFAULT_ENABLED;
+    /** TLM task ids that count as "work" and are skipped in winter. */
+    public static final ForgeConfigSpec.ConfigValue<List<? extends String>> WINTER_SKIP_TASKS;
 
     static {
         ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
@@ -80,6 +87,30 @@ public final class SleepWellConfig {
                 )
                 .defineInRange("campfireFleeRadius", CampfireFleePolicy.DEFAULT_RADIUS,
                         CampfireFleePolicy.MIN_RADIUS, CampfireFleePolicy.MAX_RADIUS);
+        builder.pop();
+
+        builder.comment(
+                "Winter work skip (needs Serene Seasons): a maid parked on the idle task instead of working.",
+                "冬天跳过工作（需要静谧四季）：女仆改挂空闲任务，不去工位。"
+        );
+        builder.push("winterSkip");
+        WINTER_SKIP_DEFAULT_ENABLED = builder
+                .comment(
+                        "Default value of the per-maid \"skip work in winter\" switch for newly met maids.",
+                        "新女仆\"冬天不工作\"开关的默认值。"
+                )
+                .define("winterSkipDefaultEnabled", true);
+        WINTER_SKIP_TASKS = builder
+                .comment(
+                        "TLM task ids treated as work. Bare names also match (farm == touhou_little_maid:farm).",
+                        "算作\"工作\"的车万女仆任务 id，写裸名也行（farm 等同 touhou_little_maid:farm）。",
+                        "Defaults: farm, cocoa, melon, sugar_cane, grass, snow, feed_animal, milk, shears, fishing, torch, honey",
+                        "默认：种地、可可、西瓜、甘蔗、割草、扫雪、繁育动物、挤奶、剪羊毛、钓鱼、放火把、采蜂蜜"
+                )
+                .defineList("winterSkipTasks",
+                        List.of("farm", "cocoa", "melon", "sugar_cane", "grass", "snow",
+                                "feed_animal", "milk", "shears", "fishing", "torch", "honey"),
+                        entry -> entry instanceof String);
         builder.pop();
 
         SPEC = builder.build();

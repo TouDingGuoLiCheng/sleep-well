@@ -1,3 +1,11 @@
 {
-  "modmenu.nameTranslation.sleep_well": "睡个好觉"
+  "modmenu.nameTranslation.sleep_well": "睡个好觉",
+  "gui.sleep_well.tab": "睡个好觉",
+  "gui.sleep_well.title": "睡个好觉",
+  "gui.sleep_well.sleep_fallback": "睡觉寻路修复",
+  "gui.sleep_well.campfire_flee": "篝火伤害避免",
+  "gui.sleep_well.winter_skip": "冬天不工作",
+  "gui.sleep_well.on": "开",
+  "gui.sleep_well.off": "关",
+  "gui.sleep_well.no_serene_seasons": "未安装静谧四季"
 }
