@@ -23,3 +23,5 @@ Thumbs.db
 
 # Local fallback jars (see libs/README.md) — too large to track
 libs/*.jar
+hs_err_pid*.log
+replay_pid*.log
