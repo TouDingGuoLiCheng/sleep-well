@@ -9,5 +9,8 @@
   "gui.sleep_well.winter_skip": "No work in winter",
   "gui.sleep_well.on": "ON",
   "gui.sleep_well.off": "OFF",
-  "gui.sleep_well.no_serene_seasons": "Serene Seasons not installed"
+  "gui.sleep_well.no_serene_seasons": "Serene Seasons not installed",
+  "gui.sleep_well.skip_tasks": "Tasks skipped in winter (global)",
+  "gui.sleep_well.done": "Done",
+  "gui.sleep_well.no_tasks": "No work tasks to pick from"
 }
