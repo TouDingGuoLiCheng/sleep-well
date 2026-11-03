@@ -31,6 +31,26 @@ public final class SleepWellConfig {
     /** TLM task ids that count as "work" and are skipped in winter. */
     public static final ForgeConfigSpec.ConfigValue<List<? extends String>> WINTER_SKIP_TASKS;
 
+    /** Master switch for "sleeps in instead of getting up at the scheduled wake-up". */
+    public static final ForgeConfigSpec.BooleanValue LIE_IN_ENABLED;
+    /** Chance to stay in bed when the schedule says it is time to get up. */
+    public static final ForgeConfigSpec.IntValue LIE_IN_CHANCE_PERCENT;
+    /** Same chance in winter (needs Serene Seasons; without it the plain number is used). */
+    public static final ForgeConfigSpec.IntValue LIE_IN_WINTER_CHANCE_PERCENT;
+    /** Shortest / longest lie-in, in in-game hours. */
+    public static final ForgeConfigSpec.IntValue LIE_IN_MIN_HOURS;
+    public static final ForgeConfigSpec.IntValue LIE_IN_MAX_HOURS;
+
+    /** Master switch for "walks back to bed on her own during the day". */
+    public static final ForgeConfigSpec.BooleanValue NAP_ENABLED;
+    /** Chance per check interval that an awake, idle maid heads back to bed. */
+    public static final ForgeConfigSpec.IntValue NAP_CHANCE_PERCENT;
+    public static final ForgeConfigSpec.IntValue NAP_WINTER_CHANCE_PERCENT;
+    /** Minutes of in-game time between two nap rolls. */
+    public static final ForgeConfigSpec.IntValue NAP_CHECK_MINUTES;
+    public static final ForgeConfigSpec.IntValue NAP_MIN_HOURS;
+    public static final ForgeConfigSpec.IntValue NAP_MAX_HOURS;
+
     static {
         ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
 
@@ -111,6 +131,65 @@ public final class SleepWellConfig {
                         List.of("farm", "cocoa", "melon", "sugar_cane", "grass", "snow",
                                 "feed_animal", "milk", "shears", "fishing", "torch", "honey", "berries_farm"),
                         entry -> entry instanceof String);
+        builder.pop();
+
+        builder.comment(
+                "Sleeping in and daytime naps: a maid stays in bed past her scheduled wake-up,",
+                "and an idle maid now and then walks back to bed on her own.",
+                "赖床与补觉：女仆会在排班起床时继续睡，空闲时也会自己回床补一觉。"
+        );
+        builder.push("lieIn");
+        LIE_IN_ENABLED = builder
+                .comment(
+                        "Whether a maid may stay in bed when her schedule says it is time to get up.",
+                        "At that moment the chance below is rolled once; on a hit she keeps sleeping for a",
+                        "random 2..5 in-game hours. Works for every task, winter is only a boost.",
+                        "排班起床时是否可能继续赖床。",
+                        "那一刻掷一次下面的概率：中了就再睡 2~5 游戏内小时。所有任务都适用，冬天只是提高概率。"
+                )
+                .define("lieInEnabled", true);
+        LIE_IN_CHANCE_PERCENT = builder
+                .comment("Chance to lie in, in percent.", "赖床概率（百分比）。")
+                .defineInRange("lieInChancePercent", 30, 0, 100);
+        LIE_IN_WINTER_CHANCE_PERCENT = builder
+                .comment(
+                        "Lie-in chance in winter. Needs Serene Seasons installed; without it the plain chance is used.",
+                        "冬季赖床概率。需要安装静谧四季；没装就用上面的普通概率。"
+                )
+                .defineInRange("lieInWinterChancePercent", 50, 0, 100);
+        LIE_IN_MIN_HOURS = builder
+                .comment("Shortest lie-in, in in-game hours (1 hour = 1000 ticks).", "最短赖床时长（游戏内小时，1 小时 = 1000 tick）。")
+                .defineInRange("lieInMinHours", 2, 1, 12);
+        LIE_IN_MAX_HOURS = builder
+                .comment("Longest lie-in, in in-game hours.", "最长赖床时长（游戏内小时）。")
+                .defineInRange("lieInMaxHours", 5, 1, 12);
+        NAP_ENABLED = builder
+                .comment(
+                        "Whether an awake maid parked on the idle task may walk back to bed on her own.",
+                        "She rolls every napCheckMinutes while idle; on a hit the rest activity's bed task",
+                        "walks her to the bed and she sleeps for napMinHours..napMaxHours.",
+                        "空闲任务的女仆是否会自己回床补觉。",
+                        "空闲时每 napCheckMinutes 分钟掷一次：中了就交给原版休息行为走回床，睡 napMinHours~napMaxHours 小时。"
+                )
+                .define("napEnabled", true);
+        NAP_CHANCE_PERCENT = builder
+                .comment("Chance per check interval, in percent.", "每次判定的补觉概率（百分比）。")
+                .defineInRange("napChancePercent", 5, 0, 100);
+        NAP_WINTER_CHANCE_PERCENT = builder
+                .comment(
+                        "Nap chance in winter. Needs Serene Seasons installed; without it the plain chance is used.",
+                        "冬季补觉概率。需要安装静谧四季；没装就用普通概率。"
+                )
+                .defineInRange("napWinterChancePercent", 10, 0, 100);
+        NAP_CHECK_MINUTES = builder
+                .comment("Minutes of in-game time between two nap rolls.", "两次补觉判定之间隔多少游戏内分钟。")
+                .defineInRange("napCheckMinutes", 30, 5, 120);
+        NAP_MIN_HOURS = builder
+                .comment("Shortest nap, in in-game hours.", "最短补觉时长（游戏内小时）。")
+                .defineInRange("napMinHours", 1, 1, 12);
+        NAP_MAX_HOURS = builder
+                .comment("Longest nap, in in-game hours.", "最长补觉时长（游戏内小时）。")
+                .defineInRange("napMaxHours", 3, 1, 12);
         builder.pop();
 
         SPEC = builder.build();

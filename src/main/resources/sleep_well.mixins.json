@@ -5,6 +5,7 @@
   "compatibilityLevel": "JAVA_17",
   "refmap": "sleep_well.refmap.json",
   "mixins": [
+    "EntityMaidScheduleMixin",
     "SchedulePosMixin"
   ],
   "injectors": {
