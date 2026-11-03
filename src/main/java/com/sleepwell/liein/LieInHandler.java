@@ -166,7 +166,10 @@ public final class LieInHandler {
             }
             int chance = LieInPolicy.chancePercent(winter,
                     SleepWellConfig.NAP_CHANCE_PERCENT.get(), SleepWellConfig.NAP_WINTER_CHANCE_PERCENT.get());
-            if (LieInPolicy.roll(chance, maid.getRandom().nextInt(100))) {
+            int napRoll = maid.getRandom().nextInt(100);
+            boolean napHit = LieInPolicy.roll(chance, napRoll);
+            LOGGER.info("Nap roll: maid={} winter={} chance={}% roll={} hit={}", id, winter, chance, napRoll, napHit);
+            if (napHit) {
                 long ticks = LieInPolicy.durationTicks(SleepWellConfig.NAP_MIN_HOURS.get(),
                         SleepWellConfig.NAP_MAX_HOURS.get(), maid.getRandom().nextInt(1000));
                 state.begin(LieInState.Kind.NAP, now, ticks, taskUid, configuredArea);

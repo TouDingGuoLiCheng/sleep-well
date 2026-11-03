@@ -69,6 +69,8 @@ public final class LieInState {
         taskUid = "";
         configuredSleepArea = false;
         originalSchedule = null;
+        // Restart the nap timer: a state that just ended must not instantly roll again on the next tick.
+        nextNapCheck = 0L;
     }
 
     public boolean rolledToday(long day) {
