@@ -12,5 +12,6 @@
   "gui.sleep_well.no_serene_seasons": "未安装静谧四季",
   "gui.sleep_well.skip_tasks": "跳过哪些工作（全局）",
   "gui.sleep_well.done": "完成",
-  "gui.sleep_well.no_tasks": "没有可以勾选的工作任务"
+  "gui.sleep_well.no_tasks": "没有可以勾选的工作任务",
+  "gui.sleep_well.skip_count": "已选 %s / 共 %s"
 }

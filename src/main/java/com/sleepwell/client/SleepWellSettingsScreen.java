@@ -1,7 +1,6 @@
 package com.sleepwell.client;
 
 import com.github.tartaricacid.touhoulittlemaid.client.gui.entity.maid.AbstractMaidContainerGui;
-import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.sleepwell.SleepWellMod;
 import com.sleepwell.config.SleepWellConfig;
 import com.sleepwell.gui.SleepWellContainer;
@@ -22,7 +21,7 @@ import java.util.List;
 /**
  * The Sleep Well page inside the maid GUI: three switches, two global and one per maid.
  * <p>
- * The winter switch carries a gear on its right edge; the gear opens the scrolling task list, because
+ * The winter switch carries a gear on its right edge; the gear opens a full window checkbox list, because
  * "which tasks count as work" is a config list the page had no way to edit before.
  */
 public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellContainer> {
@@ -39,10 +38,6 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
     /** Width carved out of the winter row for the gear. */
     private static final int GEAR_W = 20;
     private static final int GEAR_GAP = 2;
-    private static final int PICKER_X = 92;
-    private static final int PICKER_Y = 40;
-    private static final int PICKER_W = 152;
-    private static final int PICKER_H = 124;
     /** Deep warm brown, because the sunny backdrop is far too bright for white text. */
     private static final int TITLE_COLOR = 0x4A3324;
     /** PixelLab art: a cosy sunlit bed, used as the page backdrop behind the translucent switches. */
@@ -52,7 +47,6 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
     private final boolean[] state = new boolean[3];
     private final List<Button> toggles = new ArrayList<>();
     private Button gear;
-    private Button done;
     private WinterSkipPicker picker;
 
     public SleepWellSettingsScreen(SleepWellContainer container, Inventory inventory, Component title) {
@@ -72,17 +66,11 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
             winter.setMessage(Component.translatable("gui.sleep_well.no_serene_seasons"));
         }
 
-        this.picker = new WinterSkipPicker(SleepWellConfig.WINTER_SKIP_TASKS.get(), maidOf(this.menu.entityId()),
-                this::saveSkipTasks);
+        this.picker = new WinterSkipPicker(this.notHiddenTasks, SleepWellConfig.WINTER_SKIP_TASKS.get(),
+                this::closePicker, this::saveSkipTasks);
         this.gear = this.addRenderableWidget(new GearButton(this.leftPos + ROW_X + ROW_W - GEAR_W,
                 this.topPos + FIRST_ROW_Y + ROW_STEP * 2, GEAR_W, ROW_H, b -> openPicker()));
         this.gear.active = this.menu.sereneSeasons();
-        this.done = this.addRenderableWidget(Button.builder(Component.translatable("gui.sleep_well.done"),
-                        b -> closePicker())
-                .bounds(this.leftPos + PICKER_X + (PICKER_W - 56) / 2,
-                        this.topPos + PICKER_Y + PICKER_H - 20, 56, 16)
-                .build());
-        this.done.visible = false;
     }
 
     private Button addToggle(int key, boolean initial, String labelKey, int y, int width) {
@@ -96,12 +84,6 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
         });
         this.toggles.add(button);
         return this.addRenderableWidget(button);
-    }
-
-    /** The maid herself, so the list matches her own task button and skips hidden compat tasks. */
-    private static EntityMaid maidOf(int entityId) {
-        var level = Minecraft.getInstance().level;
-        return level != null && level.getEntity(entityId) instanceof EntityMaid maid ? maid : null;
     }
 
     private static Component label(String labelKey, boolean on) {
@@ -123,7 +105,6 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
         this.picker.setOpen(true);
         this.toggles.forEach(button -> button.visible = false);
         this.gear.visible = false;
-        this.done.visible = true;
     }
 
     private void closePicker() {
@@ -133,29 +114,29 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
         this.picker.setOpen(false);
         this.toggles.forEach(button -> button.visible = true);
         this.gear.visible = true;
-        this.done.visible = false;
     }
 
     private boolean pickerOpen() {
         return this.picker != null && this.picker.isOpen();
     }
 
+    /**
+     * While the overlay is up it owns the mouse: clicks never reach the page or the maid inventory, which is
+     * what kept the boxes from ever being ticked before.
+     */
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (!pickerOpen()) {
-            return super.mouseClicked(mouseX, mouseY, button);
-        }
-        if (super.mouseClicked(mouseX, mouseY, button)) {
+        if (pickerOpen()) {
+            this.picker.mouseClicked(mouseX, mouseY, button);
             return true;
         }
-        // The overlay is modal: everything it does not need is swallowed so the page behind stays put.
-        this.picker.mouseClicked(mouseX, mouseY, button);
-        return true;
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
-        if (pickerOpen() && this.picker.mouseScrolled(delta)) {
+        if (pickerOpen()) {
+            this.picker.mouseScrolled(delta);
             return true;
         }
         return super.mouseScrolled(mouseX, mouseY, delta);
@@ -179,6 +160,15 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
     }
 
     @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (pickerOpen() && keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
+            closePicker();
+            return true;
+        }
+        return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+
+    @Override
     protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
         super.renderBg(graphics, partialTick, mouseX, mouseY);
         graphics.blit(BACKGROUND, this.leftPos + PANEL_X, this.topPos + PANEL_Y,
@@ -189,8 +179,9 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         super.render(graphics, mouseX, mouseY, partialTick);
         if (pickerOpen()) {
-            this.picker.render(graphics, this.font,
-                    this.leftPos + PICKER_X, this.topPos + PICKER_Y, PICKER_W, PICKER_H, mouseX, mouseY);
+            // Covers the whole maid window, so the page's own black margins are hidden behind it too.
+            this.picker.render(graphics, this.font, this.leftPos, this.topPos,
+                    this.imageWidth, this.imageHeight, mouseX, mouseY);
         }
     }
 

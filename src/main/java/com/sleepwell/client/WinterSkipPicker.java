@@ -1,13 +1,14 @@
 package com.sleepwell.client;
 
 import com.github.tartaricacid.touhoulittlemaid.api.task.IMaidTask;
-import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.tartaricacid.touhoulittlemaid.entity.task.TaskManager;
 import com.sleepwell.winter.SkipTaskSelection;
+import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
+import net.minecraft.world.item.ItemStack;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -20,41 +21,45 @@ import java.util.Set;
 import java.util.function.Consumer;
 
 /**
- * The gear overlay on the winter row: a scrolling checkbox list of every work task in the game.
+ * The gear overlay: a two column, icon bearing checkbox list of every work task the maid can be put on.
  * <p>
- * It is not a widget on purpose. It draws on top of the page, swallows clicks while open, and reports the
- * new list through {@code onChange} so the page can write it to the config right away (same behaviour as
- * the switches above it: no save button).
+ * It is not a widget on purpose. It covers the whole maid window, draws last, and swallows every click while
+ * open: the page's own switches and the maid inventory are sheltered behind it.
  */
 final class WinterSkipPicker {
-    private static final int ROW_H = 12;
+    private static final int ROW_H = 17;
     private static final int TITLE_H = 14;
-    private static final int FOOTER_H = 24;
-    private static final int SCROLL_W = 5;
+    private static final int FOOTER_H = 22;
+    private static final int PAD = 5;
+    private static final int COL_GAP = 4;
+    private static final int SCROLL_W = 4;
+    private static final int CLOSE_W = 48;
+    private static final int CLOSE_H = 14;
     private static final int TEXT = 0xF2EEE4;
     private static final int TEXT_DIM = 0xC9C4B8;
-    private static final int HOVER = 0x33FFFFFF;
+    private static final int HOVER = 0x3AFFFFFF;
     private static final int BOX_LINE = 0xCCF2EEE4;
     private static final int BOX_ON = 0xFF9BE37A;
 
     private final List<Row> rows = new ArrayList<>();
     private final Set<String> selected = new LinkedHashSet<>();
     private final Consumer<List<String>> onChange;
-    private final EntityMaid maid;
+    private final Runnable onClose;
 
     private boolean open;
     private int scroll;
     private boolean draggingThumb;
-    // Hit boxes measured by the last render, so clicks and wheel use the same geometry.
+    // Geometry of the last render, so clicks and the wheel hit the same boxes.
     private int boxX;
     private int boxY;
     private int boxW;
     private int boxH;
 
-    WinterSkipPicker(Collection<? extends String> configured, EntityMaid maid, Consumer<List<String>> onChange) {
+    WinterSkipPicker(List<IMaidTask> tasks, Collection<? extends String> configured,
+                     Runnable onClose, Consumer<List<String>> onChange) {
         this.onChange = onChange;
-        this.maid = maid;
-        rebuild(configured);
+        this.onClose = onClose;
+        rebuild(tasks, configured);
     }
 
     boolean isOpen() {
@@ -69,38 +74,63 @@ final class WinterSkipPicker {
         }
     }
 
-    /** Tasks come from the registry, so addon tasks (Maidsoul Kitchen and friends) show up too. */
-    private void rebuild(Collection<? extends String> configured) {
+    /**
+     * Tasks come from the page, which already asked TLM for the ones this maid can actually see, so addon
+     * tasks (Maidsoul Kitchen and friends) are in the list and hidden compat tasks are not.
+     */
+    private void rebuild(List<IMaidTask> tasks, Collection<? extends String> configured) {
         selected.clear();
         for (String entry : SkipTaskSelection.normalize(configured)) {
             selected.add(SkipTaskSelection.bare(entry));
         }
-        Map<String, Component> found = new LinkedHashMap<>();
+        Map<String, Row> found = new LinkedHashMap<>();
         String idle = TaskManager.getIdleTask().getUid().toString();
-        // Same list the maid's own task button shows, so hidden compat tasks stay out of the way.
-        List<IMaidTask> tasks = maid != null ? TaskManager.getNotHiddenTaskList(maid) : TaskManager.getTaskIndex();
         for (IMaidTask task : tasks) {
             String uid = task.getUid().toString();
             if (uid.equals(idle)) {
                 continue;
             }
-            found.putIfAbsent(SkipTaskSelection.bare(uid), task.getName());
+            found.putIfAbsent(SkipTaskSelection.bare(uid), new Row(SkipTaskSelection.bare(uid), task.getName(), task.getIcon()));
         }
         // Ids already in the config that the registry does not know stay listed, so they can be removed.
         for (String bare : selected) {
-            found.putIfAbsent(bare, Component.literal(bare));
+            found.putIfAbsent(bare, new Row(bare, Component.literal(bare), ItemStack.EMPTY));
         }
         rows.clear();
-        found.forEach((bare, name) -> rows.add(new Row(bare, name)));
-        rows.sort(Comparator.comparing(row -> row.name.getString()));
+        rows.addAll(found.values());
+        rows.sort(Comparator.comparing(row -> row.name().getString()));
+    }
+
+    private int colWidth() {
+        return (boxW - 2 * PAD - SCROLL_W - COL_GAP) / 2;
     }
 
     private int visibleRows() {
         return Math.max(1, (boxH - TITLE_H - FOOTER_H) / ROW_H);
     }
 
+    private int totalRows() {
+        return (rows.size() + 1) / 2;
+    }
+
     private int maxScroll() {
-        return Math.max(0, rows.size() - visibleRows());
+        return Math.max(0, totalRows() - visibleRows());
+    }
+
+    private int rowsTop() {
+        return boxY + TITLE_H;
+    }
+
+    private int rowsHeight() {
+        return boxH - TITLE_H - FOOTER_H;
+    }
+
+    private int closeX() {
+        return boxX + boxW - PAD - CLOSE_W;
+    }
+
+    private int closeY() {
+        return boxY + boxH - FOOTER_H + 4;
     }
 
     void render(GuiGraphics graphics, Font font, int x, int y, int w, int h, int mouseX, int mouseY) {
@@ -110,72 +140,105 @@ final class WinterSkipPicker {
         boxH = h;
         scroll = Mth.clamp(scroll, 0, maxScroll());
 
-        graphics.fill(x, y, x + w, y + h, 0xE6141A2B);
-        graphics.renderOutline(x, y, w, h, 0x77FFFFFF);
-        graphics.drawString(font, Component.translatable("gui.sleep_well.skip_tasks"), x + 5, y + 3, TEXT, false);
+        graphics.fill(x, y, x + w, y + h, 0xF0141A2B);
+        graphics.renderOutline(x, y, w, h, 0x99FFFFFF);
 
-        int rowsTop = y + TITLE_H;
-        int rowsHeight = h - TITLE_H - FOOTER_H;
-        int labelWidth = w - SCROLL_W - 20;
+        Component title = Component.translatable("gui.sleep_well.skip_tasks");
+        graphics.drawString(font, title, x + PAD, y + 3, TEXT, false);
+        Component count = Component.translatable("gui.sleep_well.skip_count", selected.size(), rows.size());
+        int countWidth = font.width(count);
+        graphics.drawString(font, count, x + w - PAD - countWidth, y + 3, TEXT_DIM, false);
+        graphics.fill(x + PAD, y + TITLE_H - 2, x + w - PAD, y + TITLE_H - 1, 0x55FFFFFF);
+
+        int labelWidth = colWidth() - 32;
         int visible = visibleRows();
-        if (rows.isEmpty()) {
-            graphics.drawString(font, Component.translatable("gui.sleep_well.no_tasks"),
-                    x + 5, rowsTop + 2, TEXT_DIM, false);
+        for (int r = 0; r < visible; r++) {
+            int rowIndex = scroll + r;
+            for (int column = 0; column < 2; column++) {
+                int index = rowIndex * 2 + column;
+                if (index >= rows.size()) {
+                    break;
+                }
+                Row row = rows.get(index);
+                int cellX = x + PAD + column * (colWidth() + COL_GAP);
+                int cellY = rowsTop() + r * ROW_H;
+                boolean hovered = mouseX >= cellX && mouseX < cellX + colWidth()
+                        && mouseY >= cellY && mouseY < cellY + ROW_H;
+                if (hovered) {
+                    graphics.fill(cellX, cellY, cellX + colWidth(), cellY + ROW_H - 1, HOVER);
+                }
+                boolean on = selected.contains(row.bare());
+                int boxTop = cellY + 4;
+                graphics.fill(cellX + 1, boxTop, cellX + 9, boxTop + 8, 0x66000000);
+                graphics.renderOutline(cellX + 1, boxTop, 8, 8, BOX_LINE);
+                if (on) {
+                    graphics.fill(cellX + 3, boxTop + 2, cellX + 7, boxTop + 6, BOX_ON);
+                }
+                if (!row.icon().isEmpty()) {
+                    graphics.renderItem(row.icon(), cellX + 12, cellY);
+                }
+                String full = row.name().getString();
+                String label = font.plainSubstrByWidth(full, Math.max(8, labelWidth));
+                if (label.length() < full.length() && labelWidth > 12) {
+                    label = font.plainSubstrByWidth(full, labelWidth - 6) + "…";
+                }
+                graphics.drawString(font, label, cellX + 31, cellY + 4, on ? TEXT : TEXT_DIM, false);
+            }
         }
-        for (int i = 0; i < visible; i++) {
-            int index = scroll + i;
-            if (index >= rows.size()) {
-                break;
-            }
-            Row row = rows.get(index);
-            int rowY = rowsTop + i * ROW_H;
-            boolean hovered = mouseX >= x + 4 && mouseX < x + w - SCROLL_W - 4
-                    && mouseY >= rowY && mouseY < rowY + ROW_H;
-            if (hovered) {
-                graphics.fill(x + 4, rowY, x + w - SCROLL_W - 4, rowY + ROW_H, HOVER);
-            }
-            boolean on = selected.contains(row.bare());
-            int boxTop = rowY + 2;
-            graphics.fill(x + 5, boxTop, x + 13, boxTop + 8, 0x55000000);
-            graphics.renderOutline(x + 5, boxTop, 8, 8, BOX_LINE);
-            if (on) {
-                graphics.fill(x + 7, boxTop + 2, x + 11, boxTop + 6, BOX_ON);
-            }
-            String label = font.plainSubstrByWidth(row.name().getString(), labelWidth);
-            graphics.drawString(font, label, x + 17, rowY + 2, on ? TEXT : TEXT_DIM, false);
+
+        if (rows.size() > visible * 2) {
+            int trackX = x + w - PAD - SCROLL_W + 1;
+            int trackTop = rowsTop();
+            int trackHeight = rowsHeight();
+            graphics.fill(trackX, trackTop, trackX + 2, trackTop + trackHeight, 0x66141A2B);
+            int thumbH = Math.max(10, trackHeight * visible / Math.max(1, totalRows()));
+            int thumbY = trackTop + (trackHeight - thumbH) * scroll / Math.max(1, maxScroll());
+            graphics.fill(trackX, thumbY, trackX + 2, thumbY + thumbH, 0xD8F2EEE4);
         }
-        if (rows.size() > visible) {
-            int trackX = x + w - SCROLL_W - 2;
-            graphics.fill(trackX, rowsTop, trackX + 3, rowsTop + rowsHeight, 0x66141A2B);
-            int thumbH = Math.max(10, rowsHeight * visible / rows.size());
-            int thumbY = rowsTop + (rowsHeight - thumbH) * scroll / Math.max(1, maxScroll());
-            graphics.fill(trackX, thumbY, trackX + 3, thumbY + thumbH, 0xD8F2EEE4);
+
+        boolean closeHovered = mouseX >= closeX() && mouseX < closeX() + CLOSE_W
+                && mouseY >= closeY() && mouseY < closeY() + CLOSE_H;
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+        graphics.fill(closeX(), closeY(), closeX() + CLOSE_W, closeY() + CLOSE_H,
+                closeHovered ? 0x8C4A6B9E : 0x6633405E);
+        graphics.renderOutline(closeX(), closeY(), CLOSE_W, CLOSE_H, closeHovered ? 0xD8FFFFFF : 0x77FFFFFF);
+        graphics.drawCenteredString(font, Component.translatable("gui.sleep_well.done"),
+                closeX() + CLOSE_W / 2, closeY() + 3, TEXT);
+        RenderSystem.disableBlend();
+    }
+
+    /** Modal: whatever lands here is consumed, so nothing behind the overlay reacts. */
+    void mouseClicked(double mouseX, double mouseY, int button) {
+        if (!open || button != 0) {
+            return;
+        }
+        if (mouseX >= closeX() && mouseX < closeX() + CLOSE_W
+                && mouseY >= closeY() && mouseY < closeY() + CLOSE_H) {
+            onClose.run();
+            return;
+        }
+        if (mouseX >= boxX + boxW - PAD - SCROLL_W && mouseY >= rowsTop() && mouseY < rowsTop() + rowsHeight()) {
+            draggingThumb = true;
+            scrollToMouse(mouseY);
+            return;
+        }
+        if (mouseY >= rowsTop() && mouseY < rowsTop() + rowsHeight()
+                && mouseX >= boxX + PAD && mouseX < boxX + boxW - PAD - SCROLL_W) {
+            int rowIndex = scroll + (int) ((mouseY - rowsTop()) / ROW_H);
+            int column = (int) ((mouseX - boxX - PAD) / (colWidth() + COL_GAP));
+            if (column >= 0 && column < 2) {
+                int index = rowIndex * 2 + column;
+                if (index >= 0 && index < rows.size() && withinColumn(mouseX, column)) {
+                    toggle(rows.get(index).bare());
+                }
+            }
         }
     }
 
-    /** True when the click landed on the overlay; the page stops passing it on in that case. */
-    boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (!open || button != 0) {
-            return false;
-        }
-        if (mouseX < boxX || mouseX >= boxX + boxW || mouseY < boxY || mouseY >= boxY + boxH) {
-            return false;
-        }
-        int rowsTop = boxY + TITLE_H;
-        int rowsHeight = boxH - TITLE_H - FOOTER_H;
-        if (mouseX >= boxX + boxW - SCROLL_W - 4 && mouseY >= rowsTop && mouseY < rowsTop + rowsHeight) {
-            draggingThumb = true;
-            scrollToMouse(mouseY);
-            return true;
-        }
-        if (mouseY >= rowsTop && mouseY < rowsTop + rowsHeight) {
-            int index = scroll + (int) ((mouseY - rowsTop) / ROW_H);
-            if (index >= 0 && index < rows.size()) {
-                toggle(rows.get(index).bare());
-            }
-            return true;
-        }
-        return true;
+    private boolean withinColumn(double mouseX, int column) {
+        int cellX = boxX + PAD + column * (colWidth() + COL_GAP);
+        return mouseX >= cellX && mouseX < cellX + colWidth();
     }
 
     void mouseDragged(double mouseY) {
@@ -197,10 +260,9 @@ final class WinterSkipPicker {
     }
 
     private void scrollToMouse(double mouseY) {
-        int rowsTop = boxY + TITLE_H;
-        int rowsHeight = boxH - TITLE_H - FOOTER_H;
-        int thumbH = Math.max(10, rowsHeight * visibleRows() / Math.max(1, rows.size()));
-        double ratio = Mth.clamp((mouseY - rowsTop - thumbH / 2.0) / Math.max(1, rowsHeight - thumbH), 0, 1);
+        int trackHeight = rowsHeight();
+        int thumbH = Math.max(10, trackHeight * visibleRows() / Math.max(1, totalRows()));
+        double ratio = Mth.clamp((mouseY - rowsTop() - thumbH / 2.0) / Math.max(1, trackHeight - thumbH), 0, 1);
         scroll = (int) Math.round(ratio * maxScroll());
     }
 
@@ -211,6 +273,6 @@ final class WinterSkipPicker {
         onChange.accept(SkipTaskSelection.normalize(selected));
     }
 
-    private record Row(String bare, Component name) {
+    private record Row(String bare, Component name, ItemStack icon) {
     }
 }
