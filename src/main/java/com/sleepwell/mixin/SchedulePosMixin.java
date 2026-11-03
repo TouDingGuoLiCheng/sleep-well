@@ -3,6 +3,7 @@ package com.sleepwell.mixin;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.tartaricacid.touhoulittlemaid.config.subconfig.MaidConfig;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.SchedulePos;
+import com.sleepwell.liein.LieInHandler;
 import com.sleepwell.winter.WinterSkipHandler;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.schedule.Activity;
@@ -34,5 +35,17 @@ public abstract class SchedulePosMixin {
             maid.restrictTo(rest, MaidConfig.MAID_IDLE_RANGE.get());
         }
         ci.cancel();
+    }
+
+    /**
+     * A napping maid is walking back to a bed she can see. The schedule's own teleport (work point, idle
+     * spot, sleep point) would yank her away mid-walk, which is exactly the "tug of war" a nap used to turn
+     * into, so the whole tick is skipped while a nap runs.
+     */
+    @Inject(method = "tick", at = @At("HEAD"), cancellable = true, remap = false)
+    private void sleepwell$noChaseWhileNapping(EntityMaid maid, CallbackInfo ci) {
+        if (LieInHandler.isNapping(maid)) {
+            ci.cancel();
+        }
     }
 }

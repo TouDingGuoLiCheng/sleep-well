@@ -5,6 +5,7 @@ import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.tartaricacid.touhoulittlemaid.entity.task.TaskManager;
 import com.sleepwell.SleepWellMod;
 import com.sleepwell.config.SleepWellConfig;
+import com.sleepwell.maid.MaidCapabilities;
 import com.sleepwell.winter.SeasonBridge;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.player.Player;
@@ -29,6 +30,10 @@ import java.util.concurrent.ConcurrentHashMap;
  * {@code MaidUpdateActivityFromSchedule} then keeps her brain on the rest activity, so
  * {@code MaidClearSleepTask} (which wakes her once {@code Activity.WORK} is active) never fires and
  * {@code MaidBedTask} walks her back to bed all by itself.
+ * <p>
+ * Naps only ever start when a free maid bed is already within {@link MaidBedFinder#RADIUS} blocks, so
+ * she never gets dragged to a "sleep spot" that has nothing to lie down on; while a nap is running the
+ * schedule teleports are suppressed as well, so she is not thrown around mid-walk.
  */
 @Mod.EventBusSubscriber(modid = SleepWellMod.MOD_ID)
 public final class LieInHandler {
@@ -50,6 +55,15 @@ public final class LieInHandler {
         return state != null && state.active();
     }
 
+    /** True only while she is walking back to bed on her own; schedule teleports stay out of the way. */
+    public static boolean isNapping(EntityMaid maid) {
+        if (maid == null || maid.level().isClientSide()) {
+            return false;
+        }
+        LieInState state = STATES.get(maid.getUUID());
+        return state != null && state.kind() == LieInState.Kind.NAP;
+    }
+
     @SubscribeEvent
     public static void onLivingTick(LivingEvent.LivingTickEvent event) {
         if (event.getEntity().level().isClientSide() || !(event.getEntity() instanceof EntityMaid maid)
@@ -58,6 +72,11 @@ public final class LieInHandler {
         }
         UUID id = maid.getUUID();
         if (maid.isRemoved() || !maid.isAlive()) {
+            STATES.remove(id);
+            return;
+        }
+        // Her own switch first: "allowed" is the default, the page can turn it off per maid.
+        if (!MaidCapabilities.of(maid).lieIn()) {
             STATES.remove(id);
             return;
         }
@@ -70,7 +89,9 @@ public final class LieInHandler {
         LieInState state = STATES.computeIfAbsent(id, key -> new LieInState());
         String idleUid = idleTaskUid();
         String taskUid = taskUid(maid);
-        boolean resting = maid.getScheduleDetail() == Activity.REST;
+        Activity activity = maid.getScheduleDetail();
+        boolean resting = activity == Activity.REST;
+        boolean workDue = activity == Activity.WORK;
 
         if (state.active()) {
             keepOrEnd(maid, state, now, taskUid);
@@ -84,7 +105,8 @@ public final class LieInHandler {
         long day = level.getDayTime() / DAY_LENGTH;
         boolean winter = SeasonBridge.isWinter(level);
 
-        if (lieInEnabled() && LieInPolicy.needsWakeRoll(false, state.rolledToday(day), maid.isSleeping(), resting)) {
+        // "Rest time is not lie-in time": only the schedule moving her to WORK counts as a wake-up.
+        if (lieInEnabled() && LieInPolicy.needsWakeRoll(false, state.rolledToday(day), maid.isSleeping(), workDue)) {
             state.markRolled(day);
             int chance = LieInPolicy.chancePercent(winter,
                     SleepWellConfig.LIE_IN_CHANCE_PERCENT.get(), SleepWellConfig.LIE_IN_WINTER_CHANCE_PERCENT.get());
@@ -103,17 +125,23 @@ public final class LieInHandler {
                 state.setNextNapCheck(now + LieInPolicy.napCheckIntervalTicks(SleepWellConfig.NAP_CHECK_MINUTES.get()));
                 return;
             }
-            boolean due = LieInPolicy.napDue(true, false, true, false, false, now, state.nextNapCheck());
-            if (!due) {
+            if (!LieInPolicy.napDue(true, false, true, false, false, now, state.nextNapCheck())) {
                 return;
             }
             state.setNextNapCheck(now + LieInPolicy.napCheckIntervalTicks(SleepWellConfig.NAP_CHECK_MINUTES.get()));
+            // No bed in reach: skip the roll entirely. Reporting REST without one only makes her stand
+            // around at the sleep spot while the schedule shoves her back and forth.
+            if (MaidBedFinder.find(maid).isEmpty()) {
+                return;
+            }
             int chance = LieInPolicy.chancePercent(winter,
                     SleepWellConfig.NAP_CHANCE_PERCENT.get(), SleepWellConfig.NAP_WINTER_CHANCE_PERCENT.get());
             if (LieInPolicy.roll(chance, maid.getRandom().nextInt(100))) {
                 long ticks = LieInPolicy.durationTicks(SleepWellConfig.NAP_MIN_HOURS.get(),
                         SleepWellConfig.NAP_MAX_HOURS.get(), maid.getRandom().nextInt(1000));
                 state.begin(LieInState.Kind.NAP, now, ticks, taskUid);
+                // A nap that ends after dawn must not chain straight into a lie-in.
+                state.markRolled(day);
                 LOGGER.debug("Nap: maid {} heads back to bed for {} ticks", id, ticks);
             }
         }

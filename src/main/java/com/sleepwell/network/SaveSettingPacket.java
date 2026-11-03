@@ -13,13 +13,14 @@ import java.util.function.Supplier;
  * One switch changed on the page.
  * <p>
  * {@code key 0} and {@code key 1} are the two global switches: they live in the common config, so the page
- * writes the config value and saves the file. {@code key 2} is the per-maid winter switch and goes into her
- * capability.
+ * writes the config value and saves the file. {@code key 2} (winter skip) and {@code key 3} (lie-in / naps)
+ * are per-maid switches and go into her capability.
  */
 public final class SaveSettingPacket {
     public static final byte KEY_SLEEP_FALLBACK = 0;
     public static final byte KEY_CAMPFIRE_FLEE = 1;
     public static final byte KEY_WINTER_SKIP = 2;
+    public static final byte KEY_LIE_IN = 3;
 
     private final int entityId;
     private final byte key;
@@ -64,6 +65,7 @@ public final class SaveSettingPacket {
                     SleepWellConfig.SPEC.save();
                 }
                 case KEY_WINTER_SKIP -> MaidCapabilities.of(maid).setWinterSkip(packet.value);
+                case KEY_LIE_IN -> MaidCapabilities.of(maid).setLieIn(packet.value);
                 default -> {
                 }
             }

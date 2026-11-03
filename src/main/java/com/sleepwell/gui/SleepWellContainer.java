@@ -26,15 +26,18 @@ public class SleepWellContainer extends AbstractMaidContainer {
     private final boolean sleepFallback;
     private final boolean campfireFlee;
     private final boolean winterSkip;
+    private final boolean lieIn;
     private final boolean sereneSeasons;
 
     public SleepWellContainer(int id, Inventory inventory, int entityId,
-                              boolean sleepFallback, boolean campfireFlee, boolean winterSkip, boolean sereneSeasons) {
+                              boolean sleepFallback, boolean campfireFlee, boolean winterSkip,
+                              boolean lieIn, boolean sereneSeasons) {
         super(TYPE.get(), id, inventory, entityId);
         this.entityId = entityId;
         this.sleepFallback = sleepFallback;
         this.campfireFlee = campfireFlee;
         this.winterSkip = winterSkip;
+        this.lieIn = lieIn;
         this.sereneSeasons = sereneSeasons;
     }
 
@@ -54,6 +57,10 @@ public class SleepWellContainer extends AbstractMaidContainer {
         return winterSkip;
     }
 
+    public boolean lieIn() {
+        return lieIn;
+    }
+
     public boolean sereneSeasons() {
         return sereneSeasons;
     }
@@ -65,22 +72,23 @@ public class SleepWellContainer extends AbstractMaidContainer {
     }
 
     public static void writeData(FriendlyByteBuf buf, int entityId, boolean sleepFallback,
-                                 boolean campfireFlee, boolean winterSkip, boolean sereneSeasons) {
+                                 boolean campfireFlee, boolean winterSkip, boolean lieIn, boolean sereneSeasons) {
         buf.writeVarInt(entityId);
         buf.writeBoolean(sleepFallback);
         buf.writeBoolean(campfireFlee);
         buf.writeBoolean(winterSkip);
+        buf.writeBoolean(lieIn);
         buf.writeBoolean(sereneSeasons);
     }
 
     private static SleepWellContainer fromNetwork(int windowId, Inventory inventory, FriendlyByteBuf buf) {
         int entityId = buf.readVarInt();
         return new SleepWellContainer(windowId, inventory, entityId,
-                buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean());
+                buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean());
     }
 
     public static MenuProvider create(int entityId, boolean sleepFallback, boolean campfireFlee,
-                                      boolean winterSkip, boolean sereneSeasons) {
+                                      boolean winterSkip, boolean lieIn, boolean sereneSeasons) {
         return new MenuProvider() {
             @Override
             public Component getDisplayName() {
@@ -90,7 +98,7 @@ public class SleepWellContainer extends AbstractMaidContainer {
             @Override
             public SleepWellContainer createMenu(int id, Inventory inventory, Player player) {
                 return new SleepWellContainer(id, inventory, entityId,
-                        sleepFallback, campfireFlee, winterSkip, sereneSeasons);
+                        sleepFallback, campfireFlee, winterSkip, lieIn, sereneSeasons);
             }
         };
     }

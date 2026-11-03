@@ -71,12 +71,13 @@ class LieInPolicyTest {
     }
 
     @Test
-    void wakeRollHappensOncePerDayWhileSleepingOffRest() {
-        assertTrue(LieInPolicy.needsWakeRoll(false, false, true, false));
-        assertFalse(LieInPolicy.needsWakeRoll(true, false, true, false));
-        assertFalse(LieInPolicy.needsWakeRoll(false, true, true, false));
-        assertFalse(LieInPolicy.needsWakeRoll(false, false, false, false));
-        assertFalse(LieInPolicy.needsWakeRoll(false, false, true, true));
+    void wakeRollNeedsTheScheduleSendingHerToWork() {
+        assertTrue(LieInPolicy.needsWakeRoll(false, false, true, true));
+        assertFalse(LieInPolicy.needsWakeRoll(true, false, true, true));
+        assertFalse(LieInPolicy.needsWakeRoll(false, true, true, true));
+        assertFalse(LieInPolicy.needsWakeRoll(false, false, false, true));
+        // rest or idle time is not a wake-up: no lie-in roll there
+        assertFalse(LieInPolicy.needsWakeRoll(false, false, true, false));
     }
 
     @Test

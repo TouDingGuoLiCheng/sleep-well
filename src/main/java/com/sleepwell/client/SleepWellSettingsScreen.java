@@ -19,7 +19,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The Sleep Well page inside the maid GUI: three switches, two global and one per maid.
+ * The Sleep Well page inside the maid GUI: four switches — two global (path fix, campfire flee) and two
+ * per maid (no work in winter, lie-in / naps).
  * <p>
  * The winter switch carries a gear on its right edge; the gear opens a full window checkbox list, because
  * "which tasks count as work" is a config list the page had no way to edit before.
@@ -44,7 +45,7 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
     private static final ResourceLocation BACKGROUND =
             new ResourceLocation(SleepWellMod.MOD_ID, "textures/gui/sleep_well_bg.png");
 
-    private final boolean[] state = new boolean[3];
+    private final boolean[] state = new boolean[4];
     private final List<Button> toggles = new ArrayList<>();
     private Button gear;
     private WinterSkipPicker picker;
@@ -65,6 +66,7 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
             winter.active = false;
             winter.setMessage(Component.translatable("gui.sleep_well.no_serene_seasons"));
         }
+        addToggle(3, this.menu.lieIn(), "gui.sleep_well.lie_in", FIRST_ROW_Y + ROW_STEP * 3, ROW_W);
 
         this.picker = new WinterSkipPicker(this.notHiddenTasks, SleepWellConfig.WINTER_SKIP_TASKS.get(),
                 this::closePicker, this::saveSkipTasks);

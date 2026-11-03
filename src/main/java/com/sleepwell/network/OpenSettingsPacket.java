@@ -43,10 +43,11 @@ public final class OpenSettingsPacket {
         boolean sleepFallback = SleepWellConfig.SLEEP_FALLBACK_ENABLED.get();
         boolean campfireFlee = SleepWellConfig.CAMPFIRE_FLEE_ENABLED.get();
         boolean winterSkip = MaidCapabilities.of(maid).winterSkip();
+        boolean lieIn = MaidCapabilities.of(maid).lieIn();
         boolean sereneSeasons = SeasonBridge.sereneSeasonsLoaded();
         context.enqueueWork(() -> NetworkHooks.openScreen(player,
-                SleepWellContainer.create(packet.entityId, sleepFallback, campfireFlee, winterSkip, sereneSeasons),
+                SleepWellContainer.create(packet.entityId, sleepFallback, campfireFlee, winterSkip, lieIn, sereneSeasons),
                 buf -> SleepWellContainer.writeData(buf, packet.entityId,
-                        sleepFallback, campfireFlee, winterSkip, sereneSeasons)));
+                        sleepFallback, campfireFlee, winterSkip, lieIn, sereneSeasons)));
     }
 }
