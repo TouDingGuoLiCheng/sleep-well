@@ -37,7 +37,7 @@
 | 键 | 默认 | 说明 |
 |---|---|---|
 | `winterSkipDefaultEnabled` | `true` | 新女仆「冬天不工作」的默认值 |
-| `winterSkipTasks` | 12 项 | 算作工作的任务 id；写裸名也行（`farm` 等同 `touhou_little_maid:farm`） |
+| `winterSkipTasks` | 13 项 | 算作工作的任务 id；写裸名也行（`farm` 等同 `touhou_little_maid:farm`） |
 
 ## 女仆 GUI 页面
 
@@ -60,7 +60,8 @@
 - 工位传送由一条 mixin 拦下：工作时段把她的"据点中心"指向闲置点而不是工位，所以不会传送去工位
 - **休息与睡觉时段的寻路、传送完全不变**
 - 离开冬天、关掉开关、或主人手动给她换了任务，就还原（只有在当前仍是空闲任务时才还原，不覆盖主人的选择）
-- 跳过清单 `winterSkipTasks` 可自己改，默认：`farm, cocoa, melon, sugar_cane, grass, snow, feed_animal, milk, shears, fishing, torch, honey`
+- 跳过清单 `winterSkipTasks` 可自己改，默认：`farm, cocoa, melon, sugar_cane, grass, snow, feed_animal, milk, shears, fishing, torch, honey, berries_farm`
+- 其中 `berries_farm` 是《女仆厨房》的「浆果」任务（`maidsoulkitchen:berries_farm`），没装那个模组时这一项不会命中任何人
 
 ## 篝火跑开
 

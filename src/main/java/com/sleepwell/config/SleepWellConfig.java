@@ -104,12 +104,12 @@ public final class SleepWellConfig {
                 .comment(
                         "TLM task ids treated as work. Bare names also match (farm == touhou_little_maid:farm).",
                         "算作\"工作\"的车万女仆任务 id，写裸名也行（farm 等同 touhou_little_maid:farm）。",
-                        "Defaults: farm, cocoa, melon, sugar_cane, grass, snow, feed_animal, milk, shears, fishing, torch, honey",
-                        "默认：种地、可可、西瓜、甘蔗、割草、扫雪、繁育动物、挤奶、剪羊毛、钓鱼、放火把、采蜂蜜"
+                        "Defaults: farm, cocoa, melon, sugar_cane, grass, snow, feed_animal, milk, shears, fishing, torch, honey, berries_farm",
+                        "默认：种地、可可、西瓜、甘蔗、割草、扫雪、繁育动物、挤奶、剪羊毛、钓鱼、放火把、采蜂蜜、采浆果"
                 )
                 .defineList("winterSkipTasks",
                         List.of("farm", "cocoa", "melon", "sugar_cane", "grass", "snow",
-                                "feed_animal", "milk", "shears", "fishing", "torch", "honey"),
+                                "feed_animal", "milk", "shears", "fishing", "torch", "honey", "berries_farm"),
                         entry -> entry instanceof String);
         builder.pop();
 

@@ -10,10 +10,10 @@ import java.util.List;
  * {@code farm} also matches {@code touhou_little_maid:farm}.
  */
 public final class WinterSkipPolicy {
-    /** Default skip list: TLM work tasks that need her outside. */
+    /** Default skip list: work tasks that need her outside. {@code berries_farm} is Maidsoul Kitchen's berry task. */
     public static final List<String> DEFAULT_SKIP_TASKS = List.of(
             "farm", "cocoa", "melon", "sugar_cane", "grass", "snow",
-            "feed_animal", "milk", "shears", "fishing", "torch", "honey");
+            "feed_animal", "milk", "shears", "fishing", "torch", "honey", "berries_farm");
 
     private WinterSkipPolicy() {
     }

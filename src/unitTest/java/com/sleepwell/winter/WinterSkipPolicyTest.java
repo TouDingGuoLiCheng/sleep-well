@@ -38,6 +38,12 @@ class WinterSkipPolicyTest {
     }
 
     @Test
+    void defaultListCoversBerryPicking() {
+        assertTrue(WinterSkipPolicy.shouldSkip(true, true,
+                "maidsoulkitchen:berries_farm", WinterSkipPolicy.DEFAULT_SKIP_TASKS));
+    }
+
+    @Test
     void restoreWhenWinterEnds() {
         assertTrue(WinterSkipPolicy.shouldRestore(true, false, true,
                 "touhou_little_maid:idle", "touhou_little_maid:idle"));
