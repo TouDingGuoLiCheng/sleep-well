@@ -62,6 +62,7 @@
 - 工位传送由一条 mixin 拦下：工作时段把她的"据点中心"指向闲置点而不是工位，所以不会传送去工位
 - **休息与睡觉时段的寻路、传送完全不变**
 - 离开冬天、关掉开关、或主人手动给她换了任务，就还原（只有在当前仍是空闲任务时才还原，不覆盖主人的选择）
+- 平时一天只判一次；但主人改完齿轮里的名单、退出「睡个好觉」页面那一刻，所有女仆会立刻重判一次：刚勾掉的工作当场停下，刚取消勾选的当场回去干活
 - 跳过清单 `winterSkipTasks` 可自己改，默认：`farm, cocoa, melon, sugar_cane, grass, snow, feed_animal, milk, shears, fishing, torch, honey, berries_farm`
 - 其中 `berries_farm` 是《女仆厨房》的「浆果」任务（`maidsoulkitchen:berries_farm`），没装那个模组时这一项不会命中任何人
 

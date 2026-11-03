@@ -5,12 +5,15 @@ import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.tartaricacid.touhoulittlemaid.entity.task.TaskManager;
 import com.sleepwell.SleepWellMod;
 import com.sleepwell.config.SleepWellConfig;
+import com.sleepwell.gui.SleepWellContainer;
 import com.sleepwell.maid.MaidCapabilities;
 import com.sleepwell.maid.MaidSettings;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.ai.memory.MemoryModuleType;
 import net.minecraftforge.event.entity.living.LivingEvent;
+import net.minecraftforge.event.entity.player.PlayerContainerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import org.slf4j.Logger;
@@ -49,6 +52,23 @@ public final class WinterSkipHandler {
     public static void onPlayerJoin(net.minecraftforge.event.entity.player.PlayerEvent.PlayerLoggedInEvent event) {
         LAST_DAY.clear();
         SEASON_CACHE.clear();
+    }
+
+    /**
+     * Leaving the Sleep Well page re-checks every maid right away.
+     * <p>
+     * The list is only edited from that page, so this is the one moment where an edited list can change a
+     * maid's day: without it a maid ticked off (or back on) would keep her old state until the next daily check.
+     */
+    @SubscribeEvent
+    public static void onSettingsClosed(PlayerContainerEvent.Close event) {
+        if (!(event.getEntity() instanceof ServerPlayer)) {
+            return;
+        }
+        if (!(event.getContainer() instanceof SleepWellContainer)) {
+            return;
+        }
+        LAST_DAY.clear();
     }
 
     @SubscribeEvent
