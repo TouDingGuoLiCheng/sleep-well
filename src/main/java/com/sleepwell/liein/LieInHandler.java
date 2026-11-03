@@ -91,7 +91,7 @@ public final class LieInHandler {
         String taskUid = taskUid(maid);
         Activity activity = maid.getScheduleDetail();
         boolean resting = activity == Activity.REST;
-        boolean workDue = activity == Activity.WORK;
+        logTransition(id, state, activity, maid.isSleeping());
 
         if (state.active()) {
             keepOrEnd(maid, state, now, taskUid);
@@ -105,16 +105,20 @@ public final class LieInHandler {
         long day = level.getDayTime() / DAY_LENGTH;
         boolean winter = SeasonBridge.isWinter(level);
 
-        // "Rest time is not lie-in time": only the schedule moving her to WORK counts as a wake-up.
-        if (lieInEnabled() && LieInPolicy.needsWakeRoll(false, state.rolledToday(day), maid.isSleeping(), workDue)) {
-            state.markRolled(day);
+        // Rest time never rolls: she is only allowed to sleep in once the schedule has left REST.
+        if (lieInEnabled() && LieInPolicy.needsWakeRoll(false, state.rolledToday(day), maid.isSleeping(), resting)) {
             int chance = LieInPolicy.chancePercent(winter,
                     SleepWellConfig.LIE_IN_CHANCE_PERCENT.get(), SleepWellConfig.LIE_IN_WINTER_CHANCE_PERCENT.get());
-            if (LieInPolicy.roll(chance, maid.getRandom().nextInt(100))) {
+            int roll = maid.getRandom().nextInt(100);
+            boolean hit = LieInPolicy.roll(chance, roll);
+            state.markRolled(day);
+            LOGGER.info("Lie-in roll: maid={} day={} activity={} sleeping={} winter={} chance={}% roll={} hit={}",
+                    id, day, activity.getName(), maid.isSleeping(), winter, chance, roll, hit);
+            if (hit) {
                 long ticks = LieInPolicy.durationTicks(SleepWellConfig.LIE_IN_MIN_HOURS.get(),
                         SleepWellConfig.LIE_IN_MAX_HOURS.get(), maid.getRandom().nextInt(1000));
                 state.begin(LieInState.Kind.LIE_IN, now, ticks, taskUid);
-                LOGGER.debug("Lie-in: maid {} stays in bed for {} ticks", id, ticks);
+                LOGGER.info("Lie-in: maid {} stays in bed for {} ticks (until {})", id, ticks, now + ticks);
             }
             return;
         }
@@ -142,7 +146,7 @@ public final class LieInHandler {
                 state.begin(LieInState.Kind.NAP, now, ticks, taskUid);
                 // A nap that ends after dawn must not chain straight into a lie-in.
                 state.markRolled(day);
-                LOGGER.debug("Nap: maid {} heads back to bed for {} ticks", id, ticks);
+                LOGGER.info("Nap: maid {} heads back to bed for {} ticks (until {})", id, ticks, now + ticks);
             }
         }
     }
@@ -159,8 +163,21 @@ public final class LieInHandler {
             return;
         }
         state.clear();
-        LOGGER.debug("Lie-in: maid {} back up (task changed={}, expired={}, gaveUp={}, lostBed={})",
+        LOGGER.info("Lie-in: maid {} back up (task changed={}, expired={}, gaveUp={}, lostBed={})",
                 maid.getUUID(), taskChanged, expired, gaveUp, lieInLostBed);
+    }
+
+    /** One log line when the schedule takes her out of REST: that is the moment the roll looks for. */
+    private static void logTransition(UUID id, LieInState state, Activity activity, boolean sleeping) {
+        String name = activity == null ? "" : activity.getName();
+        String previous = state.lastActivity();
+        if (name.equals(previous)) {
+            return;
+        }
+        if (Activity.REST.getName().equals(previous)) {
+            LOGGER.info("Maid {}: schedule REST -> {} (the wake-up moment), sleeping={}", id, name, sleeping);
+        }
+        state.setLastActivity(name);
     }
 
     /** Being hurt wakes her right away. */

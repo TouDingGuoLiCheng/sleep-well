@@ -20,6 +20,7 @@ public final class LieInState {
     private String taskUid = "";
     private long rolledDay = Long.MIN_VALUE;
     private long nextNapCheck;
+    private String lastActivity = "";
 
     public boolean active() {
         return kind != null;
@@ -70,5 +71,14 @@ public final class LieInState {
 
     public void setNextNapCheck(long nextNapCheck) {
         this.nextNapCheck = nextNapCheck;
+    }
+
+    /** Name of the last schedule activity seen, so a REST -> awake transition can be logged once. */
+    public String lastActivity() {
+        return lastActivity;
+    }
+
+    public void setLastActivity(String lastActivity) {
+        this.lastActivity = lastActivity == null ? "" : lastActivity;
     }
 }

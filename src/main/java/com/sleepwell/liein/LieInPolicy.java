@@ -58,14 +58,14 @@ public final class LieInPolicy {
     }
 
     /**
-     * The wake-up roll: she is in bed, still asleep, and the schedule is sending her to {@code Activity.WORK}
+     * The wake-up roll: she is in bed, still asleep, and the schedule has already left {@code Activity.REST}
      * — the exact moment {@code MaidClearSleepTask} would get her up.
      * <p>
-     * {@code workDue} is deliberately {@code WORK} only: switching into rest or idle is not a wake-up, so rest
-     * time never rolls a lie-in.
+     * Only {@code REST} is excluded, not "everything that is not WORK": TLM's day schedule does not hand out
+     * {@code WORK} for the whole waking window, so requiring WORK meant no maid ever rolled a lie-in.
      */
-    public static boolean needsWakeRoll(boolean active, boolean alreadyRolledToday, boolean sleeping, boolean workDue) {
-        return !active && !alreadyRolledToday && sleeping && workDue;
+    public static boolean needsWakeRoll(boolean active, boolean alreadyRolledToday, boolean sleeping, boolean resting) {
+        return !active && !alreadyRolledToday && sleeping && !resting;
     }
 
     public static boolean napDue(boolean enabled, boolean active, boolean idleMode, boolean sleeping,
