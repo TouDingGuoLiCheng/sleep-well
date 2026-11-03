@@ -9,8 +9,11 @@ import com.sleepwell.config.SleepWellConfig;
 import com.sleepwell.maid.MaidCapabilities;
 import com.sleepwell.winter.SeasonBridge;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.ai.Brain;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.schedule.Activity;
+import net.minecraft.world.entity.schedule.Schedule;
+import net.minecraft.world.entity.schedule.ScheduleBuilder;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.event.entity.living.LivingEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
@@ -43,6 +46,13 @@ public final class LieInHandler {
     /** Guards against a stale entry keeping a maid in bed forever. */
     private static final long MAX_STATE_TICKS = 24000L;
     private static final Map<UUID, LieInState> STATES = new ConcurrentHashMap<>();
+    /**
+     * A schedule whose only keyframe is {@code REST} at 0: while a lie-in or a nap runs, the brain runs on this
+     * one. Swapping the brain's schedule (instead of only faking {@code getScheduleDetail()}) is what keeps the
+     * rest activity's own tasks — including {@code MaidBedTask}, the only thing that actually puts her to bed —
+     * in charge.
+     */
+    private static final Schedule FORCED_REST = new ScheduleBuilder(Schedule.EMPTY).changeActivityAt(0, Activity.REST).build();
 
     private LieInHandler() {
     }
@@ -90,11 +100,11 @@ public final class LieInHandler {
         }
         // Her own switch first: "allowed" is the default, the page can turn it off per maid.
         if (!MaidCapabilities.of(maid).lieIn()) {
-            STATES.remove(id);
+            release(maid, STATES.remove(id), "switch off");
             return;
         }
         if (!lieInEnabled() && !napEnabled()) {
-            STATES.remove(id);
+            release(maid, STATES.remove(id), "config off");
             return;
         }
 
@@ -107,6 +117,7 @@ public final class LieInHandler {
         logTransition(id, state, activity, maid.isSleeping());
 
         if (state.active()) {
+            holdBrain(maid, state);
             keepOrEnd(maid, state, now, taskUid);
             return;
         }
@@ -179,7 +190,7 @@ public final class LieInHandler {
         if (!taskChanged && !expired && !gaveUp && !lieInLostBed) {
             return;
         }
-        state.clear();
+        release(maid, state, "back up");
         LOGGER.info("Lie-in: maid {} back up (task changed={}, expired={}, gaveUp={}, lostBed={})",
                 maid.getUUID(), taskChanged, expired, gaveUp, lieInLostBed);
     }
@@ -205,7 +216,7 @@ public final class LieInHandler {
         }
         LieInState state = STATES.get(maid.getUUID());
         if (state != null && state.active()) {
-            state.clear();
+            release(maid, state, "hurt");
         }
     }
 
@@ -221,8 +232,34 @@ public final class LieInHandler {
         }
         LieInState state = STATES.get(maid.getUUID());
         if (state != null && state.active()) {
-            state.clear();
+            release(maid, state, "called");
         }
+    }
+
+    /** Keep the brain on the forced-rest schedule for as long as the state lasts. */
+    private static void holdBrain(EntityMaid maid, LieInState state) {
+        Brain<?> brain = maid.getBrain();
+        Schedule current = brain.getSchedule();
+        if (state.originalSchedule() == null && current != FORCED_REST) {
+            state.setOriginalSchedule(current);
+        }
+        if (current != FORCED_REST) {
+            brain.setSchedule(FORCED_REST);
+            LOGGER.info("Lie-in: maid {} brain schedule -> REST (was {})", maid.getUUID(), current);
+        }
+    }
+
+    /** Put her own schedule back before the state is dropped, otherwise she stays idle forever. */
+    private static void release(EntityMaid maid, LieInState state, String reason) {
+        if (state == null) {
+            return;
+        }
+        Schedule original = state.originalSchedule();
+        if (original != null) {
+            maid.getBrain().setSchedule(original);
+            LOGGER.info("Lie-in: maid {} brain schedule restored ({})", maid.getUUID(), reason);
+        }
+        state.clear();
     }
 
     /** A kappa-compass sleep point in this dimension: she has somewhere to go, bed check not needed. */

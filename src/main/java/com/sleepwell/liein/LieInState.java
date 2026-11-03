@@ -22,6 +22,7 @@ public final class LieInState {
     private long rolledDay = Long.MIN_VALUE;
     private long nextNapCheck;
     private String lastActivity = "";
+    private net.minecraft.world.entity.schedule.Schedule originalSchedule;
 
     public boolean active() {
         return kind != null;
@@ -67,6 +68,7 @@ public final class LieInState {
         started = 0L;
         taskUid = "";
         configuredSleepArea = false;
+        originalSchedule = null;
     }
 
     public boolean rolledToday(long day) {
@@ -83,6 +85,15 @@ public final class LieInState {
 
     public void setNextNapCheck(long nextNapCheck) {
         this.nextNapCheck = nextNapCheck;
+    }
+
+    /** Brain schedule before a lie-in/nap replaced it with the forced-rest one. */
+    public net.minecraft.world.entity.schedule.Schedule originalSchedule() {
+        return originalSchedule;
+    }
+
+    public void setOriginalSchedule(net.minecraft.world.entity.schedule.Schedule originalSchedule) {
+        this.originalSchedule = originalSchedule;
     }
 
     /** Name of the last schedule activity seen, so a REST -> awake transition can be logged once. */
