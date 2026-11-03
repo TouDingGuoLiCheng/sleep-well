@@ -168,21 +168,23 @@ final class WinterSkipPicker {
                     graphics.fill(cellX, cellY, cellX + colWidth(), cellY + ROW_H - 1, HOVER);
                 }
                 boolean on = selected.contains(row.bare());
+                // Icon, then name, then the tick box pinned to the right edge of the cell.
+                int boxLeft = cellX + colWidth() - 10;
                 int boxTop = cellY + 4;
-                graphics.fill(cellX + 1, boxTop, cellX + 9, boxTop + 8, 0x66000000);
-                graphics.renderOutline(cellX + 1, boxTop, 8, 8, BOX_LINE);
+                graphics.fill(boxLeft, boxTop, boxLeft + 8, boxTop + 8, 0x66000000);
+                graphics.renderOutline(boxLeft, boxTop, 8, 8, BOX_LINE);
                 if (on) {
-                    graphics.fill(cellX + 3, boxTop + 2, cellX + 7, boxTop + 6, BOX_ON);
+                    graphics.fill(boxLeft + 2, boxTop + 2, boxLeft + 6, boxTop + 6, BOX_ON);
                 }
                 if (!row.icon().isEmpty()) {
-                    graphics.renderItem(row.icon(), cellX + 12, cellY);
+                    graphics.renderItem(row.icon(), cellX + 2, cellY);
                 }
                 String full = row.name().getString();
                 String label = font.plainSubstrByWidth(full, Math.max(8, labelWidth));
                 if (label.length() < full.length() && labelWidth > 12) {
                     label = font.plainSubstrByWidth(full, labelWidth - 6) + "…";
                 }
-                graphics.drawString(font, label, cellX + 31, cellY + 4, on ? TEXT : TEXT_DIM, false);
+                graphics.drawString(font, label, cellX + 20, cellY + 4, on ? TEXT : TEXT_DIM, false);
             }
         }
 
