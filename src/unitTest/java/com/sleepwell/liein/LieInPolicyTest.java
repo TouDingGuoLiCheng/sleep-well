@@ -93,9 +93,16 @@ class LieInPolicyTest {
 
     @Test
     void napIsDroppedWhenNoBedIsReached() {
-        assertFalse(LieInPolicy.napGaveUp(true, true, 1000L, 0L));
-        assertFalse(LieInPolicy.napGaveUp(true, false, LieInPolicy.NAP_GIVE_UP_TICKS - 1, 0L));
-        assertTrue(LieInPolicy.napGaveUp(true, false, LieInPolicy.NAP_GIVE_UP_TICKS, 0L));
-        assertFalse(LieInPolicy.napGaveUp(false, false, 100000L, 0L));
+        long shortLeash = LieInPolicy.napGiveUpTicks(false);
+        long longLeash = LieInPolicy.napGiveUpTicks(true);
+        assertEquals(LieInPolicy.NAP_GIVE_UP_TICKS, shortLeash);
+        assertEquals(LieInPolicy.NAP_GIVE_UP_CONFIGURED_TICKS, longLeash);
+        assertFalse(LieInPolicy.napGaveUp(true, true, 100000L, 0L, shortLeash));
+        assertFalse(LieInPolicy.napGaveUp(true, false, shortLeash - 1, 0L, shortLeash));
+        assertTrue(LieInPolicy.napGaveUp(true, false, shortLeash, 0L, shortLeash));
+        assertFalse(LieInPolicy.napGaveUp(false, false, 100000L, 0L, shortLeash));
+        // a configured sleep area may be across the base, so it gets the longer window
+        assertFalse(LieInPolicy.napGaveUp(true, false, shortLeash + 1, 0L, longLeash));
+        assertTrue(LieInPolicy.napGaveUp(true, false, longLeash, 0L, longLeash));
     }
 }

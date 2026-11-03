@@ -2,6 +2,7 @@ package com.sleepwell.liein;
 
 import com.github.tartaricacid.touhoulittlemaid.api.task.IMaidTask;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
+import com.github.tartaricacid.touhoulittlemaid.entity.passive.SchedulePos;
 import com.github.tartaricacid.touhoulittlemaid.entity.task.TaskManager;
 import com.sleepwell.SleepWellMod;
 import com.sleepwell.config.SleepWellConfig;
@@ -55,13 +56,25 @@ public final class LieInHandler {
         return state != null && state.active();
     }
 
-    /** True only while she is walking back to bed on her own; schedule teleports stay out of the way. */
     public static boolean isNapping(EntityMaid maid) {
         if (maid == null || maid.level().isClientSide()) {
             return false;
         }
         LieInState state = STATES.get(maid.getUUID());
         return state != null && state.kind() == LieInState.Kind.NAP;
+    }
+
+    /**
+     * A nap towards a bed she can already see must not be fought over: the schedule teleports would drag her
+     * back to the idle spot while she is walking. A nap towards her configured sleep area is the opposite —
+     * there the normal pathing (and the fallback teleport) is exactly what gets her there.
+     */
+    public static boolean suppressesScheduleChase(EntityMaid maid) {
+        if (maid == null || maid.level().isClientSide()) {
+            return false;
+        }
+        LieInState state = STATES.get(maid.getUUID());
+        return state != null && state.kind() == LieInState.Kind.NAP && !state.configuredSleepArea();
     }
 
     @SubscribeEvent
@@ -133,9 +146,11 @@ public final class LieInHandler {
                 return;
             }
             state.setNextNapCheck(now + LieInPolicy.napCheckIntervalTicks(SleepWellConfig.NAP_CHECK_MINUTES.get()));
-            // No bed in reach: skip the roll entirely. Reporting REST without one only makes her stand
-            // around at the sleep spot while the schedule shoves her back and forth.
-            if (MaidBedFinder.find(maid).isEmpty()) {
+            boolean configuredArea = configuredSleepArea(maid, level);
+            // A kappa-compass sleep area is a destination in its own right: she paths there and lies down.
+            // Without one she may only nap towards a bed she can see, otherwise she would just stand at the
+            // sleep spot while the schedule shoves her back and forth.
+            if (!configuredArea && MaidBedFinder.find(maid).isEmpty()) {
                 return;
             }
             int chance = LieInPolicy.chancePercent(winter,
@@ -143,10 +158,11 @@ public final class LieInHandler {
             if (LieInPolicy.roll(chance, maid.getRandom().nextInt(100))) {
                 long ticks = LieInPolicy.durationTicks(SleepWellConfig.NAP_MIN_HOURS.get(),
                         SleepWellConfig.NAP_MAX_HOURS.get(), maid.getRandom().nextInt(1000));
-                state.begin(LieInState.Kind.NAP, now, ticks, taskUid);
+                state.begin(LieInState.Kind.NAP, now, ticks, taskUid, configuredArea);
                 // A nap that ends after dawn must not chain straight into a lie-in.
                 state.markRolled(day);
-                LOGGER.info("Nap: maid {} heads back to bed for {} ticks (until {})", id, ticks, now + ticks);
+                LOGGER.info("Nap: maid {} heads to her {} for {} ticks (until {})", id,
+                        configuredArea ? "configured sleep area" : "nearest maid bed", ticks, now + ticks);
             }
         }
     }
@@ -156,7 +172,8 @@ public final class LieInHandler {
         boolean napping = state.kind() == LieInState.Kind.NAP;
         boolean taskChanged = !state.taskUid().equals(taskUid);
         boolean expired = LieInPolicy.expired(now, state.until());
-        boolean gaveUp = LieInPolicy.napGaveUp(napping, maid.isSleeping(), now, state.started());
+        long giveUpTicks = LieInPolicy.napGiveUpTicks(state.configuredSleepArea());
+        boolean gaveUp = LieInPolicy.napGaveUp(napping, maid.isSleeping(), now, state.started(), giveUpTicks);
         boolean lieInLostBed = kindLieIn && !maid.isSleeping() && now - state.started() > 40L;
 
         if (!taskChanged && !expired && !gaveUp && !lieInLostBed) {
@@ -206,6 +223,13 @@ public final class LieInHandler {
         if (state != null && state.active()) {
             state.clear();
         }
+    }
+
+    /** A kappa-compass sleep point in this dimension: she has somewhere to go, bed check not needed. */
+    private static boolean configuredSleepArea(EntityMaid maid, ServerLevel level) {
+        SchedulePos pos = maid.getSchedulePos();
+        return pos != null && pos.isConfigured() && pos.getSleepPos() != null
+                && level.dimension().location().equals(pos.getDimension());
     }
 
     private static boolean lieInEnabled() {

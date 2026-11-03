@@ -12,8 +12,10 @@ public final class LieInPolicy {
     /** One in-game hour is 1000 ticks. */
     public static final int TICKS_PER_GAME_HOUR = 1000;
 
-    /** A nap that never reaches a bed is given up after this long. */
+    /** A nap towards a bed she can see is given up after this long. */
     public static final long NAP_GIVE_UP_TICKS = 600L;
+    /** A nap towards a configured sleep area may need to cross the base, so it gets a longer leash. */
+    public static final long NAP_GIVE_UP_CONFIGURED_TICKS = 2400L;
 
     private LieInPolicy() {
     }
@@ -74,7 +76,12 @@ public final class LieInPolicy {
     }
 
     /** A nap that has not reached a bed within the grace window is abandoned. */
-    public static boolean napGaveUp(boolean napping, boolean sleeping, long now, long started) {
-        return napping && !sleeping && now - started >= NAP_GIVE_UP_TICKS;
+    public static boolean napGaveUp(boolean napping, boolean sleeping, long now, long started, long limit) {
+        return napping && !sleeping && now - started >= limit;
+    }
+
+    /** Configured sleep areas get the longer window, a nearby-bed nap the short one. */
+    public static long napGiveUpTicks(boolean configuredSleepArea) {
+        return configuredSleepArea ? NAP_GIVE_UP_CONFIGURED_TICKS : NAP_GIVE_UP_TICKS;
     }
 }

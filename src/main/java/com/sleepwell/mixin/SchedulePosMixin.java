@@ -44,7 +44,7 @@ public abstract class SchedulePosMixin {
      */
     @Inject(method = "tick", at = @At("HEAD"), cancellable = true, remap = false)
     private void sleepwell$noChaseWhileNapping(EntityMaid maid, CallbackInfo ci) {
-        if (LieInHandler.isNapping(maid)) {
+        if (LieInHandler.suppressesScheduleChase(maid)) {
             ci.cancel();
         }
     }

@@ -18,6 +18,7 @@ public final class LieInState {
     private long until;
     private long started;
     private String taskUid = "";
+    private boolean configuredSleepArea;
     private long rolledDay = Long.MIN_VALUE;
     private long nextNapCheck;
     private String lastActivity = "";
@@ -44,10 +45,20 @@ public final class LieInState {
     }
 
     public void begin(Kind kind, long now, long durationTicks, String taskUid) {
+        begin(kind, now, durationTicks, taskUid, false);
+    }
+
+    public void begin(Kind kind, long now, long durationTicks, String taskUid, boolean configuredSleepArea) {
         this.kind = kind;
         this.started = now;
         this.until = now + durationTicks;
         this.taskUid = taskUid == null ? "" : taskUid;
+        this.configuredSleepArea = configuredSleepArea;
+    }
+
+    /** True when the nap walks her to the kappa-compass sleep area instead of a bed she can see. */
+    public boolean configuredSleepArea() {
+        return configuredSleepArea;
     }
 
     public void clear() {
@@ -55,6 +66,7 @@ public final class LieInState {
         until = 0L;
         started = 0L;
         taskUid = "";
+        configuredSleepArea = false;
     }
 
     public boolean rolledToday(long day) {

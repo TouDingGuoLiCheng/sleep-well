@@ -52,7 +52,7 @@ public final class SleepFallbackHandler {
             return;
         }
         // A nap has its own bed nearby and is being walked to; the fallback teleport would fight it.
-        if (com.sleepwell.liein.LieInHandler.isNapping(maid)) {
+        if (com.sleepwell.liein.LieInHandler.suppressesScheduleChase(maid)) {
             TRACKERS.remove(id);
             return;
         }
