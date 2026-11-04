@@ -186,7 +186,7 @@ public final class SleepWellConfig {
                 .defineInRange("napCheckMinutes", 30, 5, 120);
         NAP_MIN_HOURS = builder
                 .comment("Shortest nap, in in-game hours.", "最短补觉时长（游戏内小时）。")
-                .defineInRange("napMinHours", 1, 1, 12);
+                .defineInRange("napMinHours", 2, 1, 12);
         NAP_MAX_HOURS = builder
                 .comment("Longest nap, in in-game hours.", "最长补觉时长（游戏内小时）。")
                 .defineInRange("napMaxHours", 3, 1, 12);

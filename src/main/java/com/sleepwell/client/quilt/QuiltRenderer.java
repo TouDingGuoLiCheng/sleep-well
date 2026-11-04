@@ -39,11 +39,16 @@ import java.util.Map;
 @Mod.EventBusSubscriber(modid = SleepWellMod.MOD_ID, value = Dist.CLIENT)
 public final class QuiltRenderer {
     /** Where the cloth starts, measured from the outer edge of the pillow end. */
-    private static final float HEAD_GAP = 0.40F;
+    private static final float HEAD_GAP = 0.15F;
     private static final float FOOT_GAP = 0.05F;
     /** Half the mattress width: the bed is one block wide, so 0.40 keeps the cloth on the mattress. */
     private static final float HALF_WIDTH = 0.40F;
-    private static final float BULGE = 0.22F;
+    private static final float BULGE = 0.20F;
+    /** Extra lift right over the maid, so the cloth drapes over her instead of floating flat. */
+    private static final float BODY_BUMP = 0.11F;
+    private static final float BODY_RADIUS = 0.45F;
+    /** How far past her own body the cloth reaches at each end. */
+    private static final float BODY_MARGIN = 0.55F;
     private static final float SKIRT = 0.16F;
     private static final int SEGMENTS = 12;
     private static final int WIDTH_SEGMENTS = 6;
@@ -85,7 +90,7 @@ public final class QuiltRenderer {
         for (EntityMaid maid : sleeping) {
             Bed bed = findBed(level, maid.blockPosition());
             if (bed != null) {
-                draw(pose, buffers, level, bed);
+                draw(pose, buffers, level, bed, maid);
             }
         }
         pose.popPose();
@@ -118,7 +123,8 @@ public final class QuiltRenderer {
         return null;
     }
 
-    private static void draw(PoseStack pose, MultiBufferSource.BufferSource buffers, ClientLevel level, Bed bed) {
+    private static void draw(PoseStack pose, MultiBufferSource.BufferSource buffers, ClientLevel level,
+                             Bed bed, EntityMaid maid) {
         BlockState headState = level.getBlockState(bed.head());
         BlockState footState = level.getBlockState(bed.foot());
         double top = Math.max(headState.getShape(level, bed.head()).max(net.minecraft.core.Direction.Axis.Y),
@@ -131,8 +137,33 @@ public final class QuiltRenderer {
         Vec3 along = new Vec3(footCenter.x - headCenter.x, 0.0D, footCenter.z - headCenter.z).normalize();
         Vec3 across = new Vec3(-along.z, 0.0D, along.x);
         float length = (float) headCenter.distanceTo(footCenter);
-        float uStart = HEAD_GAP;
-        float uEnd = length + 1.0F - FOOT_GAP;
+        float bedEnd = length + 1.0F - FOOT_GAP;
+
+        // Reach: follow the maid's own footprint along the bed so that a long body still gets covered and a
+        // small one is not buried under cloth.
+        net.minecraft.world.phys.AABB box = maid.getBoundingBox();
+        float uMin = Float.MAX_VALUE;
+        float uMax = -Float.MAX_VALUE;
+        double[] xs = {box.minX, box.maxX};
+        double[] zs = {box.minZ, box.maxZ};
+        for (double x : xs) {
+            for (double z : zs) {
+                double dx = x - headCenter.x;
+                double dz = z - headCenter.z;
+                float u = (float) (dx * along.x + dz * along.z);
+                uMin = Math.min(uMin, u);
+                uMax = Math.max(uMax, u);
+            }
+        }
+        float uStart = Math.max(HEAD_GAP, uMin - BODY_MARGIN);
+        float uEnd = Math.min(bedEnd, uMax + BODY_MARGIN);
+        if (uEnd - uStart < 0.8F) {
+            uStart = HEAD_GAP;
+            uEnd = bedEnd;
+        }
+        float bodyCenter = (uStart + uEnd) * 0.5F;
+        float halfWidth = Math.min(HALF_WIDTH,
+                Math.max(0.33F, (float) maid.getBbWidth() * 0.5F + 0.10F));
 
         int light = LevelRenderer.getLightColor(level, bed.head());
         ResourceLocation texture = TEXTURES.getOrDefault(bed.color(),
@@ -150,10 +181,13 @@ public final class QuiltRenderer {
             for (int j = 0; j <= acrossSteps; j++) {
                 float s = -1.0F + 2.0F * j / acrossSteps;
                 float lift = (float) Math.cos(s * Math.PI * 0.5D);
+                float body = (float) Math.exp(-Math.pow((u - bodyCenter) / BODY_RADIUS, 2.0D));
+                float height = BULGE * arch * (0.55F + 0.45F * lift)
+                        + BODY_BUMP * body * (0.6F + 0.4F * lift);
                 points[i][j] = new Vec3(
-                        headCenter.x + along.x * u + across.x * (s * HALF_WIDTH),
-                        headCenter.y + BULGE * arch * (0.55F + 0.45F * lift),
-                        headCenter.z + along.z * u + across.z * (s * HALF_WIDTH));
+                        headCenter.x + along.x * u + across.x * (s * halfWidth),
+                        headCenter.y + height,
+                        headCenter.z + along.z * u + across.z * (s * halfWidth));
                 shades[i][j] = 0.78F + 0.22F * lift;
             }
         }

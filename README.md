@@ -104,7 +104,7 @@
 | `napChancePercent` | `5` | 0..100 | 平时每次判定的补觉概率 |
 | `napWinterChancePercent` | `10` | 0..100 | 冬季补觉概率（需静谧四季） |
 | `napCheckMinutes` | `30` | 5..120 | 补觉判定间隔（游戏内分钟） |
-| `napMinHours` / `napMaxHours` | `1` / `3` | 1..12 | 补觉时长（游戏内小时） |
+| `napMinHours` / `napMaxHours` | `2` / `3` | 1..12 | 补觉时长（游戏内小时），1 小时 = 1000 tick = 50 秒 |
 
 > `[lieIn]` 里这两组开关是**总闸**：女仆页面上的「赖床与补觉」是每只女仆自己的开关，两个都开才会生效
 
