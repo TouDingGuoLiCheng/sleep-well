@@ -44,6 +44,8 @@ public final class QuiltRenderer {
     /** Half the mattress width: the bed is one block wide, so 0.40 keeps the cloth on the mattress. */
     private static final float HALF_WIDTH = 0.50F;
     /** How far the sides hang past the mattress edge, and how far down. */
+    /** How far the cloth hangs straight down over the mattress edge. */
+    private static final float HEM_DROP = 0.20F;
     private static final float SKIRT_OUT = 0.18F;
     private static final float SKIRT_DROP = 0.46F;
     /** Roughly how far the cloth sits above the mattress where it is not lifted by her body. */
@@ -185,7 +187,7 @@ public final class QuiltRenderer {
         float uStart = Math.max(HEAD_GAP, uMin - HEAD_MARGIN);
         // Her feet often hang off the end of the bed, so the cloth is allowed past the mattress edge and
         // simply drapes off it.
-        float uEnd = Math.min(bedEnd + 0.85F, uMax + FOOT_MARGIN + 0.35F);
+        float uEnd = Math.min(bedEnd + 0.95F, uMax + FOOT_MARGIN + 0.45F);
         if (uEnd - uStart < 1.0F) {
             uStart = Math.max(HEAD_GAP, uStart - 0.25F);
             uEnd = Math.min(bedEnd + 0.85F, uEnd + 0.25F);
@@ -239,7 +241,9 @@ public final class QuiltRenderer {
             float body = Math.min(0.50F, Math.max(0.30F, Math.max(profile * 1.6F + 0.18F, clothLift + 0.06F)));
             // The feet end drapes down to the mattress instead of ending in a vertical wall; the head end
             // fades too, but it is mostly hidden by the pillow gap anyway.
-            float fade = Math.min(1.0F, Math.min(t / 0.08F, (1.0F - t) / 0.14F));
+            // Fades measured in blocks from the two ends, not as a fraction, so adding cloth at the foot
+            // does not change how the rest of the quilt looks.
+            float fade = Math.min(1.0F, Math.min(u / 0.35F, (uEnd + 0.30F - u) / 0.55F));
             body *= Math.max(0.0F, fade);
             for (int j = 0; j <= acrossSteps; j++) {
                 float s = -1.0F + 2.0F * j / acrossSteps;
@@ -266,28 +270,21 @@ public final class QuiltRenderer {
                         v0, v1, light, shades[i][j], shades[i][j + 1]);
             }
         }
-        // A rounded hem instead of a long flat curtain: it reads as the thickness of the quilt and it does
-        // not drag on the floor.
+        // The sides simply hang down: no rolled hem, no flap sticking out sideways.
         for (int side : new int[]{0, acrossSteps}) {
-            float outward = side == 0 ? -1.0F : 1.0F;
             for (int i = 0; i < alongSteps; i++) {
                 Vec3 topA = points[i][side];
                 Vec3 topB = points[i + 1][side];
-                Vec3 rollA = topA.add(across.x * outward * skirtOut, -0.07D, across.z * outward * skirtOut);
-                Vec3 rollB = topB.add(across.x * outward * skirtOut, -0.07D, across.z * outward * skirtOut);
-                Vec3 hemA = topA.add(across.x * outward * (skirtOut * 0.4D), -0.15D,
-                        across.z * outward * (skirtOut * 0.4D));
-                Vec3 hemB = topB.add(across.x * outward * (skirtOut * 0.4D), -0.15D,
-                        across.z * outward * (skirtOut * 0.4D));
+                Vec3 lowA = topA.add(0.0D, -HEM_DROP, 0.0D);
+                Vec3 lowB = topB.add(0.0D, -HEM_DROP, 0.0D);
                 if (side == 0) {
-                    quad(consumer, pose, topB, topA, rollA, rollB, 0.0F, 0.1F, light, 0.70F, 0.70F);
-                    quad(consumer, pose, rollB, rollA, hemA, hemB, 0.1F, 0.2F, light, 0.62F, 0.62F);
+                    quad(consumer, pose, topB, topA, lowA, lowB, 0.0F, 0.2F, light, 0.60F, 0.60F);
                 } else {
-                    quad(consumer, pose, topA, topB, rollB, rollA, 0.0F, 0.1F, light, 0.70F, 0.70F);
-                    quad(consumer, pose, rollA, rollB, hemB, hemA, 0.1F, 0.2F, light, 0.62F, 0.62F);
+                    quad(consumer, pose, topA, topB, lowB, lowA, 0.0F, 0.2F, light, 0.60F, 0.60F);
                 }
             }
         }
+
         buffers.endBatch(RenderType.entityCutoutNoCull(texture));
     }
 
