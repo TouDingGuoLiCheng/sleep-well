@@ -4,6 +4,7 @@ import com.github.tartaricacid.touhoulittlemaid.block.BlockMaidBed;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.tartaricacid.touhoulittlemaid.tileentity.TileEntityMaidBed;
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.logging.LogUtils;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -39,6 +40,7 @@ import java.util.Map;
  */
 @Mod.EventBusSubscriber(modid = SleepWellMod.MOD_ID, value = Dist.CLIENT)
 public final class QuiltRenderer {
+    private static final org.slf4j.Logger LOGGER = LogUtils.getLogger();
     /** Where the cloth starts, measured from the outer edge of the pillow end. */
     private static final float HEAD_GAP = 0.15F;
     private static final float FOOT_GAP = 0.02F;
@@ -111,14 +113,14 @@ public final class QuiltRenderer {
         }
         Vec3 camera = event.getCamera().getPosition();
         if (STAGE_LOGS++ < 3) {
-            System.out.println("[sleep_well] quilt stage running, camera=" + camera);
+            LOGGER.info("[sleep_well] quilt stage running, camera=" + camera);
         }
         List<EntityMaid> sleeping = level.getEntitiesOfClass(EntityMaid.class,
                 new net.minecraft.world.phys.AABB(camera.x - 64.0D, camera.y - 64.0D, camera.z - 64.0D,
                         camera.x + 64.0D, camera.y + 64.0D, camera.z + 64.0D),
                 EntityMaid::isSleeping);
         if (SLEEP_LOGS++ < 3) {
-            System.out.println("[sleep_well] sleeping maids near camera=" + sleeping.size());
+            LOGGER.info("[sleep_well] sleeping maids near camera=" + sleeping.size());
         }
         if (sleeping.isEmpty()) {
             return;

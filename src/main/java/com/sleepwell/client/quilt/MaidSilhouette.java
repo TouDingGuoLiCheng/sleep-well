@@ -1,6 +1,7 @@
 package com.sleepwell.client.quilt;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
+import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.EntityModel;
 import net.minecraft.client.renderer.entity.EntityRenderer;
@@ -19,6 +20,7 @@ import java.util.UUID;
  * so the sampled bones are the ones of her sleeping pose.
  */
 public final class MaidSilhouette {
+    private static final org.slf4j.Logger LOGGER = LogUtils.getLogger();
     public static final int BINS = 24;
     private static final float PIXELS = 16.0F;
     private static final int REFRESH_TICKS = 10;
@@ -73,7 +75,7 @@ public final class MaidSilhouette {
             Map<?, ?> parts = bedrockParts(model);
             if (parts == null || parts.isEmpty()) {
                 if (FAILURES++ < 4) {
-                    System.out.println("[sleep_well] no bedrock part map on " + model.getClass().getName()
+                    LOGGER.info("[sleep_well] no bedrock part map on " + model.getClass().getName()
                             + " parts=" + (parts == null ? "null" : parts.size()));
                 }
                 return null;
@@ -110,9 +112,9 @@ public final class MaidSilhouette {
             return out;
         } catch (Throwable error) {
             if (FAILURES++ < 4) {
-                System.out.println("[sleep_well] silhouette sampling failed: " + error);
+                LOGGER.info("[sleep_well] silhouette sampling failed: " + error);
                 for (StackTraceElement element : error.getStackTrace()) {
-                    System.out.println("[sleep_well]   at " + element);
+                    LOGGER.info("[sleep_well]   at " + element);
                     if (element.getClassName().startsWith("com.sleepwell")) {
                         break;
                     }
@@ -130,7 +132,7 @@ public final class MaidSilhouette {
             return;
         }
         PRINTS.put(id, printed + 1);
-        System.out.println("[sleep_well] silhouette maid=" + id + " model=" + model.getClass().getName()
+        LOGGER.info("[sleep_well] silhouette maid=" + id + " model=" + model.getClass().getName()
                 + " parts=" + parts.size());
         int shown = 0;
         for (Map.Entry<?, ?> entry : parts.entrySet()) {
@@ -138,7 +140,7 @@ public final class MaidSilhouette {
                 break;
             }
             Object part = entry.getValue();
-            System.out.println("[sleep_well]   bone " + entry.getKey()
+            LOGGER.info("[sleep_well]   bone " + entry.getKey()
                     + " x=" + read(part, "x") + " y=" + read(part, "y") + " z=" + read(part, "z")
                     + " ox=" + read(part, "offsetX") + " oy=" + read(part, "offsetY")
                     + " oz=" + read(part, "offsetZ"));
@@ -147,7 +149,7 @@ public final class MaidSilhouette {
         for (int i = 0; i < BINS; i++) {
             builder.append(String.format("%.2f ", profile[1 + i]));
         }
-        System.out.println("[sleep_well]   height=" + String.format("%.2f", profile[0]) + " radius=" + builder);
+        LOGGER.info("[sleep_well]   height=" + String.format("%.2f", profile[0]) + " radius=" + builder);
     }
 
     public static float radiusAt(float[] profile, float bodyY) {
