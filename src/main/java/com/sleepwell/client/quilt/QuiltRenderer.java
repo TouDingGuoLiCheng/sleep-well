@@ -40,19 +40,19 @@ import java.util.Map;
 public final class QuiltRenderer {
     /** Where the cloth starts, measured from the outer edge of the pillow end. */
     private static final float HEAD_GAP = 0.15F;
-    private static final float FOOT_GAP = 0.05F;
+    private static final float FOOT_GAP = 0.15F;
     /** Half the mattress width: the bed is one block wide, so 0.40 keeps the cloth on the mattress. */
     private static final float HALF_WIDTH = 0.40F;
-    private static final float BULGE = 0.20F;
+    private static final float BULGE = 0.10F;
     /** Extra lift right over the maid, so the cloth drapes over her instead of floating flat. */
-    private static final float BODY_BUMP = 0.11F;
+    private static final float BODY_BUMP = 0.07F;
     private static final float BODY_RADIUS = 0.45F;
     /** How far past her own body the cloth reaches at each end. */
     private static final float BODY_MARGIN = 0.55F;
     private static final float SKIRT = 0.16F;
     private static final int SEGMENTS = 12;
     private static final int WIDTH_SEGMENTS = 6;
-    private static final float FALLBACK_TOP = 0.5625F;
+    private static final float FALLBACK_TOP = 0.5125F;
 
     private static final Map<DyeColor, ResourceLocation> TEXTURES = new EnumMap<>(DyeColor.class);
 
@@ -127,9 +127,11 @@ public final class QuiltRenderer {
                              Bed bed, EntityMaid maid) {
         BlockState headState = level.getBlockState(bed.head());
         BlockState footState = level.getBlockState(bed.foot());
-        double top = Math.max(headState.getShape(level, bed.head()).max(net.minecraft.core.Direction.Axis.Y),
+        // MIN of the two halves: the head half carries the headboard and would otherwise lift the whole quilt
+        // to headboard height, which read as a tent floating above the bed.
+        double top = Math.min(headState.getShape(level, bed.head()).max(net.minecraft.core.Direction.Axis.Y),
                 footState.getShape(level, bed.foot()).max(net.minecraft.core.Direction.Axis.Y));
-        if (top <= 0.0D) {
+        if (top <= 0.0D || top > 0.60D) {
             top = FALLBACK_TOP;
         }
         Vec3 headCenter = Vec3.atLowerCornerOf(bed.head()).add(0.5D, top, 0.5D);
