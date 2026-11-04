@@ -24,6 +24,6 @@ public abstract class TileEntityMaidBedRendererMixin {
                                      MultiBufferSource buffer, int packedLight, int packedOverlay,
                                      CallbackInfo ci) {
         BlockState state = bed.getBlockState();
-        QuiltRenderer.render(state, bed.getColor(), pose, buffer, packedLight, packedOverlay);
+        QuiltRenderer.render(bed, state, pose, buffer, packedLight, packedOverlay);
     }
 }
