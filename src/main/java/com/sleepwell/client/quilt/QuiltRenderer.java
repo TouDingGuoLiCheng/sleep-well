@@ -20,6 +20,7 @@ import net.minecraft.world.level.block.state.properties.BedPart;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RenderLevelStageEvent;
+import net.minecraftforge.client.event.RenderLivingEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import com.sleepwell.SleepWellMod;
@@ -86,6 +87,15 @@ public final class QuiltRenderer {
     }
 
     private QuiltRenderer() {
+    }
+
+    /** Fires while her model still carries her animated sleeping pose, so the bones are the right ones. */
+    @SubscribeEvent
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    public static void onRenderLiving(RenderLivingEvent.Post event) {
+        if (event.getEntity() instanceof EntityMaid maid && maid.isSleeping()) {
+            MaidSilhouette.capture(maid);
+        }
     }
 
     @SubscribeEvent
