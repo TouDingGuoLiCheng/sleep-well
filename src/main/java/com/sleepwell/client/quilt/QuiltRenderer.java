@@ -218,8 +218,9 @@ public final class QuiltRenderer {
             float profile = profileBySlice[Math.min(profileBySlice.length - 1, Math.round(t * SEGMENTS))];
             // How wide and how tall she is at this slice, straight from her bones. The floors keep the cloth
             // visibly above the mattress even when every bone sits close to her centre line.
-            float cover = Math.min(halfWidth, Math.max(0.24F, profile * 1.8F + 0.12F));
-            float body = Math.min(0.30F, Math.max(0.16F, profile * 1.3F + 0.08F));
+            float norm = Math.min(1.0F, Math.max(0.45F, profile / 0.30F));
+            float cover = halfWidth * (0.55F + 0.45F * norm);
+            float body = Math.min(0.32F, Math.max(0.18F, profile * 1.3F + 0.10F));
             // The feet end drapes down to the mattress instead of ending in a vertical wall; the head end
             // fades too, but it is mostly hidden by the pillow gap anyway.
             float fade = Math.min(1.0F, Math.min(t / 0.10F, (1.0F - t) / 0.26F));
