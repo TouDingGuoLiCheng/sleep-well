@@ -40,7 +40,23 @@ public final class QuiltRenderer {
     private static final float TO_CHEST = 1.42F;
     /** How far around her the cloth wraps, in degrees, measured from "up". */
     private static final float WRAP_DEGREES = 100.0F;
-    private static final int ALONG_STEPS = 14;
+    /**
+     * Body profile along her own model axis: the cloth rises over the legs, dips at the knees and the waist,
+     * bulges over the hips and the chest, so her outline shows through instead of a plain tube.
+     * First column is the height in model blocks, second a multiplier on the base radius.
+     */
+    private static final float[][] PROFILE = {
+            {0.00F, 0.90F},
+            {0.42F, 0.97F},
+            {0.56F, 0.84F},
+            {0.72F, 1.00F},
+            {0.86F, 1.08F},
+            {1.00F, 0.89F},
+            {1.14F, 1.05F},
+            {1.30F, 0.98F},
+            {1.46F, 0.86F}
+    };
+    private static final int ALONG_STEPS = 18;
     private static final int AROUND_STEPS = 10;
 
     private static final Map<DyeColor, ResourceLocation> TEXTURES = new EnumMap<>(DyeColor.class);
@@ -79,7 +95,7 @@ public final class QuiltRenderer {
         }
         side.normalize();
 
-        float radius = Math.max(MIN_RADIUS, (float) maid.getBbWidth() * 0.5F + RADIUS_PAD);
+        float radius = Math.max(MIN_RADIUS, (float) maid.getBbWidth() * 0.5F);
         float wrap = (float) Math.toRadians(WRAP_DEGREES);
 
         PoseStack.Pose entry = pose.last();
@@ -89,15 +105,17 @@ public final class QuiltRenderer {
             float t1 = (float) (i + 1) / ALONG_STEPS;
             float y0 = FROM_FEET + (TO_CHEST - FROM_FEET) * t0;
             float y1 = FROM_FEET + (TO_CHEST - FROM_FEET) * t1;
+            float r0 = radiusAt(y0, radius);
+            float r1 = radiusAt(y1, radius);
             for (int j = 0; j < AROUND_STEPS; j++) {
                 float a0 = -wrap + 2.0F * wrap * j / AROUND_STEPS;
                 float a1 = -wrap + 2.0F * wrap * (j + 1) / AROUND_STEPS;
                 float shade0 = 0.72F + 0.28F * (float) Math.cos(a0 * 0.7D);
                 float shade1 = 0.72F + 0.28F * (float) Math.cos(a1 * 0.7D);
-                vertex(consumer, entry, scratch, up, side, radius, y0, a0, shade0, light);
-                vertex(consumer, entry, scratch, up, side, radius, y1, a0, shade0, light);
-                vertex(consumer, entry, scratch, up, side, radius, y1, a1, shade1, light);
-                vertex(consumer, entry, scratch, up, side, radius, y0, a1, shade1, light);
+                vertex(consumer, entry, scratch, up, side, r0, y0, a0, shade0, light);
+                vertex(consumer, entry, scratch, up, side, r1, y1, a0, shade0, light);
+                vertex(consumer, entry, scratch, up, side, r1, y1, a1, shade1, light);
+                vertex(consumer, entry, scratch, up, side, r0, y0, a1, shade1, light);
             }
         }
         // Little flap hanging off the two edges, so the cloth does not read as a painted band.
@@ -108,13 +126,13 @@ public final class QuiltRenderer {
             for (int i = 0; i < ALONG_STEPS; i++) {
                 float y0 = FROM_FEET + (TO_CHEST - FROM_FEET) * i / ALONG_STEPS;
                 float y1 = FROM_FEET + (TO_CHEST - FROM_FEET) * (i + 1) / ALONG_STEPS;
-                addPoint(scratch, up, side, radius, y0, sx, sy);
+                addPoint(scratch, up, side, radiusAt(y0, radius), y0, sx, sy);
                 vertex(consumer, entry, scratch, 0.0F, 0.0F, 0.70F, light);
-                addPoint(scratch, up, side, radius * 0.92F, y0 - 0.10F, sx, sy);
+                addPoint(scratch, up, side, radiusAt(y0 - 0.10F, radius) * 0.94F, y0 - 0.12F, sx, sy);
                 vertex(consumer, entry, scratch, 0.0F, 0.5F, 0.70F, light);
-                addPoint(scratch, up, side, radius * 0.92F, y1 - 0.10F, sx, sy);
+                addPoint(scratch, up, side, radiusAt(y1 - 0.10F, radius) * 0.94F, y1 - 0.12F, sx, sy);
                 vertex(consumer, entry, scratch, 1.0F, 0.5F, 0.70F, light);
-                addPoint(scratch, up, side, radius, y1, sx, sy);
+                addPoint(scratch, up, side, radiusAt(y1, radius), y1, sx, sy);
                 vertex(consumer, entry, scratch, 1.0F, 0.0F, 0.70F, light);
             }
         }
@@ -135,9 +153,25 @@ public final class QuiltRenderer {
         return DyeColor.PINK;
     }
 
+    /** Radius of the shell at a given height along her body, from the profile above. */
+    private static float radiusAt(float y, float base) {
+        float factor = PROFILE[PROFILE.length - 1][1];
+        for (int i = 0; i < PROFILE.length - 1; i++) {
+            float low = PROFILE[i][0];
+            float high = PROFILE[i + 1][0];
+            if (y <= high) {
+                float t = Math.max(0.0F, Math.min(1.0F, (y - low) / (high - low)));
+                factor = PROFILE[i][1] + (PROFILE[i + 1][1] - PROFILE[i][1]) * t;
+                break;
+            }
+        }
+        return base * factor + RADIUS_PAD * 0.5F;
+    }
+
     private static void addPoint(Vector3f out, Vector3f up, Vector3f side, float radius, float y,
                                  float cos, float sin) {
-        out.set(up).mul(radius * cos).add(side.x * radius * sin, side.y * radius * sin, side.z * radius * sin);
+        float flat = sin * 0.90F;
+        out.set(up).mul(radius * cos).add(side.x * radius * flat, side.y * radius * flat, side.z * radius * flat);
         out.y += y;
     }
 
