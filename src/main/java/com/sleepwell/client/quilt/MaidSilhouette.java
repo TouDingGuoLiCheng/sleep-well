@@ -8,8 +8,13 @@ import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.LivingEntityRenderer;
 
 import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -63,6 +68,7 @@ public final class MaidSilhouette {
     public static void forget(UUID id) {
         CACHE.remove(id);
         STAMP.remove(id);
+        PRINTS.remove(id);
     }
 
     private static float[] compute(EntityMaid maid) {
@@ -75,35 +81,47 @@ public final class MaidSilhouette {
             Map<?, ?> parts = bedrockParts(model);
             if (parts == null || parts.isEmpty()) {
                 if (FAILURES++ < 4) {
-                    LOGGER.info("[sleep_well] no bedrock part map on " + model.getClass().getName()
-                            + " parts=" + (parts == null ? "null" : parts.size()));
+                    LOGGER.info("[sleep_well] no bedrock part map on {}", model.getClass().getName());
                 }
                 return null;
             }
-            float[] radius = new float[BINS];
+            // Bones carry offsets relative to their parent, so the tree has to be walked from the roots.
+            Set<Object> children = Collections.newSetFromMap(new IdentityHashMap<>());
+            for (Object part : parts.values()) {
+                children.addAll(childrenOf(part));
+            }
+            List<float[]> points = new ArrayList<>();
+            for (Object part : parts.values()) {
+                if (part != null && !children.contains(part)) {
+                    walk(part, 0.0F, 0.0F, 0.0F, points);
+                }
+            }
+            if (points.isEmpty()) {
+                for (Object part : parts.values()) {
+                    walk(part, 0.0F, 0.0F, 0.0F, points);
+                }
+            }
+            if (points.isEmpty()) {
+                return null;
+            }
             float maxY = 0.0F;
-            for (Object value : parts.values()) {
-                if (value == null) {
-                    continue;
-                }
-                float x = read(value, "x") / PIXELS;
-                float y = read(value, "y") / PIXELS;
-                float z = read(value, "z") / PIXELS;
-                float lateral = Math.max(Math.abs(x), Math.abs(z)) + 0.10F;
-                maxY = Math.max(maxY, y);
-                int bin = (int) Math.floor(y / 2.0F);
-                if (bin >= 0 && bin < BINS) {
-                    radius[bin] = Math.max(radius[bin], lateral);
-                }
+            for (float[] point : points) {
+                maxY = Math.max(maxY, point[1]);
             }
-            if (maxY < 0.5F) {
+            if (maxY < 0.2F) {
                 return null;
+            }
+            float slice = maxY / BINS;
+            float[] radius = new float[BINS];
+            for (float[] point : points) {
+                int bin = Math.min(BINS - 1, Math.max(0, (int) (point[1] / slice)));
+                radius[bin] = Math.max(radius[bin], point[2]);
             }
             for (int i = 1; i < BINS; i++) {
-                radius[i] = Math.max(radius[i], radius[i - 1] * 0.90F);
+                radius[i] = Math.max(radius[i], radius[i - 1] * 0.85F);
             }
             for (int i = BINS - 2; i >= 0; i--) {
-                radius[i] = Math.max(radius[i], radius[i + 1] * 0.90F);
+                radius[i] = Math.max(radius[i], radius[i + 1] * 0.85F);
             }
             float[] out = new float[BINS + 1];
             out[0] = maxY;
@@ -112,44 +130,53 @@ public final class MaidSilhouette {
             return out;
         } catch (Throwable error) {
             if (FAILURES++ < 4) {
-                LOGGER.info("[sleep_well] silhouette sampling failed: " + error);
-                for (StackTraceElement element : error.getStackTrace()) {
-                    LOGGER.info("[sleep_well]   at " + element);
-                    if (element.getClassName().startsWith("com.sleepwell")) {
-                        break;
-                    }
-                }
+                LOGGER.info("[sleep_well] silhouette sampling failed: {}", error.toString());
             }
             return null;
         }
     }
 
-    /** Temporary: show what the sampler actually sees, twice per maid. */
+    private static void walk(Object part, float parentX, float parentY, float parentZ, List<float[]> points) {
+        float x = parentX + read(part, "x");
+        float y = parentY + read(part, "y");
+        float z = parentZ + read(part, "z");
+        float lateral = (float) Math.sqrt(x * x + z * z) / PIXELS + 0.06F;
+        points.add(new float[]{x / PIXELS, y / PIXELS, lateral});
+        for (Object child : childrenOf(part)) {
+            walk(child, x, y, z, points);
+        }
+    }
+
+    private static float read(Object part, String name) {
+        try {
+            return part.getClass().getField(name).getFloat(part);
+        } catch (Throwable ignored) {
+            return 0.0F;
+        }
+    }
+
+    private static List<?> childrenOf(Object part) {
+        try {
+            Object value = part.getClass().getField("children").get(part);
+            return value instanceof List<?> list ? list : List.of();
+        } catch (Throwable ignored) {
+            return List.of();
+        }
+    }
+
     private static void debug(EntityMaid maid, Object model, Map<?, ?> parts, float[] profile) {
-        java.util.UUID id = maid.getUUID();
+        UUID id = maid.getUUID();
         int printed = PRINTS.getOrDefault(id, 0);
-        if (printed >= 2) {
+        if (printed >= 1) {
             return;
         }
         PRINTS.put(id, printed + 1);
-        LOGGER.info("[sleep_well] silhouette maid=" + id + " model=" + model.getClass().getName()
-                + " parts=" + parts.size());
-        int shown = 0;
-        for (Map.Entry<?, ?> entry : parts.entrySet()) {
-            if (shown++ >= 10) {
-                break;
-            }
-            Object part = entry.getValue();
-            LOGGER.info("[sleep_well]   bone " + entry.getKey()
-                    + " x=" + read(part, "x") + " y=" + read(part, "y") + " z=" + read(part, "z")
-                    + " ox=" + read(part, "offsetX") + " oy=" + read(part, "offsetY")
-                    + " oz=" + read(part, "offsetZ"));
-        }
         StringBuilder builder = new StringBuilder();
         for (int i = 0; i < BINS; i++) {
             builder.append(String.format("%.2f ", profile[1 + i]));
         }
-        LOGGER.info("[sleep_well]   height=" + String.format("%.2f", profile[0]) + " radius=" + builder);
+        LOGGER.info("[sleep_well] silhouette maid={} model={} parts={} height={} radius={}", id,
+                model.getClass().getSimpleName(), parts.size(), String.format("%.2f", profile[0]), builder);
     }
 
     public static float radiusAt(float[] profile, float bodyY) {
@@ -160,8 +187,6 @@ public final class MaidSilhouette {
     }
 
     private static Map<?, ?> bedrockParts(EntityModel<?> model) throws IllegalAccessException {
-        // Several maps live on that model; "modelMapWrapper" is the animation wrapper table and is usually
-        // empty, the bones themselves are in "modelMap". Prefer the exact name, but accept any non-empty one.
         Map<?, ?> fallback = null;
         Class<?> type = model.getClass();
         while (type != null) {
@@ -183,13 +208,5 @@ public final class MaidSilhouette {
             type = type.getSuperclass();
         }
         return fallback;
-    }
-
-    private static float read(Object part, String name) {
-        try {
-            return part.getClass().getField(name).getFloat(part);
-        } catch (Throwable ignored) {
-            return 0.0F;
-        }
     }
 }
