@@ -192,10 +192,9 @@ public final class QuiltRenderer {
             float t = (float) i / SEGMENTS;
             if (silhouette != null) {
                 float bodyY = silhouette[0] * (1.0F - t);
-                profileBySlice[i] = Math.max(0.45F, Math.min(1.15F,
-                        MaidSilhouette.radiusAt(silhouette, bodyY) / 0.22F));
+                profileBySlice[i] = MaidSilhouette.radiusAt(silhouette, bodyY);
             } else {
-                profileBySlice[i] = profileAt(t);
+                profileBySlice[i] = profileAt(t) * 0.22F;
             }
         }
         // Wide enough that the model cannot poke out of the sides.
@@ -217,9 +216,10 @@ public final class QuiltRenderer {
             float t = (float) i / alongSteps;
             float u = uStart + (uEnd - uStart) * t;
             float profile = profileBySlice[Math.min(profileBySlice.length - 1, Math.round(t * SEGMENTS))];
-            // How wide and how tall she is at this slice, straight from her bones.
-            float cover = Math.min(halfWidth, Math.max(0.16F, profile * 0.32F));
-            float body = Math.min(0.30F, Math.max(0.08F, profile * 0.22F));
+            // How wide and how tall she is at this slice, straight from her bones. The floors keep the cloth
+            // visibly above the mattress even when every bone sits close to her centre line.
+            float cover = Math.min(halfWidth, Math.max(0.24F, profile * 1.8F + 0.12F));
+            float body = Math.min(0.30F, Math.max(0.16F, profile * 1.3F + 0.08F));
             // The feet end drapes down to the mattress instead of ending in a vertical wall; the head end
             // fades too, but it is mostly hidden by the pillow gap anyway.
             float fade = Math.min(1.0F, Math.min(t / 0.10F, (1.0F - t) / 0.26F));
