@@ -42,7 +42,10 @@ public final class QuiltRenderer {
     private static final float HEAD_GAP = 0.15F;
     private static final float FOOT_GAP = 0.15F;
     /** Half the mattress width: the bed is one block wide, so 0.40 keeps the cloth on the mattress. */
-    private static final float HALF_WIDTH = 0.48F;
+    private static final float HALF_WIDTH = 0.50F;
+    /** How far the sides hang past the mattress edge, and how far down. */
+    private static final float SKIRT_OUT = 0.10F;
+    private static final float SKIRT_DROP = 0.30F;
     /** Roughly how far the cloth sits above the mattress where it is not lifted by her body. */
     private static final float LIE_FLAT = 0.014F;
     private static final float BULGE = 0.16F;
@@ -218,9 +221,9 @@ public final class QuiltRenderer {
             float profile = profileBySlice[Math.min(profileBySlice.length - 1, Math.round(t * SEGMENTS))];
             // How wide and how tall she is at this slice, straight from her bones. The floors keep the cloth
             // visibly above the mattress even when every bone sits close to her centre line.
-            float norm = Math.min(1.0F, Math.max(0.45F, profile / 0.30F));
-            float cover = halfWidth * (0.55F + 0.45F * norm);
-            float body = Math.min(0.32F, Math.max(0.18F, profile * 1.3F + 0.10F));
+            // Thick quilt (up to half a block) with a gentle in-and-out following her bones.
+            float cover = halfWidth;
+            float body = Math.min(0.50F, Math.max(0.30F, profile * 1.6F + 0.18F));
             // The feet end drapes down to the mattress instead of ending in a vertical wall; the head end
             // fades too, but it is mostly hidden by the pillow gap anyway.
             float fade = Math.min(1.0F, Math.min(t / 0.10F, (1.0F - t) / 0.26F));
@@ -246,6 +249,21 @@ public final class QuiltRenderer {
                 float v1 = (float) (j + 1) / acrossSteps;
                 quad(consumer, pose, points[i][j], points[i + 1][j], points[i + 1][j + 1], points[i][j + 1],
                         v0, v1, light, shades[i][j], shades[i][j + 1]);
+            }
+        }
+        // Both sides hang over the edge of the bed, like a real quilt tucked in nowhere.
+        for (int side : new int[]{0, acrossSteps}) {
+            float outward = side == 0 ? -1.0F : 1.0F;
+            for (int i = 0; i < alongSteps; i++) {
+                Vec3 topA = points[i][side];
+                Vec3 topB = points[i + 1][side];
+                Vec3 lowA = topA.add(across.x * outward * SKIRT_OUT, -SKIRT_DROP, across.z * outward * SKIRT_OUT);
+                Vec3 lowB = topB.add(across.x * outward * SKIRT_OUT, -SKIRT_DROP, across.z * outward * SKIRT_OUT);
+                if (side == 0) {
+                    quad(consumer, pose, topB, topA, lowA, lowB, 0.0F, 0.2F, light, 0.66F, 0.66F);
+                } else {
+                    quad(consumer, pose, topA, topB, lowB, lowA, 0.0F, 0.2F, light, 0.66F, 0.66F);
+                }
             }
         }
         buffers.endBatch(RenderType.entityCutoutNoCull(texture));
