@@ -42,7 +42,7 @@ public final class QuiltRenderer {
     private static final float HEAD_GAP = 0.15F;
     private static final float FOOT_GAP = 0.15F;
     /** Half the mattress width: the bed is one block wide, so 0.40 keeps the cloth on the mattress. */
-    private static final float HALF_WIDTH = 0.40F;
+    private static final float HALF_WIDTH = 0.48F;
     private static final float BULGE = 0.10F;
     /** Extra lift right over the maid, so the cloth drapes over her instead of floating flat. */
     private static final float BODY_BUMP = 0.07F;
@@ -146,6 +146,7 @@ public final class QuiltRenderer {
         net.minecraft.world.phys.AABB box = maid.getBoundingBox();
         float uMin = Float.MAX_VALUE;
         float uMax = -Float.MAX_VALUE;
+        float wMax = 0.0F;
         double[] xs = {box.minX, box.maxX};
         double[] zs = {box.minZ, box.maxZ};
         for (double x : xs) {
@@ -153,19 +154,25 @@ public final class QuiltRenderer {
                 double dx = x - headCenter.x;
                 double dz = z - headCenter.z;
                 float u = (float) (dx * along.x + dz * along.z);
+                float w = Math.abs((float) (dx * across.x + dz * across.z));
                 uMin = Math.min(uMin, u);
                 uMax = Math.max(uMax, u);
+                wMax = Math.max(wMax, w);
             }
         }
+        // Cover her whole footprint, then widen the reach so no part of the model ends up outside the cloth.
         float uStart = Math.max(HEAD_GAP, uMin - BODY_MARGIN);
         float uEnd = Math.min(bedEnd, uMax + BODY_MARGIN);
-        if (uEnd - uStart < 0.8F) {
-            uStart = HEAD_GAP;
-            uEnd = bedEnd;
+        if (uEnd - uStart < 1.0F) {
+            uStart = Math.max(HEAD_GAP, uStart - 0.25F);
+            uEnd = Math.min(bedEnd, uEnd + 0.25F);
         }
         float bodyCenter = (uStart + uEnd) * 0.5F;
-        float halfWidth = Math.min(HALF_WIDTH,
-                Math.max(0.33F, (float) maid.getBbWidth() * 0.5F + 0.10F));
+        // Wide enough that the model cannot poke out of the sides.
+        float halfWidth = Math.min(HALF_WIDTH, Math.max(0.42F, wMax + 0.12F));
+        // Sit just above her, but never a full block up: a sleeping hitbox may still be the standing one.
+        float clothLift = (float) Math.min(0.42D, Math.max(0.14D, box.maxY - headCenter.y + 0.06D));
+        float skirt = clothLift + 0.06F;
 
         int light = LevelRenderer.getLightColor(level, bed.head());
         ResourceLocation texture = TEXTURES.getOrDefault(bed.color(),
@@ -188,7 +195,7 @@ public final class QuiltRenderer {
                         + BODY_BUMP * body * (0.6F + 0.4F * lift);
                 points[i][j] = new Vec3(
                         headCenter.x + along.x * u + across.x * (s * halfWidth),
-                        headCenter.y + height,
+                        headCenter.y + clothLift + height,
                         headCenter.z + along.z * u + across.z * (s * halfWidth));
                 shades[i][j] = 0.78F + 0.22F * lift;
             }
@@ -207,8 +214,8 @@ public final class QuiltRenderer {
             for (int i = 0; i < alongSteps; i++) {
                 Vec3 topA = points[i][j];
                 Vec3 topB = points[i + 1][j];
-                Vec3 lowA = topA.add(0.0D, -SKIRT, 0.0D);
-                Vec3 lowB = topB.add(0.0D, -SKIRT, 0.0D);
+                Vec3 lowA = topA.add(0.0D, -skirt, 0.0D);
+                Vec3 lowB = topB.add(0.0D, -skirt, 0.0D);
                 if (left) {
                     quad(consumer, pose, topA, topB, lowB, lowA, 0.0F, 0.25F, light, 0.72F, 0.72F);
                 } else {
@@ -223,8 +230,8 @@ public final class QuiltRenderer {
             for (int j = 0; j < acrossSteps; j++) {
                 Vec3 a = points[i][j];
                 Vec3 b = points[i][j + 1];
-                Vec3 aLow = a.add(0.0D, -SKIRT, 0.0D);
-                Vec3 bLow = b.add(0.0D, -SKIRT, 0.0D);
+                Vec3 aLow = a.add(0.0D, -skirt, 0.0D);
+                Vec3 bLow = b.add(0.0D, -skirt, 0.0D);
                 if (end == 0) {
                     quad(consumer, pose, b, a, aLow, bLow, 0.0F, 1.0F, light, 0.70F, 0.70F);
                 } else {
