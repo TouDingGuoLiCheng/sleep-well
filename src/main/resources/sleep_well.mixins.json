@@ -9,6 +9,9 @@
     "MaidClearSleepTaskMixin",
     "SchedulePosMixin"
   ],
+  "client": [
+    "TileEntityMaidBedRendererMixin"
+  ],
   "injectors": {
     "defaultRequire": 1
   }
