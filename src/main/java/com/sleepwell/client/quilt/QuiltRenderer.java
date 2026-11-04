@@ -223,7 +223,8 @@ public final class QuiltRenderer {
             // visibly above the mattress even when every bone sits close to her centre line.
             // Thick quilt (up to half a block) with a gentle in-and-out following her bones.
             float cover = halfWidth;
-            float body = Math.min(0.50F, Math.max(0.30F, profile * 1.6F + 0.18F));
+            // Never sink below her own body: clothLift is how high her hitbox reaches above the mattress.
+            float body = Math.min(0.50F, Math.max(0.30F, Math.max(profile * 1.6F + 0.18F, clothLift + 0.06F)));
             // The feet end drapes down to the mattress instead of ending in a vertical wall; the head end
             // fades too, but it is mostly hidden by the pillow gap anyway.
             float fade = Math.min(1.0F, Math.min(t / 0.10F, (1.0F - t) / 0.26F));
@@ -234,7 +235,9 @@ public final class QuiltRenderer {
                 float lift = 0.0F;
                 if (distance < cover && cover > 1.0E-3F) {
                     double ratio = distance / cover;
-                    lift = body * (float) Math.pow(0.5D + 0.5D * Math.cos(Math.PI * ratio), 0.75D);
+                    // Flat topped dome: it stays almost full height across most of the width and only
+                    // drops near the very edge, so limbs lying off centre stay under the cloth.
+                    lift = body * (float) Math.pow(0.5D + 0.5D * Math.cos(Math.PI * ratio), 0.30D);
                 }
                 points[i][j] = new Vec3(
                         headCenter.x + along.x * u + across.x * (s * halfWidth),
