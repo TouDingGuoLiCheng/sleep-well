@@ -11,6 +11,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.DyeColor;
+import net.minecraft.world.level.block.HorizontalDirectionalBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.shapes.VoxelShape;
 
@@ -44,6 +45,8 @@ public final class QuiltRenderer {
     /** Left free at the pillow end, so her head stays outside the duvet. */
     private static final float HEAD_GAP = 0.35F;
 
+    private static boolean LOGGED;
+
     private QuiltRenderer() {
     }
 
@@ -62,7 +65,13 @@ public final class QuiltRenderer {
         }
         float top = mattressTop(bed, state);
         ResourceLocation texture = TEXTURES.getOrDefault(bed.getColor(), TEXTURES.get(DyeColor.WHITE));
-        VertexConsumer consumer = buffer.getBuffer(RenderType.entityCutout(texture));
+        // No culling: the mesh is hand built and its winding would otherwise hide the top face entirely.
+        VertexConsumer consumer = buffer.getBuffer(RenderType.entityCutoutNoCull(texture));
+        if (!LOGGED) {
+            LOGGED = true;
+            System.out.println("[sleep_well] quilt render: axis=" + axis + " top=" + top + " color=" + bed.getColor()
+                    + " state=" + state);
+        }
         PoseStack.Pose last = pose.last();
 
         Direction side = axis.getClockWise();
@@ -178,7 +187,8 @@ public final class QuiltRenderer {
                 return direction;
             }
         }
-        return null;
+        // The two halves are always adjacent; if the neighbour is not loaded yet, fall back to the facing.
+        return state.getValue(HorizontalDirectionalBlock.FACING).getOpposite();
     }
 
     /** Mattress top from the block's own collision shape, so it follows TLM if the bed changes. */
