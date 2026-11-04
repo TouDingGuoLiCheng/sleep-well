@@ -43,6 +43,8 @@ public final class QuiltRenderer {
     private static final float FOOT_GAP = 0.15F;
     /** Half the mattress width: the bed is one block wide, so 0.40 keeps the cloth on the mattress. */
     private static final float HALF_WIDTH = 0.48F;
+    /** Roughly how far the cloth sits above the mattress where it is not lifted by her body. */
+    private static final float LIE_FLAT = 0.014F;
     private static final float BULGE = 0.16F;
     /**
      * Height multiplier along the bed, from the pillow end (0) to the feet end (1): chest, waist, hips,
@@ -214,20 +216,27 @@ public final class QuiltRenderer {
         for (int i = 0; i <= alongSteps; i++) {
             float t = (float) i / alongSteps;
             float u = uStart + (uEnd - uStart) * t;
-            float arch = (float) Math.sin(Math.PI * t);
-            float profile = profileBySlice[Math.min(profileBySlice.length - 1,
-                    Math.round(t * SEGMENTS))];
+            float profile = profileBySlice[Math.min(profileBySlice.length - 1, Math.round(t * SEGMENTS))];
+            // How wide and how tall she is at this slice, straight from her bones.
+            float cover = Math.min(halfWidth, Math.max(0.16F, profile * 0.32F));
+            float body = Math.min(0.30F, Math.max(0.08F, profile * 0.22F));
+            // The feet end drapes down to the mattress instead of ending in a vertical wall; the head end
+            // fades too, but it is mostly hidden by the pillow gap anyway.
+            float fade = Math.min(1.0F, Math.min(t / 0.10F, (1.0F - t) / 0.26F));
+            body *= Math.max(0.0F, fade);
             for (int j = 0; j <= acrossSteps; j++) {
                 float s = -1.0F + 2.0F * j / acrossSteps;
-                float lift = (float) Math.cos(s * Math.PI * 0.5D);
-                float body = (float) Math.exp(-Math.pow((u - bodyCenter) / BODY_RADIUS, 2.0D));
-                float prof = profile;
-                float height = (0.04F + BULGE * prof + BODY_BUMP * body) * (0.60F + 0.40F * lift);
+                float distance = Math.abs(s) * halfWidth;
+                float lift = 0.0F;
+                if (distance < cover && cover > 1.0E-3F) {
+                    double ratio = distance / cover;
+                    lift = body * (float) Math.pow(0.5D + 0.5D * Math.cos(Math.PI * ratio), 0.75D);
+                }
                 points[i][j] = new Vec3(
                         headCenter.x + along.x * u + across.x * (s * halfWidth),
-                        headCenter.y + clothLift + height,
+                        headCenter.y + LIE_FLAT + lift,
                         headCenter.z + along.z * u + across.z * (s * halfWidth));
-                shades[i][j] = 0.78F + 0.22F * lift;
+                shades[i][j] = 0.72F + 0.28F * Math.min(1.0F, lift / 0.20F);
             }
         }
         for (int i = 0; i < alongSteps; i++) {
@@ -236,37 +245,6 @@ public final class QuiltRenderer {
                 float v1 = (float) (j + 1) / acrossSteps;
                 quad(consumer, pose, points[i][j], points[i + 1][j], points[i + 1][j + 1], points[i][j + 1],
                         v0, v1, light, shades[i][j], shades[i][j + 1]);
-            }
-        }
-        // Side skirts hanging off both edges.
-        for (int j = 0; j < acrossSteps; j += acrossSteps - 1) {
-            boolean left = j == 0;
-            for (int i = 0; i < alongSteps; i++) {
-                Vec3 topA = points[i][j];
-                Vec3 topB = points[i + 1][j];
-                Vec3 lowA = topA.add(0.0D, -skirt, 0.0D);
-                Vec3 lowB = topB.add(0.0D, -skirt, 0.0D);
-                if (left) {
-                    quad(consumer, pose, topA, topB, lowB, lowA, 0.0F, 0.25F, light, 0.72F, 0.72F);
-                } else {
-                    quad(consumer, pose, topB, topA, lowA, lowB, 0.25F, 0.5F, light, 0.72F, 0.72F);
-                }
-            }
-        }
-        // End caps so the cloth does not look like a paper sheet.
-        for (int end = 0; end < 2; end++) {
-            int i = end == 0 ? 0 : alongSteps;
-            float v = end == 0 ? 0.0F : 1.0F;
-            for (int j = 0; j < acrossSteps; j++) {
-                Vec3 a = points[i][j];
-                Vec3 b = points[i][j + 1];
-                Vec3 aLow = a.add(0.0D, -skirt, 0.0D);
-                Vec3 bLow = b.add(0.0D, -skirt, 0.0D);
-                if (end == 0) {
-                    quad(consumer, pose, b, a, aLow, bLow, 0.0F, 1.0F, light, 0.70F, 0.70F);
-                } else {
-                    quad(consumer, pose, a, b, bLow, aLow, 0.0F, 1.0F, light, 0.70F, 0.70F);
-                }
             }
         }
         buffers.endBatch(RenderType.entityCutoutNoCull(texture));
