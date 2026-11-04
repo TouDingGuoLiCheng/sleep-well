@@ -47,8 +47,9 @@ public final class QuiltRenderer {
     /** Extra lift right over the maid, so the cloth drapes over her instead of floating flat. */
     private static final float BODY_BUMP = 0.07F;
     private static final float BODY_RADIUS = 0.45F;
-    /** How far past her own body the cloth reaches at each end. */
-    private static final float BODY_MARGIN = 0.55F;
+    /** How far past her hitbox the cloth reaches. The feet reach far beyond the hitbox, so that side is longer. */
+    private static final float HEAD_MARGIN = 0.45F;
+    private static final float FOOT_MARGIN = 0.95F;
     private static final float SKIRT = 0.16F;
     private static final int SEGMENTS = 12;
     private static final int WIDTH_SEGMENTS = 6;
@@ -161,8 +162,8 @@ public final class QuiltRenderer {
             }
         }
         // Cover her whole footprint, then widen the reach so no part of the model ends up outside the cloth.
-        float uStart = Math.max(HEAD_GAP, uMin - BODY_MARGIN);
-        float uEnd = Math.min(bedEnd, uMax + BODY_MARGIN);
+        float uStart = Math.max(HEAD_GAP, uMin - HEAD_MARGIN);
+        float uEnd = Math.min(bedEnd, uMax + FOOT_MARGIN);
         if (uEnd - uStart < 1.0F) {
             uStart = Math.max(HEAD_GAP, uStart - 0.25F);
             uEnd = Math.min(bedEnd, uEnd + 0.25F);
