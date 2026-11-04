@@ -185,10 +185,10 @@ public final class QuiltRenderer {
         float uStart = Math.max(HEAD_GAP, uMin - HEAD_MARGIN);
         // Her feet often hang off the end of the bed, so the cloth is allowed past the mattress edge and
         // simply drapes off it.
-        float uEnd = Math.min(bedEnd + 0.45F, uMax + FOOT_MARGIN);
+        float uEnd = Math.min(bedEnd + 0.85F, uMax + FOOT_MARGIN + 0.35F);
         if (uEnd - uStart < 1.0F) {
             uStart = Math.max(HEAD_GAP, uStart - 0.25F);
-            uEnd = Math.min(bedEnd + 0.45F, uEnd + 0.25F);
+            uEnd = Math.min(bedEnd + 0.85F, uEnd + 0.25F);
         }
         float bodyCenter = (uStart + uEnd) * 0.5F;
         // Her own bones, when TLM's model exposes them; the hard coded profile is only the fallback.
@@ -212,7 +212,8 @@ public final class QuiltRenderer {
         float halfWidth = Math.max(Math.min(HALF_WIDTH, Math.max(0.42F, wMax + 0.12F)),
                 Math.min(1.0F, frameHalf + 0.02F));
         float skirtOut = Math.max(SKIRT_OUT, Math.max(0.0F, frameHalf - halfWidth) + 0.14F);
-        float skirtDrop = (float) Math.max(SKIRT_DROP, bedTop - bedBottom + 0.14F);
+        // Kept small on purpose: a long curtain looks like a wall, not like cloth.
+        float skirtDrop = (float) Math.min(0.22F, Math.max(0.12F, bedTop - bedBottom * 0.5F));
         // Sit just above her, but never a full block up: a sleeping hitbox may still be the standing one.
         float clothLift = (float) Math.min(0.42D, Math.max(0.14D, box.maxY - headCenter.y + 0.06D));
         float skirt = clothLift + 0.06F;
@@ -265,18 +266,25 @@ public final class QuiltRenderer {
                         v0, v1, light, shades[i][j], shades[i][j + 1]);
             }
         }
-        // Both sides hang over the edge of the bed, like a real quilt tucked in nowhere.
+        // A rounded hem instead of a long flat curtain: it reads as the thickness of the quilt and it does
+        // not drag on the floor.
         for (int side : new int[]{0, acrossSteps}) {
             float outward = side == 0 ? -1.0F : 1.0F;
             for (int i = 0; i < alongSteps; i++) {
                 Vec3 topA = points[i][side];
                 Vec3 topB = points[i + 1][side];
-                Vec3 lowA = topA.add(across.x * outward * skirtOut, -skirtDrop, across.z * outward * skirtOut);
-                Vec3 lowB = topB.add(across.x * outward * skirtOut, -skirtDrop, across.z * outward * skirtOut);
+                Vec3 rollA = topA.add(across.x * outward * skirtOut, -0.07D, across.z * outward * skirtOut);
+                Vec3 rollB = topB.add(across.x * outward * skirtOut, -0.07D, across.z * outward * skirtOut);
+                Vec3 hemA = topA.add(across.x * outward * (skirtOut * 0.4D), -0.15D,
+                        across.z * outward * (skirtOut * 0.4D));
+                Vec3 hemB = topB.add(across.x * outward * (skirtOut * 0.4D), -0.15D,
+                        across.z * outward * (skirtOut * 0.4D));
                 if (side == 0) {
-                    quad(consumer, pose, topB, topA, lowA, lowB, 0.0F, 0.2F, light, 0.66F, 0.66F);
+                    quad(consumer, pose, topB, topA, rollA, rollB, 0.0F, 0.1F, light, 0.70F, 0.70F);
+                    quad(consumer, pose, rollB, rollA, hemA, hemB, 0.1F, 0.2F, light, 0.62F, 0.62F);
                 } else {
-                    quad(consumer, pose, topA, topB, lowB, lowA, 0.0F, 0.2F, light, 0.66F, 0.66F);
+                    quad(consumer, pose, topA, topB, rollB, rollA, 0.0F, 0.1F, light, 0.70F, 0.70F);
+                    quad(consumer, pose, rollA, rollB, hemB, hemA, 0.1F, 0.2F, light, 0.62F, 0.62F);
                 }
             }
         }
