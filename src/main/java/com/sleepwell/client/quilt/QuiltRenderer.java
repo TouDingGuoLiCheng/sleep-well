@@ -183,6 +183,19 @@ public final class QuiltRenderer {
             uEnd = Math.min(bedEnd, uEnd + 0.25F);
         }
         float bodyCenter = (uStart + uEnd) * 0.5F;
+        // Her own bones, when TLM's model exposes them; the hard coded profile is only the fallback.
+        float[] silhouette = MaidSilhouette.sample(maid);
+        float[] profileBySlice = new float[SEGMENTS + 1];
+        for (int i = 0; i <= SEGMENTS; i++) {
+            float t = (float) i / SEGMENTS;
+            if (silhouette != null) {
+                float bodyY = silhouette[0] * (1.0F - t);
+                profileBySlice[i] = Math.max(0.45F, Math.min(1.15F,
+                        MaidSilhouette.radiusAt(silhouette, bodyY) / 0.22F));
+            } else {
+                profileBySlice[i] = profileAt(t);
+            }
+        }
         // Wide enough that the model cannot poke out of the sides.
         float halfWidth = Math.min(HALF_WIDTH, Math.max(0.42F, wMax + 0.12F));
         // Sit just above her, but never a full block up: a sleeping hitbox may still be the standing one.
@@ -202,11 +215,13 @@ public final class QuiltRenderer {
             float t = (float) i / alongSteps;
             float u = uStart + (uEnd - uStart) * t;
             float arch = (float) Math.sin(Math.PI * t);
+            float profile = profileBySlice[Math.min(profileBySlice.length - 1,
+                    Math.round(t * SEGMENTS))];
             for (int j = 0; j <= acrossSteps; j++) {
                 float s = -1.0F + 2.0F * j / acrossSteps;
                 float lift = (float) Math.cos(s * Math.PI * 0.5D);
                 float body = (float) Math.exp(-Math.pow((u - bodyCenter) / BODY_RADIUS, 2.0D));
-                float prof = profileAt((u - uStart) / (uEnd - uStart));
+                float prof = profile;
                 float height = (0.04F + BULGE * prof + BODY_BUMP * body) * (0.60F + 0.40F * lift);
                 points[i][j] = new Vec3(
                         headCenter.x + along.x * u + across.x * (s * halfWidth),
