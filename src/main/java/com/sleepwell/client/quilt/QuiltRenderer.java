@@ -77,6 +77,8 @@ public final class QuiltRenderer {
     private static final int WIDTH_SEGMENTS = 6;
     private static final float FALLBACK_TOP = 0.5125F;
 
+    private static int STAGE_LOGS;
+    private static int SLEEP_LOGS;
     private static final Map<DyeColor, ResourceLocation> TEXTURES = new EnumMap<>(DyeColor.class);
 
     static {
@@ -108,10 +110,16 @@ public final class QuiltRenderer {
             return;
         }
         Vec3 camera = event.getCamera().getPosition();
+        if (STAGE_LOGS++ < 3) {
+            System.out.println("[sleep_well] quilt stage running, camera=" + camera);
+        }
         List<EntityMaid> sleeping = level.getEntitiesOfClass(EntityMaid.class,
                 new net.minecraft.world.phys.AABB(camera.x - 64.0D, camera.y - 64.0D, camera.z - 64.0D,
                         camera.x + 64.0D, camera.y + 64.0D, camera.z + 64.0D),
                 EntityMaid::isSleeping);
+        if (SLEEP_LOGS++ < 3) {
+            System.out.println("[sleep_well] sleeping maids near camera=" + sleeping.size());
+        }
         if (sleeping.isEmpty()) {
             return;
         }

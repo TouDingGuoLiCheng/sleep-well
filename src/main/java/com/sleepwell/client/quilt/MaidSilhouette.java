@@ -26,6 +26,7 @@ public final class MaidSilhouette {
     private static final Map<UUID, float[]> CACHE = new HashMap<>();
     private static final Map<UUID, Integer> STAMP = new HashMap<>();
     private static final Map<UUID, Integer> PRINTS = new HashMap<>();
+    private static int FAILURES;
 
     private MaidSilhouette() {
     }
@@ -71,6 +72,10 @@ public final class MaidSilhouette {
             EntityModel<?> model = living.getModel();
             Map<?, ?> parts = bedrockParts(model);
             if (parts == null || parts.isEmpty()) {
+                if (FAILURES++ < 4) {
+                    System.out.println("[sleep_well] no bedrock part map on " + model.getClass().getName()
+                            + " parts=" + (parts == null ? "null" : parts.size()));
+                }
                 return null;
             }
             float[] radius = new float[BINS];
@@ -103,7 +108,16 @@ public final class MaidSilhouette {
             System.arraycopy(radius, 0, out, 1, BINS);
             debug(maid, model, parts, out);
             return out;
-        } catch (Throwable ignored) {
+        } catch (Throwable error) {
+            if (FAILURES++ < 4) {
+                System.out.println("[sleep_well] silhouette sampling failed: " + error);
+                for (StackTraceElement element : error.getStackTrace()) {
+                    System.out.println("[sleep_well]   at " + element);
+                    if (element.getClassName().startsWith("com.sleepwell")) {
+                        break;
+                    }
+                }
+            }
             return null;
         }
     }
