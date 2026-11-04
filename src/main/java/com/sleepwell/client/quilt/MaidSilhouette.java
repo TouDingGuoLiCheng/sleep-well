@@ -160,18 +160,29 @@ public final class MaidSilhouette {
     }
 
     private static Map<?, ?> bedrockParts(EntityModel<?> model) throws IllegalAccessException {
+        // Several maps live on that model; "modelMapWrapper" is the animation wrapper table and is usually
+        // empty, the bones themselves are in "modelMap". Prefer the exact name, but accept any non-empty one.
+        Map<?, ?> fallback = null;
         Class<?> type = model.getClass();
         while (type != null) {
             for (Field field : type.getDeclaredFields()) {
-                if (Map.class.isAssignableFrom(field.getType()) && field.getName().toLowerCase().contains("modelmap")) {
-                    field.setAccessible(true);
-                    Object value = field.get(model);
-                    return value instanceof Map<?, ?> map ? map : null;
+                if (!Map.class.isAssignableFrom(field.getType())
+                        || !field.getName().toLowerCase().contains("modelmap")) {
+                    continue;
+                }
+                field.setAccessible(true);
+                if (field.get(model) instanceof Map<?, ?> map && !map.isEmpty()) {
+                    if ("modelMap".equals(field.getName())) {
+                        return map;
+                    }
+                    if (fallback == null) {
+                        fallback = map;
+                    }
                 }
             }
             type = type.getSuperclass();
         }
-        return null;
+        return fallback;
     }
 
     private static float read(Object part, String name) {
