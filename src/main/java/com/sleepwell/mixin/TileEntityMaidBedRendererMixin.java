@@ -19,11 +19,18 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  */
 @Mixin(TileEntityMaidBedRenderer.class)
 public abstract class TileEntityMaidBedRendererMixin {
+    private static int DEBUG_COUNTER;
+
     @Inject(method = "render", at = @At("TAIL"), remap = false)
     private void sleepwell$drawQuilt(TileEntityMaidBed bed, float partialTick, PoseStack pose,
                                      MultiBufferSource buffer, int packedLight, int packedOverlay,
                                      CallbackInfo ci) {
         BlockState state = bed.getBlockState();
+        if (DEBUG_COUNTER++ % 120 == 0) {
+            System.out.println("[sleep_well] bed render: pos=" + bed.getBlockPos()
+                    + " occ=" + state.getValue(com.github.tartaricacid.touhoulittlemaid.block.BlockMaidBed.OCCUPIED)
+                    + " color=" + bed.getColor() + " state=" + state);
+        }
         QuiltRenderer.render(bed, state, pose, buffer, packedLight, packedOverlay);
     }
 }
