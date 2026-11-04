@@ -160,7 +160,7 @@ public final class QuiltRenderer {
         Vec3 across = new Vec3(-along.z, 0.0D, along.x);
         float length = (float) headCenter.distanceTo(footCenter);
         float bedEnd = length + 1.0F - FOOT_GAP;
-        float bedBottom = headCenter.y - top;
+        float bedBottom = (float) (headCenter.y - top);
 
         // Reach: follow the maid's own footprint along the bed so that a long body still gets covered and a
         // small one is not buried under cloth.
@@ -207,7 +207,7 @@ public final class QuiltRenderer {
         net.minecraft.world.phys.AABB bedBox = BedGeometry.bounds(bed.head());
         float frameHalf = bedBox == null ? 0.5F
                 : (float) Math.max(bedBox.getXsize(), bedBox.getZsize()) * 0.5F;
-        float bedTop = bedBox == null ? top : Math.max(top, bedBox.maxY);
+        float bedTop = bedBox == null ? (float) top : (float) Math.max(top, bedBox.maxY);
         // Wide enough that the model cannot poke out of the sides, and never narrower than the frame.
         float halfWidth = Math.max(Math.min(HALF_WIDTH, Math.max(0.42F, wMax + 0.12F)),
                 Math.min(1.0F, frameHalf + 0.02F));
