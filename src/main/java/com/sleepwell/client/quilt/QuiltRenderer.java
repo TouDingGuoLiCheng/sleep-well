@@ -160,6 +160,7 @@ public final class QuiltRenderer {
         Vec3 across = new Vec3(-along.z, 0.0D, along.x);
         float length = (float) headCenter.distanceTo(footCenter);
         float bedEnd = length + 1.0F - FOOT_GAP;
+        float bedBottom = headCenter.y - top;
 
         // Reach: follow the maid's own footprint along the bed so that a long body still gets covered and a
         // small one is not buried under cloth.
@@ -182,10 +183,12 @@ public final class QuiltRenderer {
         }
         // Cover her whole footprint, then widen the reach so no part of the model ends up outside the cloth.
         float uStart = Math.max(HEAD_GAP, uMin - HEAD_MARGIN);
-        float uEnd = Math.min(bedEnd, uMax + FOOT_MARGIN);
+        // Her feet often hang off the end of the bed, so the cloth is allowed past the mattress edge and
+        // simply drapes off it.
+        float uEnd = Math.min(bedEnd + 0.45F, uMax + FOOT_MARGIN);
         if (uEnd - uStart < 1.0F) {
             uStart = Math.max(HEAD_GAP, uStart - 0.25F);
-            uEnd = Math.min(bedEnd, uEnd + 0.25F);
+            uEnd = Math.min(bedEnd + 0.45F, uEnd + 0.25F);
         }
         float bodyCenter = (uStart + uEnd) * 0.5F;
         // Her own bones, when TLM's model exposes them; the hard coded profile is only the fallback.
@@ -200,8 +203,16 @@ public final class QuiltRenderer {
                 profileBySlice[i] = profileAt(t) * 0.22F;
             }
         }
-        // Wide enough that the model cannot poke out of the sides.
-        float halfWidth = Math.min(HALF_WIDTH, Math.max(0.42F, wMax + 0.12F));
+        // The bed's own model bounds: the only reliable answer to how wide the frame is and where its top is.
+        net.minecraft.world.phys.AABB bedBox = BedGeometry.bounds(bed.head());
+        float frameHalf = bedBox == null ? 0.5F
+                : (float) Math.max(bedBox.getXsize(), bedBox.getZsize()) * 0.5F;
+        float bedTop = bedBox == null ? top : Math.max(top, bedBox.maxY);
+        // Wide enough that the model cannot poke out of the sides, and never narrower than the frame.
+        float halfWidth = Math.max(Math.min(HALF_WIDTH, Math.max(0.42F, wMax + 0.12F)),
+                Math.min(1.0F, frameHalf + 0.02F));
+        float skirtOut = Math.max(SKIRT_OUT, Math.max(0.0F, frameHalf - halfWidth) + 0.14F);
+        float skirtDrop = (float) Math.max(SKIRT_DROP, bedTop - bedBottom + 0.14F);
         // Sit just above her, but never a full block up: a sleeping hitbox may still be the standing one.
         float clothLift = (float) Math.min(0.42D, Math.max(0.14D, box.maxY - headCenter.y + 0.06D));
         float skirt = clothLift + 0.06F;
@@ -260,8 +271,8 @@ public final class QuiltRenderer {
             for (int i = 0; i < alongSteps; i++) {
                 Vec3 topA = points[i][side];
                 Vec3 topB = points[i + 1][side];
-                Vec3 lowA = topA.add(across.x * outward * SKIRT_OUT, -SKIRT_DROP, across.z * outward * SKIRT_OUT);
-                Vec3 lowB = topB.add(across.x * outward * SKIRT_OUT, -SKIRT_DROP, across.z * outward * SKIRT_OUT);
+                Vec3 lowA = topA.add(across.x * outward * skirtOut, -skirtDrop, across.z * outward * skirtOut);
+                Vec3 lowB = topB.add(across.x * outward * skirtOut, -skirtDrop, across.z * outward * skirtOut);
                 if (side == 0) {
                     quad(consumer, pose, topB, topA, lowA, lowB, 0.0F, 0.2F, light, 0.66F, 0.66F);
                 } else {
