@@ -25,6 +25,7 @@ public final class MaidSilhouette {
 
     private static final Map<UUID, float[]> CACHE = new HashMap<>();
     private static final Map<UUID, Integer> STAMP = new HashMap<>();
+    private static final Map<UUID, Integer> PRINTS = new HashMap<>();
 
     private MaidSilhouette() {
     }
@@ -100,10 +101,39 @@ public final class MaidSilhouette {
             float[] out = new float[BINS + 1];
             out[0] = maxY;
             System.arraycopy(radius, 0, out, 1, BINS);
+            debug(maid, model, parts, out);
             return out;
         } catch (Throwable ignored) {
             return null;
         }
+    }
+
+    /** Temporary: show what the sampler actually sees, twice per maid. */
+    private static void debug(EntityMaid maid, Object model, Map<?, ?> parts, float[] profile) {
+        java.util.UUID id = maid.getUUID();
+        int printed = PRINTS.getOrDefault(id, 0);
+        if (printed >= 2) {
+            return;
+        }
+        PRINTS.put(id, printed + 1);
+        System.out.println("[sleep_well] silhouette maid=" + id + " model=" + model.getClass().getName()
+                + " parts=" + parts.size());
+        int shown = 0;
+        for (Map.Entry<?, ?> entry : parts.entrySet()) {
+            if (shown++ >= 10) {
+                break;
+            }
+            Object part = entry.getValue();
+            System.out.println("[sleep_well]   bone " + entry.getKey()
+                    + " x=" + read(part, "x") + " y=" + read(part, "y") + " z=" + read(part, "z")
+                    + " ox=" + read(part, "offsetX") + " oy=" + read(part, "offsetY")
+                    + " oz=" + read(part, "offsetZ"));
+        }
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < BINS; i++) {
+            builder.append(String.format("%.2f ", profile[1 + i]));
+        }
+        System.out.println("[sleep_well]   height=" + String.format("%.2f", profile[0]) + " radius=" + builder);
     }
 
     public static float radiusAt(float[] profile, float bodyY) {
