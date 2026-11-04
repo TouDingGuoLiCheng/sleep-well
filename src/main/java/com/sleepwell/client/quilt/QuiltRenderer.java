@@ -40,12 +40,12 @@ import java.util.Map;
 public final class QuiltRenderer {
     /** Where the cloth starts, measured from the outer edge of the pillow end. */
     private static final float HEAD_GAP = 0.15F;
-    private static final float FOOT_GAP = 0.15F;
+    private static final float FOOT_GAP = 0.02F;
     /** Half the mattress width: the bed is one block wide, so 0.40 keeps the cloth on the mattress. */
     private static final float HALF_WIDTH = 0.50F;
     /** How far the sides hang past the mattress edge, and how far down. */
-    private static final float SKIRT_OUT = 0.10F;
-    private static final float SKIRT_DROP = 0.30F;
+    private static final float SKIRT_OUT = 0.18F;
+    private static final float SKIRT_DROP = 0.46F;
     /** Roughly how far the cloth sits above the mattress where it is not lifted by her body. */
     private static final float LIE_FLAT = 0.014F;
     private static final float BULGE = 0.16F;
@@ -227,7 +227,7 @@ public final class QuiltRenderer {
             float body = Math.min(0.50F, Math.max(0.30F, Math.max(profile * 1.6F + 0.18F, clothLift + 0.06F)));
             // The feet end drapes down to the mattress instead of ending in a vertical wall; the head end
             // fades too, but it is mostly hidden by the pillow gap anyway.
-            float fade = Math.min(1.0F, Math.min(t / 0.10F, (1.0F - t) / 0.26F));
+            float fade = Math.min(1.0F, Math.min(t / 0.08F, (1.0F - t) / 0.14F));
             body *= Math.max(0.0F, fade);
             for (int j = 0; j <= acrossSteps; j++) {
                 float s = -1.0F + 2.0F * j / acrossSteps;
