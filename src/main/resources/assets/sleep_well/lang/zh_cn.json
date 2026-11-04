@@ -13,5 +13,12 @@
   "gui.sleep_well.skip_tasks": "跳过哪些工作（全局）",
   "gui.sleep_well.done": "完成",
   "gui.sleep_well.no_tasks": "没有可以勾选的工作任务",
-  "gui.sleep_well.skip_count": "已选 %s / 共 %s"
+  "gui.sleep_well.skip_count": "已选 %s / 共 %s",
+  "gui.sleep_well.lie_in": "赖床与补觉",
+  "command.sleep_well.nap.started": "已让 %s 去补觉",
+  "command.sleep_well.nap.already": "%s 已经在睡了",
+  "command.sleep_well.nap.switch_off": "%s 的「赖床与补觉」开关是关着的",
+  "command.sleep_well.nap.no_bed": "附近没有空的女仆床，%s 也没设睡觉区域",
+  "command.sleep_well.nap.no_maid": "附近没有女仆",
+  "command.sleep_well.nap.no_player": "这个命令要玩家来执行"
 }

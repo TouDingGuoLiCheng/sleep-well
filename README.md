@@ -39,6 +39,12 @@
 | `winterSkipDefaultEnabled` | `true` | 新女仆「冬天不工作」的默认值 |
 | `winterSkipTasks` | 13 项 | 算作工作的任务 id；写裸名也行（`farm` 等同 `touhou_little_maid:farm`） |
 
+## 命令
+
+| 命令 | 权限 | 说明 |
+|---|---|---|
+| /sleepwell nap | 2 | 让身边 32 格内最近的女仆立刻去补觉；有睡觉区域走睡觉区域，没有就找最近的空女仆床 |
+
 ## 女仆 GUI 页面
 
 车万女仆的女仆界面顶部会多一个页签（盖着被子的酒狐图标），点进去是三个开关：

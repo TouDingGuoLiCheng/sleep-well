@@ -239,6 +239,46 @@ public final class LieInHandler {
         }
     }
 
+    /** Result of {@link #triggerNapNow(EntityMaid)} so the command can say what happened. */
+    public enum NapResult {
+        STARTED,
+        ALREADY_SLEEPING,
+        SWITCH_OFF,
+        NO_BED
+    }
+
+    /**
+     * Force a nap right now, used by {@code /sleepwell nap}.
+     * <p>
+     * Same path as the random nap: the brain is held on the rest schedule and TLM's own bed task walks her
+     * there. Differences: no probability roll, and she does not have to be on the idle task.
+     */
+    public static NapResult triggerNapNow(EntityMaid maid) {
+        if (!(maid.level() instanceof ServerLevel level)) {
+            return NapResult.NO_BED;
+        }
+        LieInState state = STATES.computeIfAbsent(maid.getUUID(), key -> new LieInState());
+        if (state.active() || maid.isSleeping()) {
+            return NapResult.ALREADY_SLEEPING;
+        }
+        if (!MaidCapabilities.of(maid).lieIn() || !napEnabled()) {
+            return NapResult.SWITCH_OFF;
+        }
+        boolean configuredArea = configuredSleepArea(maid, level);
+        if (!configuredArea && MaidBedFinder.find(maid).isEmpty()) {
+            return NapResult.NO_BED;
+        }
+        long now = level.getGameTime();
+        long ticks = LieInPolicy.durationTicks(SleepWellConfig.NAP_MIN_HOURS.get(),
+                SleepWellConfig.NAP_MAX_HOURS.get(), maid.getRandom().nextInt(1000));
+        state.begin(LieInState.Kind.NAP, now, ticks, taskUid(maid), configuredArea);
+        state.markRolled(level.getDayTime() / DAY_LENGTH);
+        holdBrain(maid, state);
+        LOGGER.info("Nap: maid {} sent to her {} by command for {} ticks",
+                maid.getUUID(), configuredArea ? "configured sleep area" : "nearest maid bed", ticks);
+        return NapResult.STARTED;
+    }
+
     /** Keep the brain on the forced-rest schedule for as long as the state lasts. */
     private static void holdBrain(EntityMaid maid, LieInState state) {
         Brain<?> brain = maid.getBrain();
