@@ -441,6 +441,14 @@ public final class MaidColliderCapture {
                 "%.2fx%.2fx%.2f", b[3] - b[0], b[4] - b[1], b[5] - b[2])
                 + " min=" + String.format(java.util.Locale.ROOT, "%.2f,%.2f,%.2f", b[0], b[1], b[2]));
         layerBounds = new float[]{b[3] - b[0], b[4] - b[1], b[5] - b[2]};
+        if (layerCalls % 200 == 1) {
+            LOGGER.info("[被子] layer boxes={} size={} min={} maid={} pose={} bed={}", boxes.size(),
+                    String.format(java.util.Locale.ROOT, "%.2fx%.2fx%.2f", b[3] - b[0], b[4] - b[1], b[5] - b[2]),
+                    String.format(java.util.Locale.ROOT, "%.2f,%.2f,%.2f", b[0], b[1], b[2]),
+                    String.format(java.util.Locale.ROOT, "%.2f,%.2f,%.2f", maid.getX(), maid.getY(), maid.getZ()),
+                    maid.getPose(),
+                    maid.getBedOrientation());
+        }
     }
 
     private static void walkBone(Object bone, Matrix4f parent, List<QuiltBox> boxes, int depth) {
