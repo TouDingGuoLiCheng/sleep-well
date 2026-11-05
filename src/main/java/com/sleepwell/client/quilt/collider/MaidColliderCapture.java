@@ -220,6 +220,10 @@ public final class MaidColliderCapture {
                         return set;
                     }
                 }
+                if (renderer instanceof LivingEntityRenderer<?, ?> living) {
+                    LOGGER.info("[被子] dump model: {}", dumpFields(living.getModel(), 24));
+                    LOGGER.info("[被子] dump renderer: {}", dumpFields(renderer, 18));
+                }
                 miss("direct:geoModel", "updateModel=" + updated + " parts=" + partCount
                         + " model=" + modelType
                         + " " + geoCache(location)
@@ -500,6 +504,44 @@ public final class MaidColliderCapture {
                 appendPartTree(child, applyLocal(matrix, child), boxes, depth + 1);
             }
         }
+    }
+
+    /** Compact one-line field dump: enough to see which field actually holds the geometry. */
+    static String dumpFields(Object target, int max) {
+        if (target == null) {
+            return "null";
+        }
+        StringBuilder out = new StringBuilder(target.getClass().getSimpleName()).append('{');
+        Class<?> type = target.getClass();
+        int count = 0;
+        while (type != null && type != Object.class && count < max) {
+            for (java.lang.reflect.Field field : type.getDeclaredFields()) {
+                if (java.lang.reflect.Modifier.isStatic(field.getModifiers()) || count >= max) {
+                    continue;
+                }
+                count++;
+                Object value;
+                try {
+                    field.setAccessible(true);
+                    value = field.get(target);
+                } catch (Throwable error) {
+                    value = "?";
+                }
+                String text;
+                if (value instanceof java.util.Collection<?> collection) {
+                    text = "size=" + collection.size();
+                } else if (value instanceof Map<?, ?> map) {
+                    text = "size=" + map.size();
+                } else if (value instanceof Number || value instanceof Boolean || value instanceof String) {
+                    text = String.valueOf(value);
+                } else {
+                    text = value == null ? "null" : value.getClass().getSimpleName();
+                }
+                out.append(field.getName()).append(':').append(text).append(' ');
+            }
+            type = type.getSuperclass();
+        }
+        return out.append('}').toString();
     }
 
     private static Matrix4f applyLocal(Matrix4f parent, Object node) {
