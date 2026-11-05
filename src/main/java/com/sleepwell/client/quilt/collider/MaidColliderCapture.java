@@ -198,6 +198,20 @@ public final class MaidColliderCapture {
                         "returned=" + updated + " model=" + describe(model) + " " + geoCache(location));
             }
             if (model == null) {
+                // Not every maid uses a gecko model: legacy model packs (e.g. fox_miko) render through
+                // BedrockModel, and the gecko cache simply has no entry for them.
+                if (renderer instanceof LivingEntityRenderer<?, ?> living) {
+                    List<QuiltBox> legacy = new ArrayList<>();
+                    Matrix4f matrix = entityMatrix(maid, camera, partialTick);
+                    if (captureBedrock(living, matrix, legacy)) {
+                        ColliderSet set = new ColliderSet(legacy, bounds(legacy), stamp(legacy),
+                                maid.tickCount, true);
+                        SETS.put(maid.getUUID(), set);
+                        com.sleepwell.client.quilt.diag.QuiltTrace.step("d.bedrock",
+                                "boxes=" + legacy.size() + " parts=" + bedrockParts(living.getModel()).size());
+                        return set;
+                    }
+                }
                 miss("direct:geoModel", "updateModel=" + updated + " " + geoCache(location)
                         + " ysm=" + describe(Reflect.field(renderer, "ysmMaidRenderer")));
                 return null;
@@ -399,31 +413,12 @@ public final class MaidColliderCapture {
 
     // --- bedrock (legacy models) -------------------------------------------
 
-    private static void captureBedrock(LivingEntityRenderer<?, ?> living, Matrix4f entity, List<QuiltBox> boxes) {
-        Map<?, ?> parts = null;
-        Class<?> type = living.getModel().getClass();
-        while (type != null && parts == null) {
-            for (java.lang.reflect.Field field : type.getDeclaredFields()) {
-                if (!Map.class.isAssignableFrom(field.getType())
-                        || !field.getName().toLowerCase(Locale.ROOT).contains("modelmap")) {
-                    continue;
-                }
-                try {
-                    field.setAccessible(true);
-                    if (field.get(living.getModel()) instanceof Map<?, ?> map && !map.isEmpty()) {
-                        parts = map;
-                        break;
-                    }
-                } catch (Throwable ignored) {
-                }
-            }
-            type = type.getSuperclass();
+    private static boolean captureBedrock(LivingEntityRenderer<?, ?> living, Matrix4f entity, List<QuiltBox> boxes) {
+        Map<?, ?> parts = bedrockParts(living.getModel());
+        if (parts == null || parts.isEmpty()) {
+            return false;
         }
-        if (parts == null) {
-            miss("bedrockParts", living.getModel().getClass().getName());
-            return;
-        }
-        Set<Object> children = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+        java.util.Set<Object> children = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
         for (Object part : parts.values()) {
             List<?> kids = Reflect.list(part, "children");
             if (kids != null) {
@@ -435,38 +430,85 @@ public final class MaidColliderCapture {
                 walkBedrockPart(String.valueOf(entry.getKey()), entry.getValue(), new Matrix4f(entity), boxes, 0);
             }
         }
+        return !boxes.isEmpty();
     }
 
+    private static Map<?, ?> bedrockParts(Object model) {
+        Class<?> type = model.getClass();
+        while (type != null) {
+            for (java.lang.reflect.Field field : type.getDeclaredFields()) {
+                if (!Map.class.isAssignableFrom(field.getType())
+                        || !field.getName().toLowerCase(Locale.ROOT).contains("modelmap")) {
+                    continue;
+                }
+                try {
+                    field.setAccessible(true);
+                    if (field.get(model) instanceof Map<?, ?> map && !map.isEmpty()) {
+                        return map;
+                    }
+                } catch (Throwable ignored) {
+                }
+            }
+            type = type.getSuperclass();
+        }
+        return null;
+    }
+
+    /** Legacy (bedrock-format) models: part transforms are public fields, cube sizes are in pixels. */
     private static void walkBedrockPart(String name, Object part, Matrix4f parent, List<QuiltBox> boxes, int depth) {
         if (part == null || depth > 32) {
             return;
         }
-        // BedrockPart keeps these as public fields, not getters, and `visible` false means "not drawn".
         if (Reflect.field(part, "visible") instanceof Boolean shown && !shown) {
             return;
         }
-        Matrix4f matrix = new Matrix4f(parent).translate(
-                orZero(Reflect.floatField(part, "x")) / PIXELS,
-                orZero(Reflect.floatField(part, "y")) / PIXELS,
-                orZero(Reflect.floatField(part, "z")) / PIXELS);
-        // One coarse box per part: the legacy path is a fallback, not the main shape.
+        float px = orZero(Reflect.floatField(part, "x")) / PIXELS;
+        float py = orZero(Reflect.floatField(part, "y")) / PIXELS;
+        float pz = orZero(Reflect.floatField(part, "z")) / PIXELS;
+        float rx = (float) Math.toRadians(orZero(Reflect.floatField(part, "xRot")));
+        float ry = (float) Math.toRadians(orZero(Reflect.floatField(part, "yRot")));
+        float rz = (float) Math.toRadians(orZero(Reflect.floatField(part, "zRot")));
+        float sx = defaultOne(Reflect.floatField(part, "xScale"));
+        float sy = defaultOne(Reflect.floatField(part, "yScale"));
+        float sz = defaultOne(Reflect.floatField(part, "zScale"));
+        Matrix4f matrix = new Matrix4f(parent).translate(px, py, pz).rotateXYZ(rx, ry, rz).scale(sx, sy, sz);
+        Object cubes = Reflect.field(part, "cubes");
+        if (cubes instanceof Iterable<?> list) {
+            for (Object cube : list) {
+                appendBedrockCube(cube, name, matrix, boxes);
+            }
+        }
+        List<?> kids = Reflect.list(part, "children");
+        if (kids != null) {
+            for (Object child : kids) {
+                walkBedrockPart(name, child, matrix, boxes, depth + 1);
+            }
+        }
+    }
+
+    /** A bedrock cube is origin + size in pixels; BedrockCubeBox keeps them as protected floats. */
+    private static void appendBedrockCube(Object cube, String name, Matrix4f matrix, List<QuiltBox> boxes) {
+        float x = Reflect.floatField(cube, "x");
+        float y = Reflect.floatField(cube, "y");
+        float z = Reflect.floatField(cube, "z");
+        float w = Reflect.floatField(cube, "width");
+        float h = Reflect.floatField(cube, "height");
+        float d = Reflect.floatField(cube, "depth");
+        if (Float.isNaN(x) || Float.isNaN(w) || w <= 0.0F) {
+            return;
+        }
         QuiltBox box = new QuiltBox(name);
         box.hard = isHard(name);
-        box.radius = 0.05F;
         for (int corner = 0; corner < 8; corner++) {
             float a = (corner & 1) != 0 ? 1.0F : 0.0F;
             float b = (corner & 2) != 0 ? 1.0F : 0.0F;
             float c = (corner & 4) != 0 ? 1.0F : 0.0F;
-            Vector3f world = new Vector3f((a - 0.5F) * 0.12F, b * 0.12F, (c - 0.5F) * 0.12F).mulPosition(matrix);
+            Vector3f world = new Vector3f((x + w * a) / PIXELS, (y + h * b) / PIXELS, (z + d * c) / PIXELS)
+                    .mulPosition(matrix);
             box.setCorner(corner, world.x, world.y, world.z);
         }
+        box.radius = Math.max(QuiltBox.MIN_RADIUS, Math.min(MAX_RADIUS, box.shortestEdge() * 0.5F));
         boxes.add(box);
-        List<?> kids = Reflect.list(part, "children");
-        if (kids != null) {
-            for (Object child : kids) {
-                walkBedrockPart(name + "/?", child, matrix, boxes, depth + 1);
-            }
-        }
     }
 
     // --- helpers -----------------------------------------------------------
