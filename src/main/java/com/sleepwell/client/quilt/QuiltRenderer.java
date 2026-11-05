@@ -209,7 +209,7 @@ public final class QuiltRenderer {
         float uStart = Math.max(HEAD_GAP, uMin - HEAD_MARGIN);
         // Her feet often hang off the end of the bed, so the cloth is allowed past the mattress edge and
         // simply drapes off it.
-        float uEnd = Math.min(bedEnd + 1.50F, uMax + FOOT_MARGIN + 0.45F);
+        float uEnd = Math.min(bedEnd + 1.50F, uMax + FOOT_MARGIN + 0.50F);
         if (uEnd - uStart < 1.0F) {
             uStart = Math.max(HEAD_GAP, uStart - 0.25F);
             uEnd = Math.min(bedEnd + 1.45F, uEnd + 0.25F);
