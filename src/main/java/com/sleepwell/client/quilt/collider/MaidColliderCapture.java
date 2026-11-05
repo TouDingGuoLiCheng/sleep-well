@@ -207,7 +207,10 @@ public final class MaidColliderCapture {
                     Matrix4f matrix = entityMatrix(maid, camera, partialTick);
                     Object rawParts = bedrockParts(living.getModel());
                     partCount = rawParts instanceof Map<?, ?> map ? map.size() : -1;
-                    modelType = describe(living.getModel());
+                    Object flat = Reflect.field(living.getModel(), "shouldRender");
+                    int flatCount = flat instanceof List<?> list ? list.size() : -1;
+                    partCount = partCount * 1000 + Math.max(flatCount, 0);
+                    modelType = describe(living.getModel()) + "(flat=" + flatCount + ")";
                     if (captureBedrock(living, matrix, legacy)) {
                         ColliderSet set = new ColliderSet(legacy, bounds(legacy), stamp(legacy),
                                 maid.tickCount, true);
@@ -423,7 +426,15 @@ public final class MaidColliderCapture {
     private static boolean captureBedrock(LivingEntityRenderer<?, ?> living, Matrix4f entity, List<QuiltBox> boxes) {
         Map<?, ?> parts = bedrockParts(living.getModel());
         if (parts == null || parts.isEmpty()) {
-            return false;
+            // Some packs are built without a name map; the flat draw list still holds every part.
+            Object flat = Reflect.field(living.getModel(), "shouldRender");
+            if (flat instanceof List<?> list && !list.isEmpty()) {
+                for (Object part : list) {
+                    Object source = unwrapPart(part);
+                    appendPartTree(source, partMatrix(source, entity), boxes, 0);
+                }
+            }
+            return !boxes.isEmpty();
         }
         Map<Object, Object> unwrapped = new java.util.LinkedHashMap<>();
         for (Map.Entry<?, ?> entry : parts.entrySet()) {
@@ -442,6 +453,66 @@ public final class MaidColliderCapture {
             }
         }
         return !boxes.isEmpty();
+    }
+
+    /** Full transform of one part: every ancestor's translate/rotate/scale, root first. */
+    private static Matrix4f partMatrix(Object part, Matrix4f entity) {
+        java.util.ArrayDeque<Object> chain = new java.util.ArrayDeque<>();
+        Object cursor = part;
+        int guard = 0;
+        while (cursor != null && guard++ < 32) {
+            chain.addFirst(cursor);
+            cursor = Reflect.field(cursor, "parent");
+        }
+        Matrix4f matrix = new Matrix4f(entity);
+        for (Object node : chain) {
+            matrix.translate(orZero(Reflect.floatField(node, "x")) / PIXELS,
+                            orZero(Reflect.floatField(node, "y")) / PIXELS,
+                            orZero(Reflect.floatField(node, "z")) / PIXELS)
+                    .rotateXYZ((float) Math.toRadians(orZero(Reflect.floatField(node, "xRot"))),
+                            (float) Math.toRadians(orZero(Reflect.floatField(node, "yRot"))),
+                            (float) Math.toRadians(orZero(Reflect.floatField(node, "zRot"))))
+                    .scale(defaultOne(Reflect.floatField(node, "xScale")),
+                            defaultOne(Reflect.floatField(node, "yScale")),
+                            defaultOne(Reflect.floatField(node, "zScale")));
+        }
+        return matrix;
+    }
+
+    /** Emits cubes for one part and recurses into its children with the same matrix chain. */
+    private static void appendPartTree(Object part, Matrix4f matrix, List<QuiltBox> boxes, int depth) {
+        if (part == null || depth > 32) {
+            return;
+        }
+        if (Reflect.field(part, "visible") instanceof Boolean shown && !shown) {
+            return;
+        }
+        Object cubes = Reflect.field(part, "cubes");
+        if (cubes instanceof Iterable<?> list) {
+            for (Object cube : list) {
+                appendBedrockCube(cube, "part", matrix, boxes);
+            }
+        }
+        List<?> kids = Reflect.list(part, "children");
+        if (kids != null) {
+            for (Object child : kids) {
+                // Only the child's own transform here: the ancestors are already in `matrix`.
+                appendPartTree(child, applyLocal(matrix, child), boxes, depth + 1);
+            }
+        }
+    }
+
+    private static Matrix4f applyLocal(Matrix4f parent, Object node) {
+        return new Matrix4f(parent)
+                .translate(orZero(Reflect.floatField(node, "x")) / PIXELS,
+                        orZero(Reflect.floatField(node, "y")) / PIXELS,
+                        orZero(Reflect.floatField(node, "z")) / PIXELS)
+                .rotateXYZ((float) Math.toRadians(orZero(Reflect.floatField(node, "xRot"))),
+                        (float) Math.toRadians(orZero(Reflect.floatField(node, "yRot"))),
+                        (float) Math.toRadians(orZero(Reflect.floatField(node, "zRot"))))
+                .scale(defaultOne(Reflect.floatField(node, "xScale")),
+                        defaultOne(Reflect.floatField(node, "yScale")),
+                        defaultOne(Reflect.floatField(node, "zScale")));
     }
 
     private static Map<?, ?> bedrockParts(Object model) {
