@@ -59,6 +59,9 @@ public final class QuiltWireframe {
         // camera rotation *and* the camera translation). Subtracting the camera a second time lifted
         // every box ~116 blocks into the sky, which is why nothing was ever on screen.
         Matrix4f matrix = new Matrix4f(pose.last().pose());
+        // A debug overlay must stay visible through the bed the maid is lying in, otherwise "buried"
+        // and "misplaced" look identical on screen.
+        com.mojang.blaze3d.systems.RenderSystem.disableDepthTest();
         int boxes = 0;
         int missing = 0;
         float minX = Float.MAX_VALUE, minY = Float.MAX_VALUE, minZ = Float.MAX_VALUE;
@@ -103,6 +106,7 @@ public final class QuiltWireframe {
             }
         }
         buffers.endBatch(RenderType.lines());
+        com.mojang.blaze3d.systems.RenderSystem.enableDepthTest();
         int tick = Minecraft.getInstance().player == null ? 0 : Minecraft.getInstance().player.tickCount;
         // Fold the draw-time numbers into the chat/log status line: this block is proven to run, so the
         // numbers cannot go missing the way a separate log statement did.
