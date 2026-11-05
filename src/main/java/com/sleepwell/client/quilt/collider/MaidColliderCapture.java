@@ -197,22 +197,29 @@ public final class MaidColliderCapture {
                 com.sleepwell.client.quilt.diag.QuiltTrace.step("d.updateModel",
                         "returned=" + updated + " model=" + describe(model) + " " + geoCache(location));
             }
+            int partCount = -1;
+            String modelType = "?";
             if (model == null) {
                 // Not every maid uses a gecko model: legacy model packs (e.g. fox_miko) render through
                 // BedrockModel, and the gecko cache simply has no entry for them.
                 if (renderer instanceof LivingEntityRenderer<?, ?> living) {
                     List<QuiltBox> legacy = new ArrayList<>();
                     Matrix4f matrix = entityMatrix(maid, camera, partialTick);
+                    Object rawParts = bedrockParts(living.getModel());
+                    partCount = rawParts instanceof Map<?, ?> map ? map.size() : -1;
+                    modelType = describe(living.getModel());
                     if (captureBedrock(living, matrix, legacy)) {
                         ColliderSet set = new ColliderSet(legacy, bounds(legacy), stamp(legacy),
                                 maid.tickCount, true);
                         SETS.put(maid.getUUID(), set);
                         com.sleepwell.client.quilt.diag.QuiltTrace.step("d.bedrock",
-                                "boxes=" + legacy.size() + " parts=" + bedrockParts(living.getModel()).size());
+                                "boxes=" + legacy.size() + " parts=" + partCount + " model=" + modelType);
                         return set;
                     }
                 }
-                miss("direct:geoModel", "updateModel=" + updated + " " + geoCache(location)
+                miss("direct:geoModel", "updateModel=" + updated + " parts=" + partCount
+                        + " model=" + modelType
+                        + " " + geoCache(location)
                         + " ysm=" + describe(Reflect.field(renderer, "ysmMaidRenderer")));
                 return null;
             }
@@ -418,14 +425,18 @@ public final class MaidColliderCapture {
         if (parts == null || parts.isEmpty()) {
             return false;
         }
+        Map<Object, Object> unwrapped = new java.util.LinkedHashMap<>();
+        for (Map.Entry<?, ?> entry : parts.entrySet()) {
+            unwrapped.put(entry.getKey(), unwrapPart(entry.getValue()));
+        }
         java.util.Set<Object> children = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
-        for (Object part : parts.values()) {
+        for (Object part : unwrapped.values()) {
             List<?> kids = Reflect.list(part, "children");
             if (kids != null) {
                 children.addAll(kids);
             }
         }
-        for (Map.Entry<?, ?> entry : parts.entrySet()) {
+        for (Map.Entry<Object, Object> entry : unwrapped.entrySet()) {
             if (!children.contains(entry.getValue())) {
                 walkBedrockPart(String.valueOf(entry.getKey()), entry.getValue(), new Matrix4f(entity), boxes, 0);
             }
@@ -434,6 +445,7 @@ public final class MaidColliderCapture {
     }
 
     private static Map<?, ?> bedrockParts(Object model) {
+        Map<?, ?> fallback = null;
         Class<?> type = model.getClass();
         while (type != null) {
             for (java.lang.reflect.Field field : type.getDeclaredFields()) {
@@ -444,14 +456,27 @@ public final class MaidColliderCapture {
                 try {
                     field.setAccessible(true);
                     if (field.get(model) instanceof Map<?, ?> map && !map.isEmpty()) {
-                        return map;
+                        // BedrockModel also carries modelMapWrapper, whose values are animation wrappers
+                        // around BedrockPart; the plain modelMap is the one with real parts.
+                        if ("modelMap".equals(field.getName())) {
+                            return map;
+                        }
+                        if (fallback == null) {
+                            fallback = map;
+                        }
                     }
                 } catch (Throwable ignored) {
                 }
             }
             type = type.getSuperclass();
         }
-        return null;
+        return fallback;
+    }
+
+    /** {@code ModelRendererWrapper} hides the part behind a getter; plain parts pass through. */
+    private static Object unwrapPart(Object value) {
+        Object inner = Reflect.call(value, "getModelRenderer");
+        return inner != null ? inner : value;
     }
 
     /** Legacy (bedrock-format) models: part transforms are public fields, cube sizes are in pixels. */
