@@ -52,6 +52,70 @@ public final class MaidColliderCapture {
     private static volatile int hookRuns;
     private static volatile int captures;
     private static final java.util.concurrent.atomic.AtomicInteger DIRECT_LOGS = new java.util.concurrent.atomic.AtomicInteger();
+    private static volatile int renderRuns;
+
+    /**
+     * Called from the maid renderer's HEAD: her model is alive here, so the outline can be rebuilt with the
+     * transform we compute ourselves. This is the path that does not depend on any bone-level mixin.
+     */
+    public static void captureDuringRender(EntityMaid maid) {
+        if (!maid.isSleeping()) {
+            return;
+        }
+        renderRuns++;
+        try {
+            EntityRenderer<?> renderer = Minecraft.getInstance().getEntityRenderDispatcher().getRenderer(maid);
+            Object gecko = renderer == null ? null : Reflect.field(renderer, "geckoEntityMaidRenderer");
+            Object animatable = gecko == null ? null : Reflect.call(gecko, "getAnimatableEntity", maid);
+            if (animatable == null) {
+                animatable = animatableViaCapability(maid);
+            }
+            Object model = animatable == null ? null : Reflect.call(animatable, "getGeoModel");
+            if (model == null && animatable != null) {
+                model = Reflect.call(animatable, "getCurrentModel");
+            }
+            if (model == null) {
+                miss("render:model", "animatable=" + describe(animatable) + " renderer=" + describe(renderer));
+                return;
+            }
+            List<?> roots = Reflect.list(model, "topLevelBones");
+            if (roots == null || roots.isEmpty()) {
+                miss("render:roots", model.getClass().getName());
+                return;
+            }
+            net.minecraft.world.phys.Vec3 camera =
+                    Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
+            Matrix4f entity = entityMatrix(maid, camera, 0.0F);
+            List<QuiltBox> boxes = new ArrayList<>();
+            for (Object root : roots) {
+                walkBone(root, new Matrix4f(entity), boxes, 0);
+            }
+            if (boxes.isEmpty()) {
+                miss("render:empty", "bones walked but no cubes");
+                return;
+            }
+            captures++;
+            SETS.put(maid.getUUID(), new ColliderSet(boxes, bounds(boxes), stamp(boxes), maid.tickCount, false));
+            if (RENDER_LOGS.getAndIncrement() == 0) {
+                LOGGER.info("[sleep_well] render capture boxes={} model={}",
+                        boxes.size(), model.getClass().getSimpleName());
+            }
+        } catch (Throwable error) {
+            miss("render:" + error.getClass().getSimpleName(), error.toString());
+        }
+    }
+
+    private static String describe(Object value) {
+        return value == null ? "null" : value.getClass().getSimpleName();
+    }
+
+    private static final java.util.concurrent.atomic.AtomicInteger RENDER_LOGS =
+            new java.util.concurrent.atomic.AtomicInteger();
+
+    /** How many render passes reached the capture: 0 means the renderer mixin did not apply. */
+    public static String mixinState() {
+        return String.valueOf(renderRuns);
+    }
 
     private MaidColliderCapture() {
     }

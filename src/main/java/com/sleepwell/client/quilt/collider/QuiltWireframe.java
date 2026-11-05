@@ -83,6 +83,7 @@ public final class QuiltWireframe {
             report("boxes=" + boxes + " missing=" + missing
                     + " hook=" + MaidColliderCapture.hookRuns()
                     + " captured=" + MaidColliderCapture.captures()
+                    + " mixin=" + MaidColliderCapture.mixinState()
                     + " renderer=" + renderer
                     + " miss=" + MaidColliderCapture.misses());
         }

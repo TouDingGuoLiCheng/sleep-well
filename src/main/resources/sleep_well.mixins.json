@@ -10,7 +10,7 @@
     "SchedulePosMixin"
   ],
   "client": [
-    "GeoRendererCaptureMixin"
+    "MaidRendererCaptureMixin"
   ],
   "injectors": {
     "defaultRequire": 1
