@@ -49,6 +49,8 @@ public final class QuiltRenderer {
     /** How far the sides hang past the mattress edge, and how far down. */
     /** How far the cloth hangs straight down over the mattress edge. */
     private static final float HEM_DROP = 0.20F;
+    /** One repeat of the quilt texture covers this many blocks, so the checks stay square. */
+    private static final float TILE_BLOCKS = 1.0F;
     private static final float SKIRT_OUT = 0.18F;
     private static final float SKIRT_DROP = 0.46F;
     /** Roughly how far the cloth sits above the mattress where it is not lifted by her body. */
@@ -233,6 +235,8 @@ public final class QuiltRenderer {
         // Wide enough that the model cannot poke out of the sides, and never narrower than the frame.
         float halfWidth = Math.max(Math.min(HALF_WIDTH, Math.max(0.42F, wMax + 0.12F)),
                 Math.min(1.0F, frameHalf + 0.02F));
+        // How many texture repeats the cloth is wide, so the checks stay square rather than stretched.
+        float widthTiles = (2.0F * halfWidth) / TILE_BLOCKS;
         float skirtOut = Math.max(SKIRT_OUT, Math.max(0.0F, frameHalf - halfWidth) + 0.14F);
         // Kept small on purpose: a long curtain looks like a wall, not like cloth.
         float skirtDrop = (float) Math.min(0.22F, Math.max(0.12F, bedTop - bedBottom * 0.5F));
@@ -283,11 +287,14 @@ public final class QuiltRenderer {
             }
         }
         for (int i = 0; i < alongSteps; i++) {
+            float uTex0 = (uStart + (uEnd - uStart) * i / alongSteps) / TILE_BLOCKS;
+            float uTex1 = (uStart + (uEnd - uStart) * (i + 1) / alongSteps) / TILE_BLOCKS;
             for (int j = 0; j < acrossSteps; j++) {
-                float v0 = (float) j / acrossSteps;
-                float v1 = (float) (j + 1) / acrossSteps;
+                // Texture repeats every block, so a check is a quarter of the quilt width.
+                float v0 = (float) j / acrossSteps * widthTiles;
+                float v1 = (float) (j + 1) / acrossSteps * widthTiles;
                 quad(consumer, pose, points[i][j], points[i + 1][j], points[i + 1][j + 1], points[i][j + 1],
-                        v0, v1, light, shades[i][j], shades[i][j + 1]);
+                        uTex0, uTex1, v0, v1, light, shades[i][j], shades[i][j + 1]);
             }
         }
         // The sides simply hang down: no rolled hem, no flap sticking out sideways.
@@ -297,10 +304,13 @@ public final class QuiltRenderer {
                 Vec3 topB = points[i + 1][side];
                 Vec3 lowA = topA.add(0.0D, -HEM_DROP, 0.0D);
                 Vec3 lowB = topB.add(0.0D, -HEM_DROP, 0.0D);
+                float uTex0 = (uStart + (uEnd - uStart) * i / alongSteps) / TILE_BLOCKS;
+                float uTex1 = (uStart + (uEnd - uStart) * (i + 1) / alongSteps) / TILE_BLOCKS;
+                float drop = HEM_DROP / TILE_BLOCKS;
                 if (side == 0) {
-                    quad(consumer, pose, topB, topA, lowA, lowB, 0.0F, 0.2F, light, 0.60F, 0.60F);
+                    quad(consumer, pose, topB, topA, lowA, lowB, uTex1, uTex0, 0.0F, drop, light, 0.60F, 0.60F);
                 } else {
-                    quad(consumer, pose, topA, topB, lowB, lowA, 0.0F, 0.2F, light, 0.60F, 0.60F);
+                    quad(consumer, pose, topA, topB, lowB, lowA, uTex0, uTex1, 0.0F, drop, light, 0.60F, 0.60F);
                 }
             }
         }
@@ -309,11 +319,11 @@ public final class QuiltRenderer {
     }
 
     private static void quad(VertexConsumer consumer, PoseStack pose, Vec3 a, Vec3 b, Vec3 c, Vec3 d,
-                             float v0, float v1, int light, float shadeA, float shadeB) {
-        vertex(consumer, pose, a, 0.0F, v0, light, shadeA);
-        vertex(consumer, pose, b, 1.0F, v0, light, shadeA);
-        vertex(consumer, pose, c, 1.0F, v1, light, shadeB);
-        vertex(consumer, pose, d, 0.0F, v1, light, shadeB);
+                             float u0, float u1, float v0, float v1, int light, float shadeA, float shadeB) {
+        vertex(consumer, pose, a, u0, v0, light, shadeA);
+        vertex(consumer, pose, b, u1, v0, light, shadeA);
+        vertex(consumer, pose, c, u1, v1, light, shadeB);
+        vertex(consumer, pose, d, u0, v1, light, shadeB);
     }
 
     private static void vertex(VertexConsumer consumer, PoseStack pose, Vec3 position, float u, float v,
