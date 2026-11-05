@@ -48,6 +48,8 @@ public final class MaidColliderCapture {
     };
 
     private static final Map<UUID, ColliderSet> SETS = new HashMap<>();
+    /** Animated model per maid: it is only handed out while she renders, so it is kept once seen. */
+    private static final Map<UUID, Object> MODELS = new HashMap<>();
     private static final Set<String> MISSES = new HashSet<>();
     private static volatile int hookRuns;
     private static volatile int captures;
@@ -76,9 +78,17 @@ public final class MaidColliderCapture {
                 via = "capability";
             }
             com.sleepwell.client.quilt.diag.QuiltTrace.step("7.animatable", describe(animatable) + " via=" + via);
-            Object model = animatable == null ? null : Reflect.call(animatable, "getGeoModel");
+            Object model = MODELS.get(maid.getUUID());
             if (model == null && animatable != null) {
+                model = Reflect.call(animatable, "getGeoModel");
+            }
+            if (model == null && animatable != null) {
+                Object updated = Reflect.call(animatable, "updateModel");
+                com.sleepwell.client.quilt.diag.QuiltTrace.step("8a.updateModel", describe(updated));
                 model = Reflect.call(animatable, "getCurrentModel");
+            }
+            if (model != null) {
+                MODELS.put(maid.getUUID(), model);
             }
             com.sleepwell.client.quilt.diag.QuiltTrace.step("8.model", describe(model));
             if (model == null) {
@@ -173,11 +183,20 @@ public final class MaidColliderCapture {
                 miss("direct:animatable", gecko.getClass().getName() + " -> " + dumpMethods(gecko, "getAnimatableEntity"));
                 return null;
             }
-            Object model = Reflect.call(animatable, "getGeoModel");
+            Object model = MODELS.get(maid.getUUID());
+            if (model == null) {
+                model = Reflect.call(animatable, "getGeoModel");
+            }
+            if (model == null) {
+                Reflect.call(animatable, "updateModel");
+                model = Reflect.call(animatable, "getCurrentModel");
+                com.sleepwell.client.quilt.diag.QuiltTrace.step("d.updateModel", describe(model));
+            }
             if (model == null) {
                 miss("direct:geoModel", animatable.getClass().getName() + " -> " + dumpMethods(animatable, "getGeoModel"));
                 return null;
             }
+            MODELS.put(maid.getUUID(), model);
             List<?> roots = Reflect.list(model, "topLevelBones");
             if (roots == null || roots.isEmpty()) {
                 miss("direct:roots", model.getClass().getName());
