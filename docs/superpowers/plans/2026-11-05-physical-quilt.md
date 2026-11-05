@@ -234,7 +234,7 @@ LOD 与上限：
 | # | 内容 | 产出 | 验收标准 |
 |---|---|---|---|
 | **M0** | **探针**：确认 gecko 的「动画后 bone 变换」从哪读、cube 角点怎么取 | `client/quilt/ColliderProbe.java`（`-Dsleepwell.quiltProbe=true`，每个模型打一次日志） | ✅ **数据结构已静态查清**（见第十一节），探针已编入并可跑；仍待游戏内确认「世界矩阵从哪来」 |
-| **M1** | 碰撞体采集（两条路径）+ 可见性过滤 + 每帧刷新 | `collider/*` | `quiltDebugWireframe` 打开：胶囊严丝合缝套住躺姿女仆；穿甲后藏起来的手不再有线框；换模型不错位 |
+| **M1** | 碰撞体采集（两条路径）+ 可见性过滤 + 每帧刷新 | `client/quilt/collider/*`（已交付，见 11.4） | `quiltWireframe` 打开：线框严丝合缝套住躺姿女仆；穿甲后藏起来的手不再有线框；换模型不错位 |
 | **M2** | 胶囊化 + 硬/软分级 + 体积阈值 | `QuiltCollider` | 尾巴/辫子只产生大球，不产生碎胶囊；腿/手/躯干各 ≤ 2 胶囊 |
 | **M3** | XPBD 核心（**不依赖 MC**）+ 单测 | `cloth/*` | 单测：悬垂收敛、约束不爆炸、子步 dt 无关性（1/60 与 1/240 结果接近） |
 | **M4** | 床碰撞 + 世界空间布置 + 预松弛 | `ClothState` | 被子第一帧就自然搭在床与身体上，无抽搐；床沿用 `FALLBACK_TOP` 时不歪 |
@@ -346,3 +346,24 @@ BackpackLocator / LeftWaistLocator / RifleLocator / PistolLocator   挂点
 - `GeckoColliderSource` 可以纯反射实现，**不必在本轮写 mixin**（除非 11.1 最后一行走到备选②）
 - 「按名分级硬/软碰撞体」在 gecko 侧可行（`getName()`），bedrock 侧靠 `modelMap` key
 - 原计划 M1 的「可见性过滤 + 每帧刷新」两项目标不变
+### 11.4 M1 已交付的部分（2026-11-05 第二轮）
+
+| 文件 | 作用 |
+|---|---|
+| `collider/QuiltBox.java` | 一个世界空间立方体（8 角点 + 胶囊半径 + 硬/软分级 + 骨头名） |
+| `collider/ColliderSet.java` | 一帧的整套轮廓 + 包围盒 + 变化戳 |
+| `collider/MaidColliderCapture.java` | 从 `RenderLivingEvent.Post` 采样：gecko 走 `geckoEntityMaidRenderer → getAnimatableEntity → getGeoModel → topLevelBones`，逐骨合成 `T(pos)·T(pivot)·R·S·T(-pivot)`，cube 用 `GeoMesh` 的 `position + dx/dy/dz` 取 8 角；bedrock 走 `modelMap`（粗略占位） |
+| `collider/QuiltWireframe.java` | 12 条边画盒：红=硬碰撞（身体）、蓝=软排斥（头发/尾巴/装饰） |
+| `collider/Reflect.java` | 只读反射，失败只降级不抛 |
+
+**打开方式**：`JAVA_TOOL_OPTIONS=-Dsleepwell.quiltWireframe=true gradlew runClient`
+
+**自检**：`MaidColliderCapture.selfCheck` 会拿 `poseStack` 的平移和她相对相机的真实位置比对，偏差 > 2 格就打一条 `collider miss matrix`——这就把「Post 时 PoseStack 是否还带实体变换」从猜测变成了运行时自证。
+
+**尚不确定、要靠线框确认的三件事**（按可能性排序）：
+
+1. `getRotationX/Y/Z` 是否真是弧度（按弧度实现；若线框被放大了一倍左右，就是角度）
+2. 骨头复合顺序是否为 `T(pos)·T(pivot)·R·S·T(-pivot)`（geckolib 的 `renderRecursively` 是「先平移 pivot、旋转、再平移回来」，若线框整体偏移，就是 pos 与 pivot 的先后问题）
+3. bedrock 路径目前每个部件只给一个 0.12 格的小盒，仅用于确认「这条路上有东西」，M2 再按 `BedrockCube` 补真几何
+
+**验收方式**：找一只睡在女仆床上的女仆，开线框截图——红线应贴着头/躯干/四肢，蓝线贴着头发/尾巴；形状随睡姿动画（呼吸）轻微起伏。

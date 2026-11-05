@@ -25,6 +25,8 @@ import net.minecraftforge.client.event.RenderLivingEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import com.sleepwell.SleepWellMod;
+import com.sleepwell.client.quilt.collider.MaidColliderCapture;
+import com.sleepwell.client.quilt.collider.QuiltWireframe;
 import org.joml.Vector3f;
 
 import java.util.EnumMap;
@@ -106,6 +108,7 @@ public final class QuiltRenderer {
         if (event.getEntity() instanceof EntityMaid maid && maid.isSleeping()) {
             MaidSilhouette.capture(maid);
             ColliderProbe.maybeDump(maid);
+            MaidColliderCapture.capture(maid, event.getPoseStack(), event.getPartialTick());
         }
     }
 
@@ -129,13 +132,15 @@ public final class QuiltRenderer {
         if (SLEEP_LOGS++ < 3) {
             LOGGER.info("[sleep_well] sleeping maids near camera=" + sleeping.size());
         }
-        if (sleeping.isEmpty()) {
-            return;
-        }
         PoseStack pose = event.getPoseStack();
         pose.pushPose();
         pose.translate(-camera.x, -camera.y, -camera.z);
         MultiBufferSource.BufferSource buffers = Minecraft.getInstance().renderBuffers().bufferSource();
+        QuiltWireframe.draw(pose, buffers, sleeping);
+        if (sleeping.isEmpty()) {
+            pose.popPose();
+            return;
+        }
         for (EntityMaid maid : sleeping) {
             Bed bed = findBed(level, maid.blockPosition());
             if (bed != null) {
