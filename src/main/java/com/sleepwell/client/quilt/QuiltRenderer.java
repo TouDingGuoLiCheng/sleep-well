@@ -52,7 +52,7 @@ public final class QuiltRenderer {
     /** One repeat of the quilt texture covers this many blocks, so the checks stay square. */
     private static final float TILE_BLOCKS = 1.0F;
     /** How far past the foot of the bed the cloth runs. Measured from the bed, not from her hitbox. */
-    private static final float FOOT_REACH = 0.15F;
+    private static final float FOOT_REACH = 1.0F;
     /** How much of the foot end sinks back down to the mattress. */
     private static final float END_FADE = 0.40F;
     private static final float SKIRT_OUT = 0.18F;
@@ -276,7 +276,9 @@ public final class QuiltRenderer {
             // does not change how the rest of the quilt looks.
             // Stay at full height until the very end, so her feet are covered rather than poking out of a
             // cloth that already sank to the mattress.
-            float fade = Math.min(1.0F, Math.min(u / 0.35F, (uEnd + END_FADE * 0.5F - u) / END_FADE));
+            // Full height right up to the end: the foot end is closed by a vertical wall instead of the cloth
+            // sinking to the mattress, which is what used to leave her feet sticking up in the open.
+            float fade = Math.min(1.0F, Math.min(u / 0.35F, (uEnd - u) / 0.10F));
             body *= Math.max(0.0F, fade);
             for (int j = 0; j <= acrossSteps; j++) {
                 float s = -1.0F + 2.0F * j / acrossSteps;
@@ -294,6 +296,19 @@ public final class QuiltRenderer {
                         headCenter.z + along.z * u + across.z * (s * halfWidth));
                 shades[i][j] = 0.72F + 0.28F * Math.min(1.0F, lift / 0.20F);
             }
+        }
+        // Close the foot end with a vertical wall. It reads like the folded end of a quilt and, more to the
+        // point, it hides her feet instead of letting them rise out of a cloth that had gone flat.
+        float tailY = (float) (headCenter.y + LIE_FLAT);
+        for (int j = 0; j < acrossSteps; j++) {
+            Vec3 topA = points[alongSteps][j];
+            Vec3 topB = points[alongSteps][j + 1];
+            Vec3 lowA = new Vec3(topA.x, tailY, topA.z);
+            Vec3 lowB = new Vec3(topB.x, tailY, topB.z);
+            float v0 = (float) j / acrossSteps * widthTiles;
+            float v1 = (float) (j + 1) / acrossSteps * widthTiles;
+            float uTex = uEnd / TILE_BLOCKS + 0.02F;
+            quad(consumer, pose, topA, topB, lowB, lowA, uTex, uTex + 0.03F, v0, v1, light, 0.70F, 0.52F);
         }
         for (int i = 0; i < alongSteps; i++) {
             float uTex0 = (uStart + (uEnd - uStart) * i / alongSteps) / TILE_BLOCKS;
