@@ -43,7 +43,8 @@ public final class QuiltWireframe {
         return ENABLED;
     }
 
-    public static void draw(PoseStack pose, MultiBufferSource.BufferSource buffers, List<EntityMaid> maids) {
+    public static void draw(PoseStack pose, MultiBufferSource.BufferSource buffers, List<EntityMaid> maids,
+                            net.minecraft.world.phys.Vec3 camera, float partialTick) {
         if (!ENABLED || maids.isEmpty()) {
             if (ANNOUNCED.compareAndSet(false, true)) {
                 report("flag=" + ENABLED + " sleeping=" + maids.size()
@@ -57,6 +58,9 @@ public final class QuiltWireframe {
         int missing = 0;
         for (EntityMaid maid : maids) {
             ColliderSet set = MaidColliderCapture.get(maid);
+            if (set == null) {
+                set = MaidColliderCapture.captureDirect(maid, camera, partialTick);
+            }
             if (set == null) {
                 missing++;
                 continue;
@@ -74,9 +78,12 @@ public final class QuiltWireframe {
         }
         buffers.endBatch(RenderType.lines());
         if (ANNOUNCED.compareAndSet(false, true)) {
+            String renderer = maids.isEmpty() ? "?" : Minecraft.getInstance().getEntityRenderDispatcher()
+                    .getRenderer(maids.get(0)).getClass().getSimpleName();
             report("boxes=" + boxes + " missing=" + missing
                     + " hook=" + MaidColliderCapture.hookRuns()
                     + " captured=" + MaidColliderCapture.captures()
+                    + " renderer=" + renderer
                     + " miss=" + MaidColliderCapture.misses());
         }
     }

@@ -13,12 +13,15 @@ public final class ColliderSet {
     public final long stamp;
     /** Tick the capture was made on; -1 when never captured. */
     public final int tick;
+    /** True when built without the render hook, from the model's last animated pose. */
+    public final boolean direct;
 
-    public ColliderSet(List<QuiltBox> boxes, float[] bounds, long stamp, int tick) {
+    public ColliderSet(List<QuiltBox> boxes, float[] bounds, long stamp, int tick, boolean direct) {
         this.boxes = boxes;
         this.bounds = bounds;
         this.stamp = stamp;
         this.tick = tick;
+        this.direct = direct;
     }
 
     public int hardCount() {

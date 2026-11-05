@@ -51,6 +51,7 @@ public final class MaidColliderCapture {
     private static final Set<String> MISSES = new HashSet<>();
     private static volatile int hookRuns;
     private static volatile int captures;
+    private static final java.util.concurrent.atomic.AtomicInteger DIRECT_LOGS = new java.util.concurrent.atomic.AtomicInteger();
 
     private MaidColliderCapture() {
     }
@@ -63,6 +64,74 @@ public final class MaidColliderCapture {
         } catch (Throwable error) {
             miss("capture:" + error.getClass().getSimpleName(), error.toString());
         }
+    }
+
+    /**
+     * Mixin-free fallback: read her model at {@code RenderLevelStageEvent} time, where the bones still hold
+     * the last animated (sleeping) pose, and rebuild the entity transform ourselves.
+     * <p>
+     * Vanilla's sleeping transform is {@code T(0,-eye,0) · RY(-bedDir) · RZ(-90)} inside the dispatcher's
+     * {@code RY(180 - bodyYaw)}, so it can be reconstructed without hooking anything. Throttled because a
+     * reflection walk per frame per maid is not free.
+     */
+    public static ColliderSet captureDirect(EntityMaid maid, net.minecraft.world.phys.Vec3 camera, float partialTick) {
+        ColliderSet cached = SETS.get(maid.getUUID());
+        if (cached != null && maid.tickCount - cached.tick < 5) {
+            return cached;
+        }
+        try {
+            EntityRenderer<?> renderer = Minecraft.getInstance().getEntityRenderDispatcher().getRenderer(maid);
+            Object gecko = renderer == null ? null : Reflect.field(renderer, "geckoEntityMaidRenderer");
+            Object animatable = gecko == null ? null : Reflect.call(gecko, "getAnimatableEntity", maid);
+            Object model = animatable == null ? null : Reflect.call(animatable, "getGeoModel");
+            if (model == null) {
+                miss("direct:model", (renderer == null ? "null" : renderer.getClass().getSimpleName()));
+                return null;
+            }
+            List<?> roots = Reflect.list(model, "topLevelBones");
+            if (roots == null || roots.isEmpty()) {
+                miss("direct:roots", model.getClass().getName());
+                return null;
+            }
+            Matrix4f entity = entityMatrix(maid, camera, partialTick);
+            List<QuiltBox> boxes = new ArrayList<>();
+            for (Object root : roots) {
+                walkBone(root, new Matrix4f(entity), boxes, 0);
+            }
+            if (boxes.isEmpty()) {
+                miss("direct:empty", "bones walked but no cubes");
+                return null;
+            }
+            ColliderSet set = new ColliderSet(boxes, bounds(boxes), stamp(boxes), maid.tickCount, true);
+            SETS.put(maid.getUUID(), set);
+            if (DIRECT_LOGS.getAndIncrement() == 0) {
+                float[] b = set.bounds;
+                LOGGER.info("[sleep_well] direct capture boxes={} center=({},{},{}) maidY={} renderer={}",
+                        boxes.size(), (b[0] + b[3]) / 2.0F, (b[1] + b[4]) / 2.0F, (b[2] + b[5]) / 2.0F,
+                        maid.getY(), renderer.getClass().getSimpleName());
+            }
+            return set;
+        } catch (Throwable error) {
+            miss("direct:" + error.getClass().getSimpleName(), error.toString());
+            return null;
+        }
+    }
+
+    /** Rebuilds the transform the renderer would have used: dispatcher translate/yaw plus sleeping rotation. */
+    private static Matrix4f entityMatrix(EntityMaid maid, net.minecraft.world.phys.Vec3 camera, float partialTick) {
+        net.minecraft.world.phys.Vec3 position = maid.getPosition(partialTick).subtract(camera);
+        float yaw = net.minecraft.util.Mth.rotLerp(partialTick, maid.yBodyRotO, maid.yBodyRot);
+        Matrix4f matrix = new Matrix4f()
+                .translate((float) position.x, (float) position.y, (float) position.z)
+                .rotateY((float) Math.toRadians(180.0F - yaw));
+        net.minecraft.core.Direction bed = maid.getBedOrientation();
+        if (maid.isSleeping() && bed != null) {
+            float eye = maid.getEyeHeight(net.minecraft.world.entity.Pose.STANDING) - 0.1F;
+            matrix.translate(0.0F, -eye, 0.0F);
+            matrix.rotateY((float) Math.toRadians(-bed.toYRot()));
+            matrix.rotateZ((float) Math.toRadians(-90.0F));
+        }
+        return matrix;
     }
 
     /** How many times the render hook was entered - 0 means the mixin never fired. */
@@ -108,7 +177,7 @@ public final class MaidColliderCapture {
             return;
         }
         captures++;
-        SETS.put(maid.getUUID(), new ColliderSet(boxes, bounds(boxes), stamp(boxes), maid.tickCount));
+        SETS.put(maid.getUUID(), new ColliderSet(boxes, bounds(boxes), stamp(boxes), maid.tickCount, false));
     }
 
     // --- gecko -------------------------------------------------------------

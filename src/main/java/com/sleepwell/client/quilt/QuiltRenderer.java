@@ -136,7 +136,7 @@ public final class QuiltRenderer {
         pose.pushPose();
         pose.translate(-camera.x, -camera.y, -camera.z);
         MultiBufferSource.BufferSource buffers = Minecraft.getInstance().renderBuffers().bufferSource();
-        QuiltWireframe.draw(pose, buffers, sleeping);
+        QuiltWireframe.draw(pose, buffers, sleeping, camera, event.getPartialTick());
         if (sleeping.isEmpty()) {
             pose.popPose();
             return;
