@@ -52,7 +52,7 @@ public final class QuiltRenderer {
     /** One repeat of the quilt texture covers this many blocks, so the checks stay square. */
     private static final float TILE_BLOCKS = 1.0F;
     /** How far past the foot of the bed the cloth runs. Measured from the bed, not from her hitbox. */
-    private static final float FOOT_REACH = 0.40F;
+    private static final float FOOT_REACH = 0.15F;
     /** How much of the foot end sinks back down to the mattress. */
     private static final float END_FADE = 0.40F;
     private static final float SKIRT_OUT = 0.18F;
