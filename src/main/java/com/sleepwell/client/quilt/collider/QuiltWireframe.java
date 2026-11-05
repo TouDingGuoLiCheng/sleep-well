@@ -86,8 +86,12 @@ public final class QuiltWireframe {
                 float g = box.hard ? 0.25F : 0.60F;
                 float b = box.hard ? 0.25F : 1.0F;
                 for (int[] edge : EDGES) {
-                    line(consumer, matrix, box, edge[0], r, g, b);
-                    line(consumer, matrix, box, edge[1], r, g, b);
+                    line(consumer, matrix, box, edge[0], r, g, b, 0.0F, 0.0F, 0.0F);
+                    line(consumer, matrix, box, edge[1], r, g, b, 0.0F, 0.0F, 0.0F);
+                    // Green copy two blocks aside, in open air: the shape can be judged even when the
+                    // original sits buried inside the bed.
+                    line(consumer, matrix, box, edge[0], 0.35F, 1.0F, 0.35F, 2.0F, 0.0F, 0.0F);
+                    line(consumer, matrix, box, edge[1], 0.35F, 1.0F, 0.35F, 2.0F, 0.0F, 0.0F);
                 }
                 for (int i = 0; i < 8; i++) {
                     org.joml.Vector3f view = matrix.transformPosition(
@@ -153,6 +157,9 @@ public final class QuiltWireframe {
         vertex(consumer, matrix, x + 0.6F, y + 0.05F, z, 1.0F, 1.0F, 0.0F);
         vertex(consumer, matrix, x, y + 0.05F, z - 0.6F, 1.0F, 1.0F, 0.0F);
         vertex(consumer, matrix, x, y + 0.05F, z + 0.6F, 1.0F, 1.0F, 0.0F);
+        // and a green beacon where the copied outline sits
+        vertex(consumer, matrix, x + 2.0F, y + 0.05F, z, 0.35F, 1.0F, 0.35F);
+        vertex(consumer, matrix, x + 2.0F, y + 2.0F, z, 0.35F, 1.0F, 0.35F);
     }
 
     private static void vertex(VertexConsumer consumer, Matrix4f matrix, float x, float y, float z,
@@ -161,8 +168,8 @@ public final class QuiltWireframe {
     }
 
     private static void line(VertexConsumer consumer, Matrix4f matrix, QuiltBox box, int corner,
-                             float r, float g, float b) {
-        consumer.vertex(matrix, box.x(corner), box.y(corner), box.z(corner))
+                             float r, float g, float b, float dx, float dy, float dz) {
+        consumer.vertex(matrix, box.x(corner) + dx, box.y(corner) + dy, box.z(corner) + dz)
                 .color(r, g, b, 1.0F)
                 .normal(0.0F, 1.0F, 0.0F)
                 .endVertex();
