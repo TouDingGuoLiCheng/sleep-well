@@ -420,27 +420,42 @@ public final class MaidColliderCapture {
                 .gameRenderer.getMainCamera();
         org.joml.Vector3f cameraPos = new org.joml.Vector3f((float) camera.getPosition().x,
                 (float) camera.getPosition().y, (float) camera.getPosition().z);
-        // The pose is model-to-view space. Which way the camera rotation must be inverted differs
-        // between Forge versions, so let the maid's own position decide: the variant that lands the
-        // model origin closer to her is the right one.
+        // The pose is model-to-view space, but exactly which composition Forge used is version
+        // dependent. Rather than guessing, try every plausible reading and keep the one that lands
+        // the model origin on the maid; the winner is logged so the choice stays inspectable.
+        org.joml.Matrix4f poseCopy = new org.joml.Matrix4f(pose);
+        org.joml.Vector3f viewOrigin = poseCopy.transformPosition(new org.joml.Vector3f());
         org.joml.Quaternionf rotation = camera.rotation();
         Matrix4f inverse = new Matrix4f().rotate(new org.joml.Quaternionf(rotation).conjugate());
         Matrix4f direct = new Matrix4f().rotate(new org.joml.Quaternionf(rotation));
-        org.joml.Vector3f viewOrigin = new Matrix4f(pose).transformPosition(new org.joml.Vector3f());
-        org.joml.Vector3f asInverse = inverse.transformPosition(new org.joml.Vector3f(viewOrigin)).add(cameraPos);
-        org.joml.Vector3f asDirect = direct.transformPosition(new org.joml.Vector3f(viewOrigin)).add(cameraPos);
-        org.joml.Vector3f maidPos = new org.joml.Vector3f((float) maid.getX(), (float) maid.getY(), (float) maid.getZ());
-        double distanceInverse = asInverse.distance(maidPos);
-        double distanceDirect = asDirect.distance(maidPos);
-        Matrix4f chosen = distanceInverse <= distanceDirect ? inverse : direct;
-        if (layerCalls % 200 == 1) {
-            LOGGER.info("[被子] cal inverse={} direct={} pick={}", String.format(java.util.Locale.ROOT, "%.2f", distanceInverse),
-                    String.format(java.util.Locale.ROOT, "%.2f", distanceDirect),
-                    distanceInverse <= distanceDirect ? "inverse" : "direct");
+        org.joml.Vector3f maidPos = new org.joml.Vector3f((float) maid.getX(), (float) maid.getY(),
+                (float) maid.getZ());
+        Matrix4f[] rotations = {inverse, direct, new Matrix4f(), new Matrix4f()};
+        org.joml.Vector3f[] offsets = {new org.joml.Vector3f(cameraPos), new org.joml.Vector3f(cameraPos),
+                new org.joml.Vector3f(cameraPos), new org.joml.Vector3f()};
+        String[] names = {"inverse+cam", "direct+cam", "identity+cam", "identity"};
+        double[] distances = new double[4];
+        int best = 0;
+        for (int i = 0; i < 4; i++) {
+            org.joml.Vector3f candidate = rotations[i].transformPosition(new org.joml.Vector3f(viewOrigin))
+                    .add(offsets[i]);
+            distances[i] = candidate.distance(maidPos);
+            if (distances[i] < distances[best]) {
+                best = i;
+            }
         }
-        Matrix4f toWorld = new Matrix4f().translate(cameraPos)
-                .mul(chosen)
-                .mul(new Matrix4f(pose));
+        if (!POSE_LOGGED) {
+            POSE_LOGGED = true;
+            LOGGER.info("[被子] pose4x4 {} v0={} cam={} maid={}", poseCopy, viewOrigin, cameraPos, maidPos);
+        }
+        if (layerCalls % 200 == 1) {
+            LOGGER.info("[被子] cal {} pick={} dist={}", String.format(java.util.Locale.ROOT,
+                            "inv=%.2f dir=%.2f idcam=%.2f id=%.2f", distances[0], distances[1], distances[2], distances[3]),
+                    names[best], String.format(java.util.Locale.ROOT, "%.2f", distances[best]));
+        }
+        Matrix4f toWorld = new Matrix4f().translate(offsets[best])
+                .mul(rotations[best])
+                .mul(poseCopy);
         List<QuiltBox> boxes = new ArrayList<>();
         for (Object root : roots) {
             walkBone(root, new Matrix4f(toWorld), boxes, 0);
@@ -629,6 +644,7 @@ public final class MaidColliderCapture {
     }
 
     private static boolean DUMPED;
+    private static boolean POSE_LOGGED;
 
     /** One-shot listing of every gecko model key, so a missed lookup can be matched against real names. */
     private static void logCacheKeys() {
