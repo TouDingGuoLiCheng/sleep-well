@@ -277,6 +277,21 @@ public final class MaidColliderCapture {
     }
 
     /** Rebuilds the transform the renderer would have used: dispatcher translate/yaw plus sleeping rotation. */
+    /** Same composition as {@link #entityMatrix}, but in world space: used by the render-layer capture. */
+    private static Matrix4f entityMatrixWorld(EntityMaid maid) {
+        Matrix4f matrix = new Matrix4f()
+                .translate((float) maid.getX(), (float) maid.getY(), (float) maid.getZ())
+                .rotateY((float) Math.toRadians(180.0F - maid.yBodyRot));
+        net.minecraft.core.Direction bed = maid.getBedOrientation();
+        if (maid.isSleeping() && bed != null) {
+            float eye = maid.getEyeHeight(net.minecraft.world.entity.Pose.STANDING) - 0.1F;
+            matrix.translate(0.0F, -eye, 0.0F);
+            matrix.rotateY((float) Math.toRadians(-bed.toYRot()));
+            matrix.rotateZ((float) Math.toRadians(-90.0F));
+        }
+        return matrix;
+    }
+
     private static Matrix4f entityMatrix(EntityMaid maid, net.minecraft.world.phys.Vec3 camera, float partialTick) {
         net.minecraft.world.phys.Vec3 position = maid.getPosition(partialTick).subtract(camera);
         float yaw = net.minecraft.util.Mth.rotLerp(partialTick, maid.yBodyRotO, maid.yBodyRot);
@@ -420,42 +435,10 @@ public final class MaidColliderCapture {
                 .gameRenderer.getMainCamera();
         org.joml.Vector3f cameraPos = new org.joml.Vector3f((float) camera.getPosition().x,
                 (float) camera.getPosition().y, (float) camera.getPosition().z);
-        // The pose is model-to-view space, but exactly which composition Forge used is version
-        // dependent. Rather than guessing, try every plausible reading and keep the one that lands
-        // the model origin on the maid; the winner is logged so the choice stays inspectable.
-        org.joml.Matrix4f poseCopy = new org.joml.Matrix4f(pose);
-        org.joml.Vector3f viewOrigin = poseCopy.transformPosition(new org.joml.Vector3f());
-        org.joml.Quaternionf rotation = camera.rotation();
-        Matrix4f inverse = new Matrix4f().rotate(new org.joml.Quaternionf(rotation).conjugate());
-        Matrix4f direct = new Matrix4f().rotate(new org.joml.Quaternionf(rotation));
-        org.joml.Vector3f maidPos = new org.joml.Vector3f((float) maid.getX(), (float) maid.getY(),
-                (float) maid.getZ());
-        Matrix4f[] rotations = {inverse, direct, new Matrix4f(), new Matrix4f()};
-        org.joml.Vector3f[] offsets = {new org.joml.Vector3f(cameraPos), new org.joml.Vector3f(cameraPos),
-                new org.joml.Vector3f(cameraPos), new org.joml.Vector3f()};
-        String[] names = {"inverse+cam", "direct+cam", "identity+cam", "identity"};
-        double[] distances = new double[4];
-        int best = 0;
-        for (int i = 0; i < 4; i++) {
-            org.joml.Vector3f candidate = rotations[i].transformPosition(new org.joml.Vector3f(viewOrigin))
-                    .add(offsets[i]);
-            distances[i] = candidate.distance(maidPos);
-            if (distances[i] < distances[best]) {
-                best = i;
-            }
-        }
-        if (!POSE_LOGGED) {
-            POSE_LOGGED = true;
-            LOGGER.info("[被子] pose4x4 {} v0={} cam={} maid={}", poseCopy, viewOrigin, cameraPos, maidPos);
-        }
-        if (layerCalls % 200 == 1) {
-            LOGGER.info("[被子] cal {} pick={} dist={}", String.format(java.util.Locale.ROOT,
-                            "inv=%.2f dir=%.2f idcam=%.2f id=%.2f", distances[0], distances[1], distances[2], distances[3]),
-                    names[best], String.format(java.util.Locale.ROOT, "%.2f", distances[best]));
-        }
-        Matrix4f toWorld = new Matrix4f().translate(offsets[best])
-                .mul(rotations[best])
-                .mul(poseCopy);
+        // The layer's PoseStack is camera-relative with no camera rotation applied, so it cannot be
+        // turned into world space reliably. The pose *is* useful as a cross-check: capture with the
+        // analytic sleeping transform below, and log how far the result lands from her.
+        Matrix4f toWorld = entityMatrixWorld(maid);
         List<QuiltBox> boxes = new ArrayList<>();
         for (Object root : roots) {
             walkBone(root, new Matrix4f(toWorld), boxes, 0);
