@@ -68,7 +68,14 @@ public final class QuiltWireframe {
         float maxX = -Float.MAX_VALUE, maxY = -Float.MAX_VALUE, maxZ = -Float.MAX_VALUE;
         org.joml.Vector3f firstBoxWorld = null;
         org.joml.Vector3f firstBoxView = null;
+        EntityMaid nearest = null;
+        double nearestDistance = Double.MAX_VALUE;
         for (EntityMaid maid : maids) {
+            double d = maid.position().distanceTo(camera);
+            if (d < nearestDistance) {
+                nearestDistance = d;
+                nearest = maid;
+            }
             ColliderSet set = MaidColliderCapture.get(maid);
             if (set == null) {
                 set = MaidColliderCapture.captureDirect(maid, camera, partialTick);
@@ -114,12 +121,20 @@ public final class QuiltWireframe {
         int tick = Minecraft.getInstance().player == null ? 0 : Minecraft.getInstance().player.tickCount;
         // Fold the draw-time numbers into the chat/log status line: this block is proven to run, so the
         // numbers cannot go missing the way a separate log statement did.
-        drawDiagnostics = String.format(java.util.Locale.ROOT,
-                " cam=%.2f,%.2f,%.2f viewBox=[%.2f,%.2f,%.2f..%.2f,%.2f,%.2f] firstWorld=%s firstView=%s camRot=%s",
+        String nearInfo = "-";
+        if (nearest != null) {
+            ColliderSet nearSet = MaidColliderCapture.get(nearest);
+            float[] nb = nearSet == null ? null : nearSet.bounds;
+            nearInfo = String.format(java.util.Locale.ROOT,
+                    "%.2f@%.2f,%.2f,%.2f n=%d min=%s", nearestDistance, nearest.getX(), nearest.getY(),
+                    nearest.getZ(), nearSet == null ? -1 : nearSet.boxes.size(),
+                    nb == null ? "-" : String.format(java.util.Locale.ROOT, "%.2f,%.2f,%.2f", nb[0], nb[1], nb[2]));
+        }
+        drawDiagnostics = " near=" + nearInfo + String.format(java.util.Locale.ROOT,
+                " cam=%.2f,%.2f,%.2f viewBox=[%.2f,%.2f,%.2f..%.2f,%.2f,%.2f] firstWorld=%s firstView=%s",
                 camera.x, camera.y, camera.z, minX, minY, minZ, maxX, maxY, maxZ,
                 firstBoxWorld == null ? "-" : firstBoxWorld.toString(),
-                firstBoxView == null ? "-" : firstBoxView.toString(),
-                pose.last().pose().toString().replace("Matrix4f[", "").replace("]", ""));
+                firstBoxView == null ? "-" : firstBoxView.toString());
         if ((ANNOUNCED.compareAndSet(false, true) || tick % 200 == 0) && tick > 0) {
             String renderer = maids.isEmpty() ? "?" : Minecraft.getInstance().getEntityRenderDispatcher()
                     .getRenderer(maids.get(0)).getClass().getSimpleName();
