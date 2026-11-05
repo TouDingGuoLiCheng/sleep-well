@@ -25,3 +25,6 @@ Thumbs.db
 libs/*.jar
 hs_err_pid*.log
 replay_pid*.log
+# Build artifacts that land next to the project
+/sleep_well-*.jar
+/build_compile.log

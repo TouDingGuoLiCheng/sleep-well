@@ -105,6 +105,7 @@ public final class QuiltRenderer {
     public static void onRenderLiving(RenderLivingEvent.Post event) {
         if (event.getEntity() instanceof EntityMaid maid && maid.isSleeping()) {
             MaidSilhouette.capture(maid);
+            ColliderProbe.maybeDump(maid);
         }
     }
 

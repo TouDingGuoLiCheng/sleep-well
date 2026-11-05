@@ -233,7 +233,7 @@ LOD 与上限：
 
 | # | 内容 | 产出 | 验收标准 |
 |---|---|---|---|
-| **M0** | **探针**：确认 gecko 的「动画后 bone 矩阵」从哪读、`GeoCube` 角点怎么取 | 临时 `ColliderProbe`（`F3` 触发一次日志） | 5 个模型各打印 bone/cube 统计 + 睡姿下的矩阵非单位阵；拿不到就当场转「退路方案」并在此文档追加结论 |
+| **M0** | **探针**：确认 gecko 的「动画后 bone 变换」从哪读、cube 角点怎么取 | `client/quilt/ColliderProbe.java`（`-Dsleepwell.quiltProbe=true`，每个模型打一次日志） | ✅ **数据结构已静态查清**（见第十一节），探针已编入并可跑；仍待游戏内确认「世界矩阵从哪来」 |
 | **M1** | 碰撞体采集（两条路径）+ 可见性过滤 + 每帧刷新 | `collider/*` | `quiltDebugWireframe` 打开：胶囊严丝合缝套住躺姿女仆；穿甲后藏起来的手不再有线框；换模型不错位 |
 | **M2** | 胶囊化 + 硬/软分级 + 体积阈值 | `QuiltCollider` | 尾巴/辫子只产生大球，不产生碎胶囊；腿/手/躯干各 ≤ 2 胶囊 |
 | **M3** | XPBD 核心（**不依赖 MC**）+ 单测 | `cloth/*` | 单测：悬垂收敛、约束不爆炸、子步 dt 无关性（1/60 与 1/240 结果接近） |
@@ -317,3 +317,32 @@ BackpackLocator / LeftWaistLocator / RifleLocator / PistolLocator   挂点
 | 日志前缀 | `[sleep_well] quilt ...`，一次性日志用 `PRINTS` 计数限制（沿用现状写法） |
 | 命令 | `/sleepwell quiltdebug`（权限 2，客户端侧只改本地开关） |
 | 单测 | `src/unitTest/java/com/sleepwell/quilt/*`：XPBD 数值稳定性、胶囊-粒子碰撞、姿态指纹 |
+---
+
+## 十一、M0 探针结论（2026-11-05）
+
+### 11.1 静态查清的部分（可直接照此写 M1）
+
+| 环节 | 结论 |
+|---|---|
+| 从女仆拿到 gecko 模型 | `EntityMaidRenderer` 字段 `geckoEntityMaidRenderer` → `getAnimatableEntity(maid)` 得 `GeckoMaidEntity` → `getGeoModel()` 返回 `ILocationModel`，实际实现是 `AnimatedGeoModel` |
+| 动画后的骨头变换 | `AnimatedGeoBone` 上现成：`getName()`、`getPositionX/Y/Z()`、`getRotationX/Y/Z()`、`getScaleX/Y/Z()`、`isHidden()`、`areCubesHidden()`、`children()`、`geoBone()` —— **不需要自己插进动画管线** |
+| 骨头几何 | `GeoBone#pivot()` / `rotation()` / `cubes()` / `dontRender()`；`GeoMesh` 是打包数组（`position[] dx[] dy[] dz[] cubeCount`），cube 角点可用 `position + dx/dy/dz` 直接还原，**比原计划「用 quad 顶点反算 8 角」更省**（`GeoVertex.position` 留作兜底） |
+| 可见性过滤 | gecko：`isHidden()` / `areCubesHidden()` / `dontRender`；bedrock：`BedrockPart.visible` —— 两套都有，Q4 可解 |
+| bedrock 侧 | `modelMap` 的 **key 才是部件名**（`BedrockPart` 自身没有 name 字段），被子要按名字分级时从 key 取 |
+| 世界矩阵 | **仍是唯一未定项**：`GeoBone` / `AnimatedGeoBone` 都**不缓存**世界矩阵，矩阵在渲染递归里现算。两条备选：①`RenderLivingEvent.Post` 里 `poseStack.last().pose()` 是否仍带实体变换（探针线框一验即知）；②mixin `GeoReplacedEntityRenderer#render(T, E, float, float, PoseStack, MultiBufferSource, int)` 的 HEAD 抓栈顶 |
+
+### 11.2 已交付的探针
+
+- 文件：`src/main/java/com/sleepwell/client/quilt/ColliderProbe.java`
+- 触发：`JAVA_TOOL_OPTIONS=-Dsleepwell.quiltProbe=true gradlew runClient`（默认关闭，一次游戏只跑一遍，按渲染器类型去重）
+- 日志前缀 `[sleep_well] probe ...`，逐跳打印「拿到了什么 / 哪一跳断了」：渲染器类名 → 模型类名 → `geckoEntityMaidRenderer` → `GeckoMaidEntity` → `AnimatedGeoModel` → 前 6 根骨头 + 每 20 根骨头一行（名字/TRS/隐藏/cube 数/pivot）→ bedrock `modelMap` 汇总
+- 挂载点：`QuiltRenderer.onRenderLiving`（与该模组现有采样同一处，保证拿到的是睡姿）
+- 验证：`gradlew compileJava` 通过（18 秒，仅剩工程既有的 `ResourceLocation(String,String)` 过时警告，与本次改动无关）
+- 生命周期：M1 落地 `collider/` 后删除本类
+
+### 11.3 对 M1 的影响
+
+- `GeckoColliderSource` 可以纯反射实现，**不必在本轮写 mixin**（除非 11.1 最后一行走到备选②）
+- 「按名分级硬/软碰撞体」在 gecko 侧可行（`getName()`），bedrock 侧靠 `modelMap` key
+- 原计划 M1 的「可见性过滤 + 每帧刷新」两项目标不变
