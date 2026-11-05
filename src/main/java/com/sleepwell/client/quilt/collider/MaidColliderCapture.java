@@ -420,8 +420,26 @@ public final class MaidColliderCapture {
                 .gameRenderer.getMainCamera();
         org.joml.Vector3f cameraPos = new org.joml.Vector3f((float) camera.getPosition().x,
                 (float) camera.getPosition().y, (float) camera.getPosition().z);
+        // The pose is model-to-view space. Which way the camera rotation must be inverted differs
+        // between Forge versions, so let the maid's own position decide: the variant that lands the
+        // model origin closer to her is the right one.
+        org.joml.Quaternionf rotation = camera.rotation();
+        Matrix4f inverse = new Matrix4f().rotate(new org.joml.Quaternionf(rotation).conjugate());
+        Matrix4f direct = new Matrix4f().rotate(new org.joml.Quaternionf(rotation));
+        org.joml.Vector3f viewOrigin = new Matrix4f(pose).transformPosition(new org.joml.Vector3f());
+        org.joml.Vector3f asInverse = inverse.transformPosition(new org.joml.Vector3f(viewOrigin)).add(cameraPos);
+        org.joml.Vector3f asDirect = direct.transformPosition(new org.joml.Vector3f(viewOrigin)).add(cameraPos);
+        org.joml.Vector3f maidPos = new org.joml.Vector3f((float) maid.getX(), (float) maid.getY(), (float) maid.getZ());
+        double distanceInverse = asInverse.distance(maidPos);
+        double distanceDirect = asDirect.distance(maidPos);
+        Matrix4f chosen = distanceInverse <= distanceDirect ? inverse : direct;
+        if (layerCalls % 200 == 1) {
+            LOGGER.info("[被子] cal inverse={} direct={} pick={}", String.format(java.util.Locale.ROOT, "%.2f", distanceInverse),
+                    String.format(java.util.Locale.ROOT, "%.2f", distanceDirect),
+                    distanceInverse <= distanceDirect ? "inverse" : "direct");
+        }
         Matrix4f toWorld = new Matrix4f().translate(cameraPos)
-                .rotate(camera.rotation().conjugate(new org.joml.Quaternionf()))
+                .mul(chosen)
                 .mul(new Matrix4f(pose));
         List<QuiltBox> boxes = new ArrayList<>();
         for (Object root : roots) {
