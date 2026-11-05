@@ -209,10 +209,10 @@ public final class QuiltRenderer {
         float uStart = Math.max(HEAD_GAP, uMin - HEAD_MARGIN);
         // Her feet often hang off the end of the bed, so the cloth is allowed past the mattress edge and
         // simply drapes off it.
-        float uEnd = Math.min(bedEnd + 0.95F, uMax + FOOT_MARGIN + 0.45F);
+        float uEnd = Math.min(bedEnd + 1.20F, uMax + FOOT_MARGIN + 0.75F);
         if (uEnd - uStart < 1.0F) {
             uStart = Math.max(HEAD_GAP, uStart - 0.25F);
-            uEnd = Math.min(bedEnd + 0.85F, uEnd + 0.25F);
+            uEnd = Math.min(bedEnd + 1.10F, uEnd + 0.25F);
         }
         float bodyCenter = (uStart + uEnd) * 0.5F;
         // Her own bones, when TLM's model exposes them; the hard coded profile is only the fallback.
@@ -267,7 +267,9 @@ public final class QuiltRenderer {
             // fades too, but it is mostly hidden by the pillow gap anyway.
             // Fades measured in blocks from the two ends, not as a fraction, so adding cloth at the foot
             // does not change how the rest of the quilt looks.
-            float fade = Math.min(1.0F, Math.min(u / 0.35F, (uEnd + 0.30F - u) / 0.55F));
+            // Stay at full height until the very end, so her feet are covered rather than poking out of a
+            // cloth that already sank to the mattress.
+            float fade = Math.min(1.0F, Math.min(u / 0.35F, (uEnd + 0.15F - u) / 0.30F));
             body *= Math.max(0.0F, fade);
             for (int j = 0; j <= acrossSteps; j++) {
                 float s = -1.0F + 2.0F * j / acrossSteps;
