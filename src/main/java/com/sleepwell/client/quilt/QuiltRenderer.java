@@ -51,6 +51,10 @@ public final class QuiltRenderer {
     private static final float HEM_DROP = 0.20F;
     /** One repeat of the quilt texture covers this many blocks, so the checks stay square. */
     private static final float TILE_BLOCKS = 1.0F;
+    /** How far past the foot of the bed the cloth runs. Measured from the bed, not from her hitbox. */
+    private static final float FOOT_REACH = 0.40F;
+    /** How much of the foot end sinks back down to the mattress. */
+    private static final float END_FADE = 0.40F;
     private static final float SKIRT_OUT = 0.18F;
     private static final float SKIRT_DROP = 0.46F;
     /** Roughly how far the cloth sits above the mattress where it is not lifted by her body. */
@@ -209,10 +213,11 @@ public final class QuiltRenderer {
         float uStart = Math.max(HEAD_GAP, uMin - HEAD_MARGIN);
         // Her feet often hang off the end of the bed, so the cloth is allowed past the mattress edge and
         // simply drapes off it.
-        float uEnd = Math.min(bedEnd + 1.50F, uMax + FOOT_MARGIN + 0.40F);
+        // The foot end is anchored to the bed, never to her hitbox: a sleeping maid's box is often still the
+        // small standing one, which made the cloth stop in the middle of the bed and leave her feet bare.
+        float uEnd = bedEnd + FOOT_REACH;
         if (uEnd - uStart < 1.0F) {
-            uStart = Math.max(HEAD_GAP, uStart - 0.25F);
-            uEnd = Math.min(bedEnd + 1.45F, uEnd + 0.25F);
+            uStart = Math.max(HEAD_GAP, uEnd - 1.0F);
         }
         float bodyCenter = (uStart + uEnd) * 0.5F;
         // Her own bones, when TLM's model exposes them; the hard coded profile is only the fallback.
@@ -269,7 +274,7 @@ public final class QuiltRenderer {
             // does not change how the rest of the quilt looks.
             // Stay at full height until the very end, so her feet are covered rather than poking out of a
             // cloth that already sank to the mattress.
-            float fade = Math.min(1.0F, Math.min(u / 0.35F, (uEnd + 0.20F - u) / 0.40F));
+            float fade = Math.min(1.0F, Math.min(u / 0.35F, (uEnd + END_FADE * 0.5F - u) / END_FADE));
             body *= Math.max(0.0F, fade);
             for (int j = 0; j <= acrossSteps; j++) {
                 float s = -1.0F + 2.0F * j / acrossSteps;
