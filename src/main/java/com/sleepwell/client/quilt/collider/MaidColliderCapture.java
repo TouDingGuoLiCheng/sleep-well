@@ -435,10 +435,23 @@ public final class MaidColliderCapture {
                 .gameRenderer.getMainCamera();
         org.joml.Vector3f cameraPos = new org.joml.Vector3f((float) camera.getPosition().x,
                 (float) camera.getPosition().y, (float) camera.getPosition().z);
-        // The layer's PoseStack is camera-relative with no camera rotation applied, so it cannot be
-        // turned into world space reliably. The pose *is* useful as a cross-check: capture with the
-        // analytic sleeping transform below, and log how far the result lands from her.
-        Matrix4f toWorld = entityMatrixWorld(maid);
+        // Two facts, measured rather than assumed:
+        //   1. the layer's PoseStack is world-relative-with-camera-subtracted and carries no camera
+        //      rotation, so "pose + camera position" already places the standing model exactly on her;
+        //   2. the lying-down rotation is not in that PoseStack at all.
+        // So place with the pose, then rotate the whole thing about her own position by the sleep rotation.
+        org.joml.Vector3f pivot = new org.joml.Vector3f((float) maid.getX(), (float) maid.getY(), (float) maid.getZ());
+        Matrix4f base = new Matrix4f().translate(cameraPos).mul(new Matrix4f(pose));
+        Matrix4f lie = new Matrix4f()
+                .rotateY((float) Math.toRadians(180.0F - maid.yBodyRot));
+        net.minecraft.core.Direction bedDirection = maid.getBedOrientation();
+        if (bedDirection != null) {
+            lie.rotateY((float) Math.toRadians(-bedDirection.toYRot()));
+            lie.rotateZ((float) Math.toRadians(-90.0F));
+        }
+        Matrix4f toWorld = new Matrix4f().translate(pivot).mul(lie)
+                .mul(new Matrix4f().translate(-pivot.x, -pivot.y, -pivot.z))
+                .mul(base);
         List<QuiltBox> boxes = new ArrayList<>();
         for (Object root : roots) {
             walkBone(root, new Matrix4f(toWorld), boxes, 0);
@@ -457,7 +470,7 @@ public final class MaidColliderCapture {
                 "%.2fx%.2fx%.2f", b[3] - b[0], b[4] - b[1], b[5] - b[2])
                 + " min=" + String.format(java.util.Locale.ROOT, "%.2f,%.2f,%.2f", b[0], b[1], b[2]));
         layerBounds = new float[]{b[3] - b[0], b[4] - b[1], b[5] - b[2]};
-        if (layerCalls % 200 == 1) {
+        if (layerCalls % 600 == 1) {
             LOGGER.info("[被子] layer boxes={} size={} min={} maid={} pose={} bed={}", boxes.size(),
                     String.format(java.util.Locale.ROOT, "%.2fx%.2fx%.2f", b[3] - b[0], b[4] - b[1], b[5] - b[2]),
                     String.format(java.util.Locale.ROOT, "%.2f,%.2f,%.2f", b[0], b[1], b[2]),
