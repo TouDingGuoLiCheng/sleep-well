@@ -55,10 +55,10 @@ public final class QuiltWireframe {
             return;
         }
         VertexConsumer consumer = buffers.getBuffer(RenderType.lines());
-        // AFTER_ENTITIES hands us a camera-relative space: the pose contains the camera rotation only,
-        // entities are drawn at (world - camera). Our boxes are in world space, so bring them over.
-        Matrix4f matrix = new Matrix4f(pose.last().pose())
-                .translate((float) -camera.x, (float) -camera.y, (float) -camera.z);
+        // Measured: the AFTER_ENTITIES pose already maps world space into view space (it carries the
+        // camera rotation *and* the camera translation). Subtracting the camera a second time lifted
+        // every box ~116 blocks into the sky, which is why nothing was ever on screen.
+        Matrix4f matrix = new Matrix4f(pose.last().pose());
         int boxes = 0;
         int missing = 0;
         float minX = Float.MAX_VALUE, minY = Float.MAX_VALUE, minZ = Float.MAX_VALUE;
