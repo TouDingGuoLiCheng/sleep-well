@@ -81,11 +81,28 @@ public final class MaidColliderCapture {
         }
         try {
             EntityRenderer<?> renderer = Minecraft.getInstance().getEntityRenderDispatcher().getRenderer(maid);
-            Object gecko = renderer == null ? null : Reflect.field(renderer, "geckoEntityMaidRenderer");
-            Object animatable = gecko == null ? null : Reflect.call(gecko, "getAnimatableEntity", maid);
-            Object model = animatable == null ? null : Reflect.call(animatable, "getGeoModel");
+            if (renderer == null) {
+                miss("direct:renderer", "dispatcher returned null");
+                return null;
+            }
+            Object gecko = Reflect.field(renderer, "geckoEntityMaidRenderer");
+            if (gecko == null) {
+                miss("direct:geckoField", dumpFields(renderer));
+                return null;
+            }
+            Object animatable = Reflect.call(gecko, "getAnimatableEntity", maid);
+            if (animatable == null) {
+                // The renderer route can come back empty (capability not yet resolved, or a signature change);
+                // the capability itself is public and gives the same GeckoMaidEntity.
+                animatable = animatableViaCapability(maid);
+            }
+            if (animatable == null) {
+                miss("direct:animatable", gecko.getClass().getName() + " -> " + dumpMethods(gecko, "getAnimatableEntity"));
+                return null;
+            }
+            Object model = Reflect.call(animatable, "getGeoModel");
             if (model == null) {
-                miss("direct:model", (renderer == null ? "null" : renderer.getClass().getSimpleName()));
+                miss("direct:geoModel", animatable.getClass().getName() + " -> " + dumpMethods(animatable, "getGeoModel"));
                 return null;
             }
             List<?> roots = Reflect.list(model, "topLevelBones");
@@ -418,6 +435,67 @@ public final class MaidColliderCapture {
                     + (long) (box.z(0) * 100.0F) * 31L;
         }
         return stamp;
+    }
+
+    /**
+     * {@code GeckoMaidEntityCapabilityProvider.CAP} is a public static capability; going through it skips the
+     * renderer entirely and works even before the first frame of her model has been drawn.
+     */
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private static Object animatableViaCapability(EntityMaid maid) {
+        try {
+            Class<?> provider = Class.forName(
+                    "com.github.tartaricacid.touhoulittlemaid.capability.GeckoMaidEntityCapabilityProvider");
+            Object token = provider.getField("CAP").get(null);
+            if (!(token instanceof net.minecraftforge.common.capabilities.Capability capability)) {
+                miss("cap:token", "CAP is not a Capability");
+                return null;
+            }
+            net.minecraftforge.common.util.LazyOptional lazy = maid.getCapability(capability);
+            Object value = lazy != null && lazy.isPresent() ? lazy.orElse(null) : null;
+            miss("cap:value", value == null ? "capability absent" : value.getClass().getSimpleName());
+            return value;
+        } catch (Throwable error) {
+            miss("cap:" + error.getClass().getSimpleName(), error.toString());
+            return null;
+        }
+    }
+
+    /** Field name/type/null-ness dump, used once when a reflection hop lands on nothing. */
+    private static String dumpFields(Object target) {
+        StringBuilder builder = new StringBuilder(target.getClass().getSimpleName()).append('{');
+        Class<?> type = target.getClass();
+        int shown = 0;
+        while (type != null && shown < 20) {
+            for (java.lang.reflect.Field field : type.getDeclaredFields()) {
+                if (shown++ >= 20) {
+                    break;
+                }
+                builder.append(field.getName()).append(':').append(field.getType().getSimpleName());
+                try {
+                    field.setAccessible(true);
+                    Object value = field.get(target);
+                    builder.append(value == null ? "=null" : "=" + value.getClass().getSimpleName());
+                } catch (Throwable ignored) {
+                    builder.append("=?");
+                }
+                builder.append(' ');
+            }
+            type = type.getSuperclass();
+        }
+        return builder.append('}').toString();
+    }
+
+    /** Lists the overloads for a method name plus the exception each one threw, if any. */
+    private static String dumpMethods(Object target, String name) {
+        StringBuilder builder = new StringBuilder();
+        for (java.lang.reflect.Method method : target.getClass().getMethods()) {
+            if (!method.getName().equals(name)) {
+                continue;
+            }
+            builder.append(java.util.Arrays.toString(method.getParameterTypes())).append("; ");
+        }
+        return builder.length() == 0 ? "no method " + name : builder.toString();
     }
 
     private static void miss(String key, String detail) {
