@@ -86,7 +86,8 @@ public final class QuiltWireframe {
                     + " mixin=" + MaidColliderCapture.mixinState()
                     + " captured=" + MaidColliderCapture.captures()
                     + " renderer=" + renderer
-                    + " miss=" + MaidColliderCapture.misses());
+                    + " miss=" + MaidColliderCapture.misses()
+                    + " | " + MaidColliderCapture.lastMiss());
             LOGGER.info("[sleep_well] trace summary {}", com.sleepwell.client.quilt.diag.QuiltTrace.summary());
         }
     }

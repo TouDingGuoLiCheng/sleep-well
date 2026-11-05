@@ -51,6 +51,7 @@ public final class MaidColliderCapture {
     /** Animated model per maid: it is only handed out while she renders, so it is kept once seen. */
     private static final Map<UUID, Object> MODELS = new HashMap<>();
     private static final Set<String> MISSES = new HashSet<>();
+    private static volatile String LAST_MISS = "";
     private static volatile int hookRuns;
     private static volatile int captures;
     private static final java.util.concurrent.atomic.AtomicInteger DIRECT_LOGS = new java.util.concurrent.atomic.AtomicInteger();
@@ -187,13 +188,18 @@ public final class MaidColliderCapture {
             if (model == null) {
                 model = Reflect.call(animatable, "getGeoModel");
             }
+            Object updated = null;
+            Object location = null;
             if (model == null) {
-                Reflect.call(animatable, "updateModel");
+                updated = Reflect.call(animatable, "updateModel");
                 model = Reflect.call(animatable, "getCurrentModel");
-                com.sleepwell.client.quilt.diag.QuiltTrace.step("d.updateModel", describe(model));
+                location = Reflect.call(animatable, "getModelLocation");
+                com.sleepwell.client.quilt.diag.QuiltTrace.step("d.updateModel",
+                        "returned=" + updated + " model=" + describe(model) + " " + geoCache(location));
             }
             if (model == null) {
-                miss("direct:geoModel", animatable.getClass().getName() + " -> " + dumpMethods(animatable, "getGeoModel"));
+                miss("direct:geoModel", "updateModel=" + updated + " " + geoCache(location)
+                        + " ysm=" + describe(Reflect.field(renderer, "ysmMaidRenderer")));
                 return null;
             }
             MODELS.put(maid.getUUID(), model);
@@ -591,8 +597,32 @@ public final class MaidColliderCapture {
     }
 
     private static void miss(String key, String detail) {
+        LAST_MISS = key + ":" + detail;
         if (MISSES.add(key)) {
             LOGGER.info("[sleep_well] collider miss {}: {}", key, detail);
         }
+    }
+
+    /** Last miss, trimmed for the chat line. */
+    public static String lastMiss() {
+        String text = LAST_MISS;
+        return text.length() > 110 ? text.substring(0, 110) + "…" : text;
+    }
+
+    /** Size and membership of TLM's gecko model cache - tells "no model" apart from "wrong location". */
+    private static String geoCache(Object location) {
+        try {
+            Class<?> cacheClass = Class.forName(
+                    "com.github.tartaricacid.touhoulittlemaid.geckolib3.resource.GeckoLibCache");
+            Object instance = cacheClass.getMethod("getInstance").invoke(null);
+            Object models = cacheClass.getMethod("getGeoModels").invoke(instance);
+            if (models instanceof Map<?, ?> map) {
+                return "size=" + map.size() + " has=" + (location != null && map.containsKey(location))
+                        + " key=" + location;
+            }
+        } catch (Throwable error) {
+            return "cache error " + error;
+        }
+        return "no cache";
     }
 }
