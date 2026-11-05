@@ -187,7 +187,9 @@ public final class QuiltRenderer {
         Vec3 along = new Vec3(footCenter.x - headCenter.x, 0.0D, footCenter.z - headCenter.z).normalize();
         Vec3 across = new Vec3(-along.z, 0.0D, along.x);
         float length = (float) headCenter.distanceTo(footCenter);
-        float bedEnd = length + 1.0F - FOOT_GAP;
+        // The foot block runs half a block past its centre, not a whole one: the old one-block version put the
+        // "end of the bed" half a block into thin air and every later number was measured from there.
+        float bedEnd = length + 0.5F - FOOT_GAP;
         float bedBottom = (float) (headCenter.y - top);
 
         // Reach: follow the maid's own footprint along the bed so that a long body still gets covered and a
