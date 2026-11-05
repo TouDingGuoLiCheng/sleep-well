@@ -441,7 +441,13 @@ public final class MaidColliderCapture {
         //   2. the lying-down rotation is not in that PoseStack at all.
         // So place with the pose, then rotate the whole thing about her own position by the sleep rotation.
         org.joml.Vector3f pivot = new org.joml.Vector3f((float) maid.getX(), (float) maid.getY(), (float) maid.getZ());
-        Matrix4f base = new Matrix4f().translate(cameraPos).mul(new Matrix4f(pose));
+        // Do not trust the global camera here: shadow passes and other passes hand us a pose that is
+        // relative to a different camera, which is exactly how the boxes ended up 11 blocks away.
+        // The pose maps the model origin onto (maid - camera), so solving for the camera from her own
+        // position anchors every pass without knowing which one we are in.
+        org.joml.Vector3f viewOrigin = new Matrix4f(pose).transformPosition(new org.joml.Vector3f());
+        org.joml.Vector3f anchor = new org.joml.Vector3f(pivot).sub(viewOrigin);
+        Matrix4f base = new Matrix4f().translate(anchor).mul(new Matrix4f(pose));
         Matrix4f lie = new Matrix4f()
                 .rotateY((float) Math.toRadians(180.0F - maid.yBodyRot));
         net.minecraft.core.Direction bedDirection = maid.getBedOrientation();
