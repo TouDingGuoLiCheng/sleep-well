@@ -9,7 +9,9 @@
     "MaidClearSleepTaskMixin",
     "SchedulePosMixin"
   ],
-  "client": [],
+  "client": [
+    "GeoRendererCaptureMixin"
+  ],
   "injectors": {
     "defaultRequire": 1
   }
