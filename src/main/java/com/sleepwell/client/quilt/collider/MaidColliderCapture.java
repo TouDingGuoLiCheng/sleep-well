@@ -220,9 +220,21 @@ public final class MaidColliderCapture {
                         return set;
                     }
                 }
-                if (renderer instanceof LivingEntityRenderer<?, ?> living) {
-                    LOGGER.info("[被子] dump model: {}", dumpFields(living.getModel(), 24));
+                if (!DUMPED) {
+                    DUMPED = true;
+                    if (renderer instanceof LivingEntityRenderer<?, ?> living) {
+                        LOGGER.info("[被子] dump model: {}", dumpFields(living.getModel(), 24));
+                    }
                     LOGGER.info("[被子] dump renderer: {}", dumpFields(renderer, 18));
+                    Object geckoRenderer = Reflect.field(renderer, "geckoEntityMaidRenderer");
+                    LOGGER.info("[被子] dump geckoRenderer: {}", dumpFields(geckoRenderer, 20));
+                    Object geckoAnimatable = Reflect.call(geckoRenderer, "getAnimatableEntity", maid);
+                    LOGGER.info("[被子] dump animatable: {}", dumpFields(geckoAnimatable, 26));
+                    LOGGER.info("[被子] animatable loc={} geoModel={} currentModel={}",
+                            Reflect.call(geckoAnimatable, "getModelLocation"),
+                            describe(Reflect.call(geckoAnimatable, "getGeoModel")),
+                            describe(Reflect.call(geckoAnimatable, "getCurrentModel")));
+                    logCacheKeys();
                 }
                 miss("direct:geoModel", "updateModel=" + updated + " parts=" + partCount
                         + " model=" + modelType
@@ -503,6 +515,22 @@ public final class MaidColliderCapture {
                 // Only the child's own transform here: the ancestors are already in `matrix`.
                 appendPartTree(child, applyLocal(matrix, child), boxes, depth + 1);
             }
+        }
+    }
+
+    private static boolean DUMPED;
+
+    /** One-shot listing of every gecko model key, so a missed lookup can be matched against real names. */
+    private static void logCacheKeys() {
+        try {
+            Object cache = Class.forName("com.github.tartaricacid.touhoulittlemaid.geckolib3.resource.GeckoLibCache")
+                    .getMethod("getInstance").invoke(null);
+            Object models = Reflect.call(cache, "getGeoModels");
+            if (models instanceof Map<?, ?> map) {
+                LOGGER.info("[被子] gecko cache keys ({}): {}", map.size(), map.keySet());
+            }
+        } catch (Throwable error) {
+            LOGGER.info("[被子] gecko cache dump failed: {}", error.toString());
         }
     }
 

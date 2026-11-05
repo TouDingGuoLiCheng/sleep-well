@@ -64,17 +64,21 @@ public final class Reflect {
         if (target == null) {
             return null;
         }
+        Object result = null;
         for (Method method : target.getClass().getMethods()) {
             if (!method.getName().equals(name) || method.getParameterCount() != args.length) {
                 continue;
             }
             try {
-                return method.invoke(target, args);
+                result = method.invoke(target, args);
+                if (result != null) {
+                    return result;
+                }
             } catch (Throwable ignored) {
-                return null;
+                // try the next overload: renamed/typed parameters differ between TLM versions
             }
         }
-        return null;
+        return result;
     }
 
     public static float floatField(Object target, String name) {
