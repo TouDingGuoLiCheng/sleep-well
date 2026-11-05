@@ -45,6 +45,7 @@ public final class QuiltWireframe {
 
     public static void draw(PoseStack pose, MultiBufferSource.BufferSource buffers, List<EntityMaid> maids,
                             net.minecraft.world.phys.Vec3 camera, float partialTick) {
+        com.sleepwell.client.quilt.diag.QuiltTrace.step("11.wireframe", "enabled=" + ENABLED + " maids=" + maids.size());
         if (!ENABLED || maids.isEmpty()) {
             if (ANNOUNCED.compareAndSet(false, true)) {
                 report("flag=" + ENABLED + " sleeping=" + maids.size()
@@ -80,12 +81,13 @@ public final class QuiltWireframe {
         if (ANNOUNCED.compareAndSet(false, true)) {
             String renderer = maids.isEmpty() ? "?" : Minecraft.getInstance().getEntityRenderDispatcher()
                     .getRenderer(maids.get(0)).getClass().getSimpleName();
-            report("boxes=" + boxes + " missing=" + missing
-                    + " hook=" + MaidColliderCapture.hookRuns()
-                    + " captured=" + MaidColliderCapture.captures()
+            report("停在=" + com.sleepwell.client.quilt.diag.QuiltTrace.last()
+                    + " boxes=" + boxes + " missing=" + missing
                     + " mixin=" + MaidColliderCapture.mixinState()
+                    + " captured=" + MaidColliderCapture.captures()
                     + " renderer=" + renderer
                     + " miss=" + MaidColliderCapture.misses());
+            LOGGER.info("[sleep_well] trace summary {}", com.sleepwell.client.quilt.diag.QuiltTrace.summary());
         }
     }
 

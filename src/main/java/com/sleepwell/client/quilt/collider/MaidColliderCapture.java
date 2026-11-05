@@ -63,22 +63,30 @@ public final class MaidColliderCapture {
             return;
         }
         renderRuns++;
+        com.sleepwell.client.quilt.diag.QuiltTrace.step("4.mixinHead", "uuid=" + maid.getUUID());
         try {
             EntityRenderer<?> renderer = Minecraft.getInstance().getEntityRenderDispatcher().getRenderer(maid);
+            com.sleepwell.client.quilt.diag.QuiltTrace.step("5.renderer", describe(renderer));
             Object gecko = renderer == null ? null : Reflect.field(renderer, "geckoEntityMaidRenderer");
+            com.sleepwell.client.quilt.diag.QuiltTrace.step("6.geckoField", describe(gecko));
             Object animatable = gecko == null ? null : Reflect.call(gecko, "getAnimatableEntity", maid);
+            String via = "renderer";
             if (animatable == null) {
                 animatable = animatableViaCapability(maid);
+                via = "capability";
             }
+            com.sleepwell.client.quilt.diag.QuiltTrace.step("7.animatable", describe(animatable) + " via=" + via);
             Object model = animatable == null ? null : Reflect.call(animatable, "getGeoModel");
             if (model == null && animatable != null) {
                 model = Reflect.call(animatable, "getCurrentModel");
             }
+            com.sleepwell.client.quilt.diag.QuiltTrace.step("8.model", describe(model));
             if (model == null) {
                 miss("render:model", "animatable=" + describe(animatable) + " renderer=" + describe(renderer));
                 return;
             }
             List<?> roots = Reflect.list(model, "topLevelBones");
+            com.sleepwell.client.quilt.diag.QuiltTrace.step("9.roots", "n=" + (roots == null ? -1 : roots.size()));
             if (roots == null || roots.isEmpty()) {
                 miss("render:roots", model.getClass().getName());
                 return;
@@ -90,6 +98,7 @@ public final class MaidColliderCapture {
             for (Object root : roots) {
                 walkBone(root, new Matrix4f(entity), boxes, 0);
             }
+            com.sleepwell.client.quilt.diag.QuiltTrace.step("10.walked", "boxes=" + boxes.size());
             if (boxes.isEmpty()) {
                 miss("render:empty", "bones walked but no cubes");
                 return;

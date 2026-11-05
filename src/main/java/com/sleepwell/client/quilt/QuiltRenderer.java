@@ -117,10 +117,12 @@ public final class QuiltRenderer {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_ENTITIES) {
             return;
         }
+        com.sleepwell.client.quilt.diag.QuiltTrace.step("1.afterEntities", "poseStack ok");
         ClientLevel level = Minecraft.getInstance().level;
         if (level == null) {
             return;
         }
+        com.sleepwell.client.quilt.diag.QuiltTrace.step("2.level", "ok");
         Vec3 camera = event.getCamera().getPosition();
         if (STAGE_LOGS++ < 3) {
             LOGGER.info("[sleep_well] quilt stage running, camera=" + camera);
@@ -132,6 +134,7 @@ public final class QuiltRenderer {
         if (SLEEP_LOGS++ < 3) {
             LOGGER.info("[sleep_well] sleeping maids near camera=" + sleeping.size());
         }
+        com.sleepwell.client.quilt.diag.QuiltTrace.step("3.sleeping", "n=" + sleeping.size());
         PoseStack pose = event.getPoseStack();
         pose.pushPose();
         pose.translate(-camera.x, -camera.y, -camera.z);
