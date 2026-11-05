@@ -30,6 +30,7 @@ public final class QuiltWireframe {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final boolean ENABLED = !"false".equalsIgnoreCase(System.getProperty("sleepwell.quiltWireframe"));
     private static final AtomicBoolean ANNOUNCED = new AtomicBoolean();
+    private static String drawDiagnostics = "";
     private static final int[][] EDGES = {
             {0, 1}, {2, 3}, {4, 5}, {6, 7},
             {0, 2}, {1, 3}, {4, 6}, {5, 7},
@@ -103,19 +104,14 @@ public final class QuiltWireframe {
         }
         buffers.endBatch(RenderType.lines());
         int tick = Minecraft.getInstance().player == null ? 0 : Minecraft.getInstance().player.tickCount;
-        if (tick % 200 == 0 && tick > 0 && boxes > 0) {
-            LOGGER.info("[被子] draw cam={} boxes={} viewBox=min({},{},{}) max({},{},{}) firstWorld={} firstView={}",
-                    String.format(java.util.Locale.ROOT, "%.2f,%.2f,%.2f", camera.x, camera.y, camera.z),
-                    boxes,
-                    String.format(java.util.Locale.ROOT, "%.2f", minX),
-                    String.format(java.util.Locale.ROOT, "%.2f", minY),
-                    String.format(java.util.Locale.ROOT, "%.2f", minZ),
-                    String.format(java.util.Locale.ROOT, "%.2f", maxX),
-                    String.format(java.util.Locale.ROOT, "%.2f", maxY),
-                    String.format(java.util.Locale.ROOT, "%.2f", maxZ),
-                    firstBoxWorld == null ? "-" : firstBoxWorld.toString(),
-                    firstBoxView == null ? "-" : firstBoxView.toString());
-        }
+        // Fold the draw-time numbers into the chat/log status line: this block is proven to run, so the
+        // numbers cannot go missing the way a separate log statement did.
+        drawDiagnostics = String.format(java.util.Locale.ROOT,
+                " cam=%.2f,%.2f,%.2f viewBox=[%.2f,%.2f,%.2f..%.2f,%.2f,%.2f] firstWorld=%s firstView=%s camRot=%s",
+                camera.x, camera.y, camera.z, minX, minY, minZ, maxX, maxY, maxZ,
+                firstBoxWorld == null ? "-" : firstBoxWorld.toString(),
+                firstBoxView == null ? "-" : firstBoxView.toString(),
+                pose.last().pose().toString().replace("Matrix4f[", "").replace("]", ""));
         if ((ANNOUNCED.compareAndSet(false, true) || tick % 200 == 0) && tick > 0) {
             String renderer = maids.isEmpty() ? "?" : Minecraft.getInstance().getEntityRenderDispatcher()
                     .getRenderer(maids.get(0)).getClass().getSimpleName();
@@ -125,6 +121,7 @@ public final class QuiltWireframe {
                     + " captured=" + MaidColliderCapture.captures()
                     + " " + MaidColliderCapture.layerState()
                     + " renderer=" + renderer
+                    + drawDiagnostics
                     + " miss=" + MaidColliderCapture.misses()
                     + " | " + MaidColliderCapture.lastMiss());
             LOGGER.info("[sleep_well] trace summary {}", com.sleepwell.client.quilt.diag.QuiltTrace.summary());
