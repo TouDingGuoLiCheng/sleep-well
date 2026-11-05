@@ -52,9 +52,9 @@ public final class QuiltRenderer {
     /** One repeat of the quilt texture covers this many blocks, so the checks stay square. */
     private static final float TILE_BLOCKS = 1.0F;
     /** How far past the foot of the bed the cloth runs. Measured from the bed, not from her hitbox. */
-    private static final float FOOT_REACH = 1.0F;
+    private static final float FOOT_REACH = 0.45F;
     /** How much of the foot end sinks back down to the mattress. */
-    private static final float END_FADE = 0.40F;
+    private static final float END_FADE = 0.10F;
     private static final float SKIRT_OUT = 0.18F;
     private static final float SKIRT_DROP = 0.46F;
     /** Roughly how far the cloth sits above the mattress where it is not lifted by her body. */
@@ -278,7 +278,7 @@ public final class QuiltRenderer {
             // cloth that already sank to the mattress.
             // Full height right up to the end: the foot end is closed by a vertical wall instead of the cloth
             // sinking to the mattress, which is what used to leave her feet sticking up in the open.
-            float fade = Math.min(1.0F, Math.min(u / 0.35F, (uEnd - u) / 0.10F));
+            float fade = Math.min(1.0F, Math.min(u / 0.35F, (uEnd - u) / END_FADE));
             body *= Math.max(0.0F, fade);
             for (int j = 0; j <= acrossSteps; j++) {
                 float s = -1.0F + 2.0F * j / acrossSteps;
