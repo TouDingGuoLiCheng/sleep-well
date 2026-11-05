@@ -54,7 +54,10 @@ public final class QuiltWireframe {
             return;
         }
         VertexConsumer consumer = buffers.getBuffer(RenderType.lines());
-        Matrix4f matrix = pose.last().pose();
+        // AFTER_ENTITIES hands us a camera-relative space: the pose contains the camera rotation only,
+        // entities are drawn at (world - camera). Our boxes are in world space, so bring them over.
+        Matrix4f matrix = new Matrix4f(pose.last().pose())
+                .translate((float) -camera.x, (float) -camera.y, (float) -camera.z);
         int boxes = 0;
         int missing = 0;
         for (EntityMaid maid : maids) {
@@ -78,7 +81,8 @@ public final class QuiltWireframe {
             }
         }
         buffers.endBatch(RenderType.lines());
-        if (ANNOUNCED.compareAndSet(false, true)) {
+        int tick = Minecraft.getInstance().player == null ? 0 : Minecraft.getInstance().player.tickCount;
+        if ((ANNOUNCED.compareAndSet(false, true) || tick % 200 == 0) && tick > 0) {
             String renderer = maids.isEmpty() ? "?" : Minecraft.getInstance().getEntityRenderDispatcher()
                     .getRenderer(maids.get(0)).getClass().getSimpleName();
             report("停在=" + com.sleepwell.client.quilt.diag.QuiltTrace.last()
