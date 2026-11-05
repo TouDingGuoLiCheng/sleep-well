@@ -5,9 +5,12 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
+import com.mojang.logging.LogUtils;
 import org.joml.Matrix4f;
+import org.slf4j.Logger;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Debug view for the captured outline: every cube as a wire box, red for body (hard collision) and blue
@@ -17,7 +20,9 @@ import java.util.List;
  * the cloth solver can be written against it. Enable with {@code -Dsleepwell.quiltWireframe=true}.
  */
 public final class QuiltWireframe {
+    private static final Logger LOGGER = LogUtils.getLogger();
     private static final boolean ENABLED = Boolean.getBoolean("sleepwell.quiltWireframe");
+    private static final AtomicBoolean ANNOUNCED = new AtomicBoolean();
     private static final int[][] EDGES = {
             {0, 1}, {2, 3}, {4, 5}, {6, 7},
             {0, 2}, {1, 3}, {4, 6}, {5, 7},
@@ -34,6 +39,9 @@ public final class QuiltWireframe {
     public static void draw(PoseStack pose, MultiBufferSource.BufferSource buffers, List<EntityMaid> maids) {
         if (!ENABLED || maids.isEmpty()) {
             return;
+        }
+        if (ANNOUNCED.compareAndSet(false, true)) {
+            LOGGER.info("[sleep_well] quilt wireframe ON, sleeping maids={}", maids.size());
         }
         VertexConsumer consumer = buffers.getBuffer(RenderType.lines());
         Matrix4f matrix = pose.last().pose();
