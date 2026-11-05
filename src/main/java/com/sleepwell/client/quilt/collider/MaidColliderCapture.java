@@ -435,29 +435,19 @@ public final class MaidColliderCapture {
                 .gameRenderer.getMainCamera();
         org.joml.Vector3f cameraPos = new org.joml.Vector3f((float) camera.getPosition().x,
                 (float) camera.getPosition().y, (float) camera.getPosition().z);
-        // Two facts, measured rather than assumed:
-        //   1. the layer's PoseStack is world-relative-with-camera-subtracted and carries no camera
-        //      rotation, so "pose + camera position" already places the standing model exactly on her;
-        //   2. the lying-down rotation is not in that PoseStack at all.
-        // So place with the pose, then rotate the whole thing about her own position by the sleep rotation.
-        org.joml.Vector3f pivot = new org.joml.Vector3f((float) maid.getX(), (float) maid.getY(), (float) maid.getZ());
-        // Do not trust the global camera here: shadow passes and other passes hand us a pose that is
-        // relative to a different camera, which is exactly how the boxes ended up 11 blocks away.
-        // The pose maps the model origin onto (maid - camera), so solving for the camera from her own
-        // position anchors every pass without knowing which one we are in.
-        org.joml.Vector3f viewOrigin = new Matrix4f(pose).transformPosition(new org.joml.Vector3f());
-        org.joml.Vector3f anchor = new org.joml.Vector3f(pivot).sub(viewOrigin);
-        Matrix4f base = new Matrix4f().translate(anchor).mul(new Matrix4f(pose));
-        Matrix4f lie = new Matrix4f()
+        // Geometry comes from this layer (it is the only place with the real posed bones); the world
+        // transform does NOT. Every attempt to reuse the layer's PoseStack landed the boxes in the sky,
+        // so it is rebuilt here from her own state only: position, body yaw, bed direction, lying 90°.
+        org.joml.Vector3f pivot = new org.joml.Vector3f((float) maid.getX(),
+                (float) maid.getY() + 0.2F, (float) maid.getZ());
+        Matrix4f toWorld = new Matrix4f()
+                .translate(pivot)
                 .rotateY((float) Math.toRadians(180.0F - maid.yBodyRot));
         net.minecraft.core.Direction bedDirection = maid.getBedOrientation();
         if (bedDirection != null) {
-            lie.rotateY((float) Math.toRadians(-bedDirection.toYRot()));
-            lie.rotateZ((float) Math.toRadians(-90.0F));
+            toWorld.rotateY((float) Math.toRadians(-bedDirection.toYRot()));
+            toWorld.rotateZ((float) Math.toRadians(-90.0F));
         }
-        Matrix4f toWorld = new Matrix4f().translate(pivot).mul(lie)
-                .mul(new Matrix4f().translate(-pivot.x, -pivot.y, -pivot.z))
-                .mul(base);
         List<QuiltBox> boxes = new ArrayList<>();
         for (Object root : roots) {
             walkBone(root, new Matrix4f(toWorld), boxes, 0);
