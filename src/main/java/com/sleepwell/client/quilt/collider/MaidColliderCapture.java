@@ -49,17 +49,35 @@ public final class MaidColliderCapture {
 
     private static final Map<UUID, ColliderSet> SETS = new HashMap<>();
     private static final Set<String> MISSES = new HashSet<>();
+    private static volatile int hookRuns;
+    private static volatile int captures;
 
     private MaidColliderCapture() {
     }
 
     /** Called from {@code RenderLivingEvent.Post}, i.e. while the sleeping pose is still on the model. */
     public static void capture(EntityMaid maid, PoseStack poseStack, float partialTick) {
+        hookRuns++;
         try {
             doCapture(maid, poseStack, partialTick);
         } catch (Throwable error) {
             miss("capture:" + error.getClass().getSimpleName(), error.toString());
         }
+    }
+
+    /** How many times the render hook was entered - 0 means the mixin never fired. */
+    public static int hookRuns() {
+        return hookRuns;
+    }
+
+    /** How many times a non-empty outline was produced. */
+    public static int captures() {
+        return captures;
+    }
+
+    /** One-line diagnosis for the in-game message. */
+    public static String misses() {
+        return MISSES.toString();
     }
 
     /** Last captured outline, or null when she has never been rendered while asleep. */
@@ -89,6 +107,7 @@ public final class MaidColliderCapture {
             miss("empty", "no cubes captured for " + living.getModel().getClass().getSimpleName());
             return;
         }
+        captures++;
         SETS.put(maid.getUUID(), new ColliderSet(boxes, bounds(boxes), stamp(boxes), maid.tickCount));
     }
 

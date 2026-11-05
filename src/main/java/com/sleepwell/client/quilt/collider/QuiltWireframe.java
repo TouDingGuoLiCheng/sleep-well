@@ -4,8 +4,11 @@ import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.logging.LogUtils;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
+import net.minecraft.network.chat.Component;
 import org.joml.Matrix4f;
 import org.slf4j.Logger;
 
@@ -17,16 +20,16 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * for the rest (soft repulsion).
  * <p>
  * This is the acceptance test for M1: if the boxes wrap her sleeping pose exactly, the capture is right and
- * the cloth solver can be written against it. Enable with {@code -Dsleepwell.quiltWireframe=true}.
+ * the cloth solver can be written against it.
  * <p>
- * The first frame logs what it saw even when it draws nothing, so "nothing on screen" can be told apart
- * from "switch never reached the JVM" without another build.
+ * <b>On by default</b> while this branch is under construction; {@code -Dsleepwell.quiltWireframe=false}
+ * turns it off. The first frame reports itself both in the log and in the chat bar, so "nothing on screen"
+ * can be told apart from "the switch never reached the JVM" without hunting for a log file.
  */
 public final class QuiltWireframe {
     private static final Logger LOGGER = LogUtils.getLogger();
-    private static final boolean ENABLED = Boolean.getBoolean("sleepwell.quiltWireframe");
+    private static final boolean ENABLED = !"false".equalsIgnoreCase(System.getProperty("sleepwell.quiltWireframe"));
     private static final AtomicBoolean ANNOUNCED = new AtomicBoolean();
-    private static final AtomicBoolean DRAWN = new AtomicBoolean();
     private static final int[][] EDGES = {
             {0, 1}, {2, 3}, {4, 5}, {6, 7},
             {0, 2}, {1, 3}, {4, 6}, {5, 7},
@@ -41,10 +44,11 @@ public final class QuiltWireframe {
     }
 
     public static void draw(PoseStack pose, MultiBufferSource.BufferSource buffers, List<EntityMaid> maids) {
-        if (ANNOUNCED.compareAndSet(false, true)) {
-            LOGGER.info("[sleep_well] quilt wireframe flag={} sleepingMaids={}", ENABLED, maids.size());
-        }
         if (!ENABLED || maids.isEmpty()) {
+            if (ANNOUNCED.compareAndSet(false, true)) {
+                report("flag=" + ENABLED + " sleeping=" + maids.size()
+                        + " hook=" + MaidColliderCapture.hookRuns());
+            }
             return;
         }
         VertexConsumer consumer = buffers.getBuffer(RenderType.lines());
@@ -69,8 +73,21 @@ public final class QuiltWireframe {
             }
         }
         buffers.endBatch(RenderType.lines());
-        if (DRAWN.compareAndSet(false, true)) {
-            LOGGER.info("[sleep_well] wireframe drew boxes={} missingSets={}", boxes, missing);
+        if (ANNOUNCED.compareAndSet(false, true)) {
+            report("boxes=" + boxes + " missing=" + missing
+                    + " hook=" + MaidColliderCapture.hookRuns()
+                    + " captured=" + MaidColliderCapture.captures()
+                    + " miss=" + MaidColliderCapture.misses());
+        }
+    }
+
+    /** Log plus one chat line: the chat line is what a player actually notices during a test run. */
+    private static void report(String status) {
+        LOGGER.info("[sleep_well] quilt wireframe {}", status);
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player != null) {
+            minecraft.player.displayClientMessage(
+                    Component.literal("[被子] 线框 " + status).withStyle(ChatFormatting.AQUA), false);
         }
     }
 
