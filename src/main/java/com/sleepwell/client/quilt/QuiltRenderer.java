@@ -209,7 +209,7 @@ public final class QuiltRenderer {
         float uStart = Math.max(HEAD_GAP, uMin - HEAD_MARGIN);
         // Her feet often hang off the end of the bed, so the cloth is allowed past the mattress edge and
         // simply drapes off it.
-        float uEnd = Math.min(bedEnd + 1.50F, uMax + FOOT_MARGIN + 0.50F);
+        float uEnd = Math.min(bedEnd + 1.50F, uMax + FOOT_MARGIN + 0.40F);
         if (uEnd - uStart < 1.0F) {
             uStart = Math.max(HEAD_GAP, uStart - 0.25F);
             uEnd = Math.min(bedEnd + 1.45F, uEnd + 0.25F);
@@ -269,7 +269,7 @@ public final class QuiltRenderer {
             // does not change how the rest of the quilt looks.
             // Stay at full height until the very end, so her feet are covered rather than poking out of a
             // cloth that already sank to the mattress.
-            float fade = Math.min(1.0F, Math.min(u / 0.35F, (uEnd + 0.12F - u) / 0.25F));
+            float fade = Math.min(1.0F, Math.min(u / 0.35F, (uEnd + 0.20F - u) / 0.40F));
             body *= Math.max(0.0F, fade);
             for (int j = 0; j <= acrossSteps; j++) {
                 float s = -1.0F + 2.0F * j / acrossSteps;
