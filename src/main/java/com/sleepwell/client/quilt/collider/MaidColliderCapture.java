@@ -165,6 +165,10 @@ public final class MaidColliderCapture {
         }
         try {
             EntityRenderer<?> renderer = Minecraft.getInstance().getEntityRenderDispatcher().getRenderer(maid);
+            if (renderer != null) {
+                // The layer is the only place that sees posed geometry, so make sure it is installed early.
+                installLayer(renderer);
+            }
             if (renderer == null) {
                 miss("direct:renderer", "dispatcher returned null");
                 return null;
@@ -357,6 +361,86 @@ public final class MaidColliderCapture {
             walkBone(root, new Matrix4f(entity), boxes, 0);
         }
         return true;
+    }
+
+    // --- gecko render layer: the only hook that sees the real, posed geometry ---------------------------------
+
+    private static final java.util.Set<Object> LAYERED =
+            java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+    private static int layerRuns;
+    private static int layerCalls;
+    private static String layerMiss = "-";
+    private static float[] layerBounds;
+
+    /** Registers the capture layer on a maid renderer (idempotent, per renderer instance). */
+    static void installLayer(Object renderer) {
+        Object geo = Reflect.field(renderer, "geckoEntityMaidRenderer");
+        if (geo == null || LAYERED.contains(geo)) {
+            return;
+        }
+        try {
+            Object layer = new QuiltGeckoLayer(
+                    (com.github.tartaricacid.touhoulittlemaid.client.renderer.entity.GeckoEntityMaidRenderer<
+                            com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid>) geo);
+            Reflect.call(geo, "addGeoLayerRenderer", layer);
+            LAYERED.add(geo);
+            LOGGER.info("[被子] 已挂载 gecko 采集层 -> {}", geo.getClass().getSimpleName());
+        } catch (Throwable error) {
+            LOGGER.warn("[被子] 挂载采集层失败: {}", error.toString());
+        }
+    }
+
+    static String layerState() {
+        return "layer=" + layerCalls + "/" + layerRuns + (layerBounds == null ? ""
+                : String.format(java.util.Locale.ROOT, " size=%.2fx%.2fx%.2f",
+                layerBounds[0], layerBounds[1], layerBounds[2])) + (layerMiss.equals("-") ? "" : " layerMiss=" + layerMiss);
+    }
+
+    /** Called from the maid's own render pass: pose is model-to-view space, already including the sleep pose. */
+    static void captureFromLayer(com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid maid,
+                                 Object geoEntity, Matrix4f pose) {
+        layerRuns++;
+        if (maid == null || !maid.isSleeping()) {
+            return;
+        }
+        Object model = geoEntity == null ? null : Reflect.call(geoEntity, "getCurrentModel");
+        if (model == null) {
+            model = Reflect.field(geoEntity, "currentModel");
+        }
+        if (model == null) {
+            layerMiss = "noCurrentModel";
+            return;
+        }
+        List<?> roots = Reflect.list(model, "topLevelBones");
+        if (roots == null || roots.isEmpty()) {
+            layerMiss = "noRootBones";
+            return;
+        }
+        net.minecraft.client.Camera camera = net.minecraft.client.Minecraft.getInstance()
+                .gameRenderer.getMainCamera();
+        org.joml.Vector3f cameraPos = new org.joml.Vector3f((float) camera.getPosition().x,
+                (float) camera.getPosition().y, (float) camera.getPosition().z);
+        Matrix4f toWorld = new Matrix4f().translate(cameraPos)
+                .rotate(camera.rotation().conjugate(new org.joml.Quaternionf()))
+                .mul(new Matrix4f(pose));
+        List<QuiltBox> boxes = new ArrayList<>();
+        for (Object root : roots) {
+            walkBone(root, new Matrix4f(toWorld), boxes, 0);
+        }
+        if (boxes.isEmpty()) {
+            layerMiss = "noCubes";
+            return;
+        }
+        layerCalls++;
+        layerMiss = "-";
+        ColliderSet set = new ColliderSet(boxes, bounds(boxes), stamp(boxes), maid.tickCount, true);
+        SETS.put(maid.getUUID(), set);
+        float[] b = set.bounds;
+        com.sleepwell.client.quilt.diag.QuiltTrace.step("e.layer", "boxes=" + boxes.size()
+                + " roots=" + roots.size() + " size=" + String.format(java.util.Locale.ROOT,
+                "%.2fx%.2fx%.2f", b[3] - b[0], b[4] - b[1], b[5] - b[2])
+                + " min=" + String.format(java.util.Locale.ROOT, "%.2f,%.2f,%.2f", b[0], b[1], b[2]));
+        layerBounds = new float[]{b[3] - b[0], b[4] - b[1], b[5] - b[2]};
     }
 
     private static void walkBone(Object bone, Matrix4f parent, List<QuiltBox> boxes, int depth) {
