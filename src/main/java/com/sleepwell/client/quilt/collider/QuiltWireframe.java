@@ -223,6 +223,15 @@ public final class QuiltWireframe {
                 raw(consumer, matrix, p1, r, g, b);
             }
         }
+        // Four side rails: without them the end rings read as free-floating polygons.
+        for (int i = 0; i < 4; i++) {
+            float t = (float) (Math.PI * 0.5 * i);
+            org.joml.Vector3f offset = new org.joml.Vector3f()
+                    .fma((float) Math.cos(t) * cap.radius, u)
+                    .fma((float) Math.sin(t) * cap.radius, v);
+            raw(consumer, matrix, new org.joml.Vector3f(cap.a).add(offset), r, g, b);
+            raw(consumer, matrix, new org.joml.Vector3f(cap.b).add(offset), r, g, b);
+        }
     }
 
     private static void raw(VertexConsumer consumer, Matrix4f matrix, org.joml.Vector3f p,

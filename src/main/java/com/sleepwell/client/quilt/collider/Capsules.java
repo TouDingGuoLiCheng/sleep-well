@@ -37,9 +37,14 @@ public final class Capsules {
     }
 
     private static void fitBone(String bone, List<QuiltBox> boxes, List<Capsule> out) {
-        float minX = Float.MAX_VALUE, minY = Float.MAX_VALUE, minZ = Float.MAX_VALUE;
-        float maxX = -Float.MAX_VALUE, maxY = -Float.MAX_VALUE, maxZ = -Float.MAX_VALUE;
-        for (QuiltBox box : boxes) {
+        int count = boxes.size();
+        float[] centerX = new float[count], centerY = new float[count], centerZ = new float[count];
+        float[] half = new float[count];
+        float meanX = 0, meanY = 0, meanZ = 0;
+        for (int i = 0; i < count; i++) {
+            QuiltBox box = boxes.get(i);
+            float minX = Float.MAX_VALUE, minY = Float.MAX_VALUE, minZ = Float.MAX_VALUE;
+            float maxX = -Float.MAX_VALUE, maxY = -Float.MAX_VALUE, maxZ = -Float.MAX_VALUE;
             for (int corner = 0; corner < 8; corner++) {
                 minX = Math.min(minX, box.x(corner));
                 minY = Math.min(minY, box.y(corner));
@@ -48,46 +53,77 @@ public final class Capsules {
                 maxY = Math.max(maxY, box.y(corner));
                 maxZ = Math.max(maxZ, box.z(corner));
             }
+            centerX[i] = (minX + maxX) * 0.5F;
+            centerY[i] = (minY + maxY) * 0.5F;
+            centerZ[i] = (minZ + maxZ) * 0.5F;
+            // A cube's own half-size is the honest local thickness; the group aggregate is only used to
+            // find the direction.
+            half[i] = Math.max(maxX - minX, Math.max(maxY - minY, maxZ - minZ)) * 0.5F;
+            meanX += centerX[i];
+            meanY += centerY[i];
+            meanZ += centerZ[i];
         }
-        float dx = maxX - minX, dy = maxY - minY, dz = maxZ - minZ;
-        Vector3f axis;
-        float length;
-        if (dy >= dx && dy >= dz) {
-            axis = new Vector3f(0, 1, 0);
-            length = dy;
-        } else if (dx >= dz) {
-            axis = new Vector3f(1, 0, 0);
-            length = dx;
-        } else {
-            axis = new Vector3f(0, 0, 1);
-            length = dz;
+        meanX /= count;
+        meanY /= count;
+        meanZ /= count;
+        // Dominant direction from the cube centres: works for diagonally posed limbs, where a world-axis
+        // bounding box produced those fat wandering rings.
+        double cxx = 0, cxy = 0, cxz = 0, cyy = 0, cyz = 0, czz = 0;
+        for (int i = 0; i < count; i++) {
+            double dx = centerX[i] - meanX, dy = centerY[i] - meanY, dz = centerZ[i] - meanZ;
+            cxx += dx * dx;
+            cxy += dx * dy;
+            cxz += dx * dz;
+            cyy += dy * dy;
+            cyz += dy * dz;
+            czz += dz * dz;
         }
-        // Radius so the capsule swallows every cube of the bone, not just its axis.
-        // Thickness is the larger of the two extents across the axis — NOT their diagonal, which inflated
-        // every capsule by sqrt(2) and made the body look armoured in tin cans.
-        float across;
-        if (dx == length) {
-            across = Math.max(dy, dz) * 0.5F;
-        } else if (dy == length) {
-            across = Math.max(dx, dz) * 0.5F;
-        } else {
-            across = Math.max(dx, dy) * 0.5F;
+        org.joml.Vector3f axis = new org.joml.Vector3f(0, 1, 0);
+        if (count > 2 && (cxx + cyy + czz) > 1.0E-7) {
+            axis.set(1, 0, 0);
+            for (int iter = 0; iter < 24; iter++) {
+                float x = (float) (cxx * axis.x + cxy * axis.y + cxz * axis.z);
+                float y = (float) (cxy * axis.x + cyy * axis.y + cyz * axis.z);
+                float z = (float) (cxz * axis.x + cyz * axis.y + czz * axis.z);
+                axis.set(x, y, z);
+                if (axis.lengthSquared() < 1.0E-9F) {
+                    axis.set(0, 1, 0);
+                    break;
+                }
+                axis.normalize();
+            }
         }
-        float radius = Math.min(MAX_RADIUS, Math.max(MIN_RADIUS, across));
-        Vector3f center = new Vector3f((minX + maxX) * 0.5F, (minY + maxY) * 0.5F, (minZ + maxZ) * 0.5F);
-        if (length < 0.05F) {
-            // A speck of a bone: a capsule there would only add noise to the cloth solve.
-            return;
+        float tMin = Float.MAX_VALUE, tMax = -Float.MAX_VALUE;
+        for (int i = 0; i < count; i++) {
+            float t = (centerX[i] - meanX) * axis.x + (centerY[i] - meanY) * axis.y
+                    + (centerZ[i] - meanZ) * axis.z;
+            tMin = Math.min(tMin, t);
+            tMax = Math.max(tMax, t);
         }
-        float half = Math.max(length * 0.5F, 0.001F);
+        // 90th percentile of the perpendicular offsets plus the local cube half-size: robust against a
+        // single wide cube dragging the whole limb fat.
+        float[] spread = new float[count];
+        for (int i = 0; i < count; i++) {
+            float ox = centerX[i] - meanX, oy = centerY[i] - meanY, oz = centerZ[i] - meanZ;
+            float t = ox * axis.x + oy * axis.y + oz * axis.z;
+            float px = ox - axis.x * t, py = oy - axis.y * t, pz = oz - axis.z * t;
+            spread[i] = (float) Math.sqrt(px * px + py * py + pz * pz) + half[i];
+        }
+        java.util.Arrays.sort(spread);
+        float radius = spread[(int) Math.min(count - 1, Math.floor(count * 0.9))];
+        radius = Math.min(MAX_RADIUS, Math.max(MIN_RADIUS, radius));
+        float length = tMax - tMin;
+        if (length < 0.04F) {
+            // Roundish blob: one sphere-like segment is enough.
+            length = 0.04F;
+        }
         int segments = Math.max(1, (int) Math.ceil(length / MAX_SEGMENT));
         float step = length / segments;
         boolean hard = !isSoft(bone);
+        org.joml.Vector3f base = new org.joml.Vector3f(meanX, meanY, meanZ).fma(tMin, axis);
         for (int i = 0; i < segments; i++) {
-            float t0 = -half + step * i;
-            float t1 = t0 + step;
-            Vector3f a = new Vector3f(center).fma(t0, axis);
-            Vector3f b = new Vector3f(center).fma(t1, axis);
+            Vector3f a = new Vector3f(base).fma(step * i, axis);
+            Vector3f b = new Vector3f(base).fma(step * (i + 1), axis);
             out.add(new Capsule(a, b, radius, hard, bone));
         }
     }
