@@ -29,8 +29,18 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class QuiltWireframe {
     private static final Logger LOGGER = LogUtils.getLogger();
     /** Off by default now that the capture is proven: it costs a draw pass and floods the screen. */
-    private static final boolean ENABLED =
+    private static volatile boolean enabled =
             "true".equalsIgnoreCase(System.getProperty("sleepwell.quiltWireframe"));
+
+    /** Runtime switch, so a test run does not need a JVM argument and a restart. */
+    public static void setEnabled(boolean value) {
+        enabled = value;
+        ANNOUNCED.set(false);
+    }
+
+    public static boolean isEnabled() {
+        return enabled;
+    }
     /** Capsule chains were an attempt at cheap collision; the cloth now uses the cubes directly. */
     private static final boolean CAPSULES =
             "true".equalsIgnoreCase(System.getProperty("sleepwell.quiltCapsules"));
@@ -46,15 +56,15 @@ public final class QuiltWireframe {
     }
 
     public static boolean enabled() {
-        return ENABLED;
+        return enabled;
     }
 
     public static void draw(PoseStack pose, MultiBufferSource.BufferSource buffers, List<EntityMaid> maids,
                             net.minecraft.world.phys.Vec3 camera, float partialTick) {
-        com.sleepwell.client.quilt.diag.QuiltTrace.step("11.wireframe", "enabled=" + ENABLED + " maids=" + maids.size());
-        if (!ENABLED || maids.isEmpty()) {
+        com.sleepwell.client.quilt.diag.QuiltTrace.step("11.wireframe", "enabled=" + enabled + " maids=" + maids.size());
+        if (!enabled || maids.isEmpty()) {
             if (ANNOUNCED.compareAndSet(false, true)) {
-                report("flag=" + ENABLED + " sleeping=" + maids.size()
+                report("flag=" + enabled + " sleeping=" + maids.size()
                         + " hook=" + MaidColliderCapture.hookRuns());
             }
             return;
