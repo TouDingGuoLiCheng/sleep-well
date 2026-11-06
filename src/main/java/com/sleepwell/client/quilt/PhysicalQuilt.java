@@ -72,6 +72,10 @@ public final class PhysicalQuilt {
      * straight on a body that is only 0.23 blocks tall, which reads as a flat bed sheet rather than a quilt.
      */
     private static final float DUET_PADDING = 0.022F;
+    /** Visible thickness of the quilt, drawing only: the underside sits this far below the solved surface. */
+    private static final float SHELL = 0.045F;
+    private static final float UNDER_SHADE = 0.72F;
+    private static final float RIM_V = 0.16F;
     /** Below this average per-substep motion the sheet is considered settled and gets extra damping. */
     private static final float CALM_SPEED = 0.0016F;
     /** One solve, done properly: the sheet is settled once and then frozen (R6). */
@@ -988,6 +992,36 @@ public final class PhysicalQuilt {
                     RenderType.entityCutoutNoCull(QuiltRenderer.textureFor(color)));
             PoseStack.Pose entry = pose.last();
             int light = net.minecraft.client.renderer.LightTexture.FULL_BRIGHT;
+            float[] nx = new float[count];
+            float[] ny = new float[count];
+            float[] nz = new float[count];
+            // A sheet with no underside reads as a decal no matter how it is shaded, so the quilt is drawn as
+            // a shell: the simulated surface, the same surface pushed down along its normals, and a rim of
+            // quads joining them at the border. The solver is untouched - thickness is purely a drawing fact.
+            for (int row = 0; row < ROWS; row++) {
+                for (int col = 0; col < COLS; col++) {
+                    int i = row * COLS + col;
+                    Vector3f left = now[row * COLS + Math.max(0, col - 1)];
+                    Vector3f right = now[row * COLS + Math.min(COLS - 1, col + 1)];
+                    Vector3f up = now[Math.max(0, row - 1) * COLS + col];
+                    Vector3f down = now[Math.min(ROWS - 1, row + 1) * COLS + col];
+                    float ux = right.x - left.x, uy = right.y - left.y, uz = right.z - left.z;
+                    float vx = down.x - up.x, vy = down.y - up.y, vz = down.z - up.z;
+                    float cx = uy * vz - uz * vy;
+                    float cy = uz * vx - ux * vz;
+                    float cz = ux * vy - uy * vx;
+                    float len = (float) Math.sqrt(cx * cx + cy * cy + cz * cz);
+                    if (len < 1.0E-6F || cy < 0.0F) {
+                        cx = 0.0F;
+                        cy = 1.0F;
+                        cz = 0.0F;
+                        len = 1.0F;
+                    }
+                    nx[i] = cx / len;
+                    ny[i] = cy / len;
+                    nz[i] = cz / len;
+                }
+            }
             for (int row = 0; row + 1 < ROWS; row++) {
                 for (int col = 0; col + 1 < COLS; col++) {
                     int a = row * COLS + col;
@@ -998,21 +1032,56 @@ public final class PhysicalQuilt {
                     float u1 = (float) (col + 1) / (COLS - 1) * TILE;
                     float v0 = (float) row / (ROWS - 1) * TILE;
                     float v1 = (float) (row + 1) / (ROWS - 1) * TILE;
-                    // Shade by height so the sheet reads as a surface instead of a flat decal.
-                    float shade = 0.75F + 0.25F * Math.min(1.0F, Math.max(0.0F,
-                            (now[a].y - (float) bedTop) / 0.35F));
-                    vertex(consumer, entry, now[a], u0, v0, light, shade);
-                    vertex(consumer, entry, now[b], u1, v0, light, shade);
-                    vertex(consumer, entry, now[c], u1, v1, light, shade);
-                    vertex(consumer, entry, now[d], u0, v1, light, shade);
+                    // Lit by the surface normal: folds and the head of the bed now read as shape.
+                    float shade = 0.55F + 0.45F * Math.min(1.0F, Math.max(0.0F, ny[a]));
+                    vertex(consumer, entry, now[a].x, now[a].y, now[a].z, u0, v0, light, shade);
+                    vertex(consumer, entry, now[b].x, now[b].y, now[b].z, u1, v0, light, shade);
+                    vertex(consumer, entry, now[c].x, now[c].y, now[c].z, u1, v1, light, shade);
+                    vertex(consumer, entry, now[d].x, now[d].y, now[d].z, u0, v1, light, shade);
+                    // Underside, one thickness below, wound the other way.
+                    float under = shade * UNDER_SHADE;
+                    vertex(consumer, entry, now[d].x - nx[d] * SHELL, now[d].y - ny[d] * SHELL,
+                            now[d].z - nz[d] * SHELL, u0, v1, light, under);
+                    vertex(consumer, entry, now[c].x - nx[c] * SHELL, now[c].y - ny[c] * SHELL,
+                            now[c].z - nz[c] * SHELL, u1, v1, light, under);
+                    vertex(consumer, entry, now[b].x - nx[b] * SHELL, now[b].y - ny[b] * SHELL,
+                            now[b].z - nz[b] * SHELL, u1, v0, light, under);
+                    vertex(consumer, entry, now[a].x - nx[a] * SHELL, now[a].y - ny[a] * SHELL,
+                            now[a].z - nz[a] * SHELL, u0, v0, light, under);
                 }
+            }
+            // Rim: the four borders joined top to bottom, which is where thickness is actually visible.
+            float rimShade = 0.62F;
+            for (int col = 0; col + 1 < COLS; col++) {
+                rim(consumer, entry, rimShade, light, col, 0, col + 1, 0, nx, ny, nz);
+                rim(consumer, entry, rimShade, light, col, ROWS - 1, col + 1, ROWS - 1, nx, ny, nz);
+            }
+            for (int row = 0; row + 1 < ROWS; row++) {
+                rim(consumer, entry, rimShade, light, 0, row, 0, row + 1, nx, ny, nz);
+                rim(consumer, entry, rimShade, light, COLS - 1, row, COLS - 1, row + 1, nx, ny, nz);
             }
             buffers.endBatch(RenderType.entityCutoutNoCull(QuiltRenderer.textureFor(color)));
         }
 
-        private static void vertex(VertexConsumer consumer, PoseStack.Pose entry, Vector3f p, float u, float v,
-                                   int light, float shade) {
-            consumer.vertex(entry.pose(), p.x, p.y, p.z)
+        /** One border quad: particle p at the top, the same particle sunk along its normal, for two partners. */
+        private void rim(VertexConsumer consumer, PoseStack.Pose entry, float shade, int light,
+                         int colA, int rowA, int colB, int rowB,
+                         float[] nx, float[] ny, float[] nz) {
+            int a = rowA * COLS + colA;
+            int b = rowB * COLS + colB;
+            float u0 = (float) colA / (COLS - 1) * TILE;
+            float u1 = (float) colB / (COLS - 1) * TILE;
+            vertex(consumer, entry, now[a].x, now[a].y, now[a].z, u0, 0.0F, light, shade);
+            vertex(consumer, entry, now[b].x, now[b].y, now[b].z, u1, 0.0F, light, shade);
+            vertex(consumer, entry, now[b].x - nx[b] * SHELL, now[b].y - ny[b] * SHELL,
+                    now[b].z - nz[b] * SHELL, u1, RIM_V, light, shade);
+            vertex(consumer, entry, now[a].x - nx[a] * SHELL, now[a].y - ny[a] * SHELL,
+                    now[a].z - nz[a] * SHELL, u0, RIM_V, light, shade);
+        }
+
+        private static void vertex(VertexConsumer consumer, PoseStack.Pose entry, float x, float y, float z,
+                                   float u, float v, int light, float shade) {
+            consumer.vertex(entry.pose(), x, y, z)
                     .color(shade, shade, shade, 1.0F)
                     .uv(u, v)
                     .overlayCoords(net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY)
