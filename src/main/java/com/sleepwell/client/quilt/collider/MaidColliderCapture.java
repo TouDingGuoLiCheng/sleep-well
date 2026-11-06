@@ -458,7 +458,10 @@ public final class MaidColliderCapture {
         net.minecraft.core.Direction bedDirection = maid.getBedOrientation();
         if (bedDirection != null) {
             toWorld.rotateY((float) Math.toRadians(-bedDirection.toYRot()));
-            toWorld.rotateZ((float) Math.toRadians(-90.0F));
+            // Lie her down about X, not Z: rotating about Z turned her shoulder width (X) into height,
+            // which is why the outline was 1.6 blocks thick. About X, her front becomes "up" and her
+            // standing height runs along the bed.
+            toWorld.rotateX((float) Math.toRadians(-90.0F));
         }
         List<QuiltBox> boxes = new ArrayList<>();
         for (Object root : roots) {
