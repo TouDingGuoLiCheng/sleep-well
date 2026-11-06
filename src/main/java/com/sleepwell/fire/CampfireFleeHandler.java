@@ -143,6 +143,16 @@ public final class CampfireFleeHandler {
         } else {
             flee.stuckTicks = 0;
         }
+        if (flee.ticks % 10 == 0) {
+            // Heartbeat: without this there is no way to tell "the tick path never ran" from "it ran and the
+            // maid refused to move".
+            LOGGER.info("[篝火] 逃跑中 maid={} 位置={} 起点={} 卡住={} 剩余={} 目标={}", shortId(maid),
+                    maid.blockPosition(), new BlockPos((int) Math.floor(flee.startX),
+                            (int) Math.floor(flee.startY), (int) Math.floor(flee.startZ)),
+                    flee.stuckTicks, flee.ticksLeft, new BlockPos((int) Math.floor(flee.target.x),
+                            (int) Math.floor(flee.target.y), (int) Math.floor(flee.target.z)));
+        }
+        flee.ticks++;
         if (--flee.ticksLeft <= 0) {
             stop(maid);
             return;
@@ -194,6 +204,7 @@ public final class CampfireFleeHandler {
         private int ticksLeft;
         private int ticksOnTarget;
         private int stuckTicks;
+        private int ticks;
         private double startX;
         private double startY;
         private double startZ;
