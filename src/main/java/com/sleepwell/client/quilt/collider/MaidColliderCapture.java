@@ -488,9 +488,22 @@ public final class MaidColliderCapture {
         // centred on her position, bottom resting at her feet height. That removes the last hand-tuned
         // offset and keeps every model aligned to the same rules.
         float[] rawBounds = bounds(boxes);
+        // The bed's top surface is the floor she is lying on; her own Y is where the entity stands, which
+        // for TLM's bed block sits above the mattress and made the whole outline float.
+        float floorY = (float) maid.getY();
+        java.util.Optional<net.minecraft.core.BlockPos> bedPos = maid.getSleepingPos();
+        if (bedPos.isPresent()) {
+            floorY = bedPos.get().getY() + 1.0F;
+        }
         float shiftX = (float) maid.getX() - (rawBounds[0] + rawBounds[3]) * 0.5F;
-        float shiftY = (float) maid.getY() - rawBounds[1];
+        float shiftY = floorY - rawBounds[1];
         float shiftZ = (float) maid.getZ() - (rawBounds[2] + rawBounds[5]) * 0.5F;
+        if (layerCalls % 600 == 1) {
+            LOGGER.info("[被子] floor maidY={} bedTop={} bedPos={} shiftY={}",
+                    String.format(java.util.Locale.ROOT, "%.2f", maid.getY()),
+                    String.format(java.util.Locale.ROOT, "%.2f", floorY), bedPos.orElse(null),
+                    String.format(java.util.Locale.ROOT, "%.2f", shiftY));
+        }
         for (QuiltBox box : boxes) {
             for (int corner = 0; corner < 8; corner++) {
                 box.setCorner(corner, box.x(corner) + shiftX, box.y(corner) + shiftY, box.z(corner) + shiftZ);
