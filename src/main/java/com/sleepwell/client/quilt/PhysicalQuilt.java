@@ -128,6 +128,19 @@ public final class PhysicalQuilt {
             }
             return;
         }
+        if (set.captureFrame != MaidColliderCapture.frameCounter()) {
+            // The set comes from an earlier frame, so its view-space corners no longer match the camera;
+            // transforming them now is what put the collision boxes 1.5 blocks above the bed. Keep the
+            // frozen sheet as it is and wait for a set captured this very frame.
+            Cloth existing = CLOTHS.get(maid.getUUID());
+            if (existing != null && existing.initialised) {
+                existing.draw(pose, buffers, bed.color());
+            } else if (SKIP_LOGS-- > 0) {
+                LOGGER.info("[被子] 碰撞集不是本帧的 maid={} setFrame={} now={}（等本帧采集）", shortId(maid),
+                        set.captureFrame, MaidColliderCapture.frameCounter());
+            }
+            return;
+        }
         if (set.boxes.size() < 100 && SKIP_LOGS-- > 0) {
             LOGGER.warn("[被子] 碰撞盒偏少 maid={} boxes={}（采集可能漏骨骼，被子会穿透）", shortId(maid),
                     set.boxes.size());
@@ -318,7 +331,8 @@ public final class PhysicalQuilt {
                 refreshBoxes(set, viewToWorld);
             }
             float sub = DT / SUBSTEPS;
-            float damping = CALM ? DAMPING_CALM : DAMPING;
+            // While settling the sheet still has to fall, so the calm-down damping must not apply yet.
+            float damping = (!warmup && CALM) ? DAMPING_CALM : DAMPING;
             for (int s = 0; s < SUBSTEPS; s++) {
                 for (int i = 0; i < count; i++) {
                     Vector3f p = now[i];

@@ -23,6 +23,11 @@ public final class ColliderSet {
     public java.util.List<Capsule> capsules = java.util.List.of();
     /** Maps the captured view-space corners back to world space; needed to collide the cloth in world space. */
     public org.joml.Matrix4f viewToWorld = new org.joml.Matrix4f();
+    /**
+     * The render frame this set was captured in. View-space corners are only valid together with the pose
+     * of that very frame; using a stale set with a newer camera shifts the whole body.
+     */
+    public long captureFrame;
 
     public ColliderSet(List<QuiltBox> boxes, float[] bounds, long stamp, int tick, boolean direct) {
         this.boxes = boxes;

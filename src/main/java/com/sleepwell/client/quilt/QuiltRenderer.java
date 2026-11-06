@@ -123,6 +123,9 @@ public final class QuiltRenderer {
         }
         com.sleepwell.client.quilt.diag.QuiltTrace.step("1.afterEntities", "poseStack ok");
         ClientLevel level = Minecraft.getInstance().level;
+        // One frame counter for the whole pipeline: a view-space capture is only valid in the frame that
+        // produced it, and the cloth needs proof of freshness before it trusts those corners.
+        com.sleepwell.client.quilt.collider.MaidColliderCapture.nextFrame();
         if (level == null) {
             return;
         }

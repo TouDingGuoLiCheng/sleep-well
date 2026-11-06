@@ -435,6 +435,18 @@ public final class MaidColliderCapture {
     }
 
     /** Called from the maid's own render pass: pose is model-to-view space, already including the sleep pose. */
+    /** Bumped once per rendered frame by the level stage, so a set can be proven fresh. */
+    private static long FRAME;
+
+    public static long frameCounter() {
+        return FRAME;
+    }
+
+    /** Called from the level stage at the start of every frame. */
+    public static void nextFrame() {
+        FRAME++;
+    }
+
     static void captureFromLayer(com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid maid,
                                  Object geoEntity, Matrix4f pose) {
         layerRuns++;
@@ -476,6 +488,7 @@ public final class MaidColliderCapture {
         ColliderSet set = new ColliderSet(boxes, bounds(boxes), stamp(boxes), maid.tickCount, true);
         set.fromLayer = true;
         set.viewSpace = true;
+        set.captureFrame = frameCounter();
         set.viewToWorld = new Matrix4f(viewMatrix).invert();
         set.capsules = Capsules.fit(boxes);
         if (layerCalls % 600 == 1) {
