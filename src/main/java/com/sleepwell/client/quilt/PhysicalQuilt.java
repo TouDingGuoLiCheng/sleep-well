@@ -54,7 +54,26 @@ public final class PhysicalQuilt {
 
     private static final Map<UUID, Cloth> CLOTHS = new HashMap<>();
     private static int FRAMES;
-    private static int TICK_LOGS;
+    private static int TICK_LOGS = 300;
+    /** Bounded: the skip path can fire every frame and would flood the log. */
+    private static int SKIP_LOGS = 5;
+
+    private static String shortId(EntityMaid maid) {
+        String id = maid.getUUID().toString();
+        return id.substring(0, 8);
+    }
+
+    private static String fmt(double value) {
+        return String.format(Locale.ROOT, "%.2f", value);
+    }
+
+    private static String fmt(Vec3 value) {
+        return String.format(Locale.ROOT, "%.2f,%.2f,%.2f", value.x, value.y, value.z);
+    }
+
+    private static String fmt(float value) {
+        return String.format(Locale.ROOT, "%.2f", value);
+    }
 
     private PhysicalQuilt() {
     }
@@ -67,7 +86,16 @@ public final class PhysicalQuilt {
                               EntityMaid maid) {
         ColliderSet set = MaidColliderCapture.get(maid);
         if (set == null || set.boxes.isEmpty()) {
+            // Silence here is what made "the quilt vanished" take a log hunt to explain.
+            if (SKIP_LOGS-- > 0) {
+                LOGGER.warn("[被子] 布料跳过 maid={} set={} boxes={}", shortId(maid),
+                        set == null ? "null" : "ok", set == null ? -1 : set.boxes.size());
+            }
             return;
+        }
+        if (set.boxes.size() < 100 && SKIP_LOGS-- > 0) {
+            LOGGER.warn("[被子] 碰撞盒偏少 maid={} boxes={}（采集可能漏骨骼，被子会穿透）", shortId(maid),
+                    set.boxes.size());
         }
         Vec3 head = Vec3.atLowerCornerOf(bed.head()).add(0.5D, 0.0D, 0.5D);
         Vec3 foot = Vec3.atLowerCornerOf(bed.foot()).add(0.5D, 0.0D, 0.5D);
@@ -89,16 +117,32 @@ public final class PhysicalQuilt {
         cloth.bedFoot = foot.add(0.0D, top, 0.0D);
         if (!cloth.initialised) {
             cloth.reset();
+            LOGGER.info("[被子] 布料新建 maid={} grid={}x{} anchor={} bedTop={} boxes={}",
+                    shortId(maid), COLS, ROWS, fmt(cloth.anchor), fmt(cloth.bedTop), set.boxes.size());
             cloth.settle(set, viewToWorld);
             cloth.initialised = true;
+            LOGGER.info("[被子] 布料静解算完成 maid={} steps={} yRange={}..{} 质心={}",
+                    shortId(maid), WARMUP, fmt(cloth.minY()), fmt(cloth.maxY()), fmt(cloth.centroid()));
         } else {
             cloth.step(set, viewToWorld);
         }
         cloth.draw(pose, buffers, bed.color());
         if (--TICK_LOGS <= 0) {
             TICK_LOGS = 300;
-            LOGGER.info("[被子] cloth p={} boxes={} yRange={}..{}", cloth.count, set.boxes.size(),
-                    String.format(Locale.ROOT, "%.2f", cloth.minY()), String.format(Locale.ROOT, "%.2f", cloth.maxY()));
+            float minY = cloth.minY();
+            float maxY = cloth.maxY();
+            float drift = (float) Math.abs(cloth.centroid().y - (cloth.bedTop + 0.15D));
+            LOGGER.info("[被子] 布料 frame={} p={} boxes={} yRange={}..{} 床面={} 质心高度差={} 悬浮={}",
+                    FRAMES, cloth.count, set.boxes.size(), fmt(minY), fmt(maxY), fmt(cloth.bedTop),
+                    fmt(drift), drift > 1.5F ? "是" : "否");
+            if (drift > 1.5F) {
+                LOGGER.warn("[被子] 布料整体离床 {} 格（床面 {}，质心 {}）：坐标换算或碰撞盒方向有问题",
+                        fmt(drift), fmt(cloth.bedTop), fmt(cloth.centroid().y));
+            }
+            if (Float.isNaN(minY) || Float.isNaN(maxY)) {
+                LOGGER.error("[被子] 布料出现 NaN，重置 maid={}", shortId(maid));
+                cloth.initialised = false;
+            }
         }
     }
 
@@ -318,6 +362,16 @@ public final class PhysicalQuilt {
                 boxMax[base + 1] = maxY;
                 boxMax[base + 2] = maxZ;
             }
+        }
+
+        private Vec3 centroid() {
+            double x = 0, y = 0, z = 0;
+            for (Vector3f p : now) {
+                x += p.x;
+                y += p.y;
+                z += p.z;
+            }
+            return new Vec3(x / count, y / count, z / count);
         }
 
         private float minY() {
