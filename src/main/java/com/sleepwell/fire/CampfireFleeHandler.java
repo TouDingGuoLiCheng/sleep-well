@@ -43,6 +43,10 @@ public final class CampfireFleeHandler {
     private static final int CLOSE_ENOUGH = 1;
     /** Per-maid flee state; dropped when the flee ends or the maid disappears. */
     private static final Map<UUID, Flee> FLEES = new ConcurrentHashMap<>();
+    /** Debug lines used to be invisible (log level is INFO), which is why "she stands in the fire" took a
+     *  code read to even confirm the handler ran. These counters keep the report honest and quiet. */
+    private static int DAMAGE_LOGS;
+    private static int DRIVE_LOGS;
 
     private CampfireFleeHandler() {
     }
@@ -58,6 +62,11 @@ public final class CampfireFleeHandler {
         boolean enabled = SleepWellConfig.CAMPFIRE_FLEE_ENABLED.get();
         boolean fireDamage = event.getSource().is(DamageTypeTags.IS_FIRE);
         boolean standingOnCampfire = onLitCampfire(level, maid.blockPosition());
+        if (DAMAGE_LOGS++ < 6) {
+            LOGGER.info("[篝火] 受伤事件 maid={} 伤害={} 火属性={} 站在篝火上={} 开关={} 睡={} 载具={} 位置={}",
+                    maid.getUUID().toString().substring(0, 8), event.getAmount(), fireDamage, standingOnCampfire,
+                    enabled, maid.isSleeping(), maid.isPassenger() || maid.isVehicle(), maid.blockPosition());
+        }
         if (!CampfireFleePolicy.eligible(enabled, maid.isAlive(), maid.isSleeping(),
                 maid.isPassenger() || maid.isVehicle(), fireDamage, standingOnCampfire)) {
             if (!enabled) {
@@ -73,10 +82,14 @@ public final class CampfireFleeHandler {
         flee.target = CampfireFleeSpot.find(level, maid, radius).orElse(null);
         if (flee.target == null) {
             FLEES.remove(maid.getUUID());
-            LOGGER.debug("Campfire flee: no safe spot for maid {} near {}", maid.getUUID(), maid.blockPosition());
+            LOGGER.warn("[篝火] 找不到安全落点 maid={} 位置={} 半径={}", shortId(maid), maid.blockPosition(), radius);
             return;
         }
-        LOGGER.debug("Campfire flee: maid {} burned at {}, running to {}", maid.getUUID(), maid.blockPosition(), flee.target);
+        if (DRIVE_LOGS++ < 6) {
+            LOGGER.info("[篝火] 开始逃跑 maid={} 从={} 跑向={} 半径={}", shortId(maid), maid.blockPosition(),
+                    new BlockPos((int) Math.floor(flee.target.x), (int) Math.floor(flee.target.y),
+                            (int) Math.floor(flee.target.z)), radius);
+        }
         drive(maid, flee.target);
     }
 
@@ -117,6 +130,10 @@ public final class CampfireFleeHandler {
             flee.target = next;
         }
         drive(maid, flee.target);
+    }
+
+    private static String shortId(EntityMaid maid) {
+        return maid.getUUID().toString().substring(0, 8);
     }
 
     /** Push the walk target back and steer the navigation directly, so a busy task cannot keep her in the fire. */
