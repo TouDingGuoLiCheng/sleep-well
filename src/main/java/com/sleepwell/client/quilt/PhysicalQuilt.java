@@ -47,7 +47,14 @@ public final class PhysicalQuilt {
     private static final float GRAVITY = -9.8F;
     private static final float DAMPING = 0.985F;
     private static final float THICKNESS = 0.012F;
+    /** Upper bound on how far one particle may move per substep, in blocks. */
+    private static final float MAX_STEP = 0.05F;
+    /** Fraction of tangential speed kept when the cloth rubs against something; 0 = glued. */
+    private static final float FRICTION = 0.35F;
     private static final int WARMUP = 90;
+    /** How many rows at the pillow end are held in place. */
+    private static final int PINNED_ROWS = 2;
+    private static final float PIN_STRENGTH = 0.12F;
     /** Half a bed's width, plus the overhang that hangs down the sides. */
     private static final float HALF_WIDTH = 0.78F;
     private static final float TILE = 1.0F;
@@ -174,6 +181,9 @@ public final class PhysicalQuilt {
         private final List<int[]> constraints = new ArrayList<>();
         private final List<float[]> rests = new ArrayList<>();
         private final int count = COLS * ROWS;
+        private final float[] pinX = new float[COLS * ROWS];
+        private final float[] pinY = new float[COLS * ROWS];
+        private final float[] pinZ = new float[COLS * ROWS];
         private boolean initialised;
         private Vec3 anchor = Vec3.ZERO;
         private Vec3 along = Vec3.ZERO;
@@ -198,6 +208,9 @@ public final class PhysicalQuilt {
                     int index = row * COLS + col;
                     now[index] = new Vector3f((float) p.x, (float) p.y, (float) p.z);
                     prev[index] = new Vector3f((float) p.x, (float) p.y, (float) p.z);
+                    pinX[index] = (float) p.x;
+                    pinY[index] = (float) p.y;
+                    pinZ[index] = (float) p.z;
                 }
             }
             constraints.clear();
@@ -256,6 +269,14 @@ public final class PhysicalQuilt {
                     p.x += vx;
                     p.y += vy + GRAVITY * sub * sub;
                     p.z += vz;
+                    // Cap the per-substep displacement: without this a single deep overlap can inject
+                    // enough energy to fling the sheet around.
+                    float mx = p.x - o.x, my = p.y - o.y, mz = p.z - o.z;
+                    float dist = (float) Math.sqrt(mx * mx + my * my + mz * mz);
+                    if (dist > MAX_STEP) {
+                        float k = MAX_STEP / dist;
+                        p.set(o.x + mx * k, o.y + my * k, o.z + mz * k);
+                    }
                     if (Math.abs(p.y - (float) bedTop) > 4.0F || p.distanceSquared(o) > 4.0F) {
                         // Runaway particle: put it back on the bed instead of letting one bad push fling
                         // the whole sheet out of the world.
@@ -270,10 +291,24 @@ public final class PhysicalQuilt {
                         project(pair[0], pair[1], rest[0], rest[1]);
                     }
                     collide();
+                    pinHeadEnd();
                 }
             }
             if (!warmup) {
                 FRAMES++;
+            }
+        }
+
+        /** Rows at the pillow end stay put, the way a quilt is tucked under the pillow. */
+        private void pinHeadEnd() {
+            for (int row = 0; row < PINNED_ROWS; row++) {
+                for (int col = 0; col < COLS; col++) {
+                    int index = row * COLS + col;
+                    Vector3f p = now[index];
+                    p.x += (pinX[index] - p.x) * PIN_STRENGTH;
+                    p.y += (pinY[index] - p.y) * PIN_STRENGTH;
+                    p.z += (pinZ[index] - p.z) * PIN_STRENGTH;
+                }
             }
         }
 
@@ -330,6 +365,11 @@ public final class PhysicalQuilt {
                 // Mattress: only inside the bed footprint, so the overhang may still fall down the sides.
                 if (p.y < bedTop + THICKNESS && insideBed(p)) {
                     p.y = (float) (bedTop + THICKNESS);
+                    // Rub: a real quilt stays put because cloth grips the mattress. Killing most of the
+                    // tangential velocity here is what stops the sheet from skating across the bed.
+                    Vector3f previous = prev[i];
+                    previous.x = p.x + (previous.x - p.x) * FRICTION;
+                    previous.z = p.z + (previous.z - p.z) * FRICTION;
                 }
             }
         }
