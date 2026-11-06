@@ -171,17 +171,10 @@ public final class PhysicalQuilt {
                     shortId(maid), WARMUP, String.format(Locale.ROOT, "%.1f",
                             (System.nanoTime() - start) / 1.0E6), fmt(cloth.minY()), fmt(cloth.maxY()),
                     cloth.alongSpan());
-        } else if (maid.tickCount - cloth.frozenAt >= RECHECK_TICKS) {
-            // Frozen afterwards: the only per-tick work is this cheap comparison, and only every few seconds.
-            cloth.frozenAt = maid.tickCount;
-            float current = fingerprint(set);
-            if (Math.abs(current - cloth.fingerprint) > 0.05F) {
-                LOGGER.info("[被子] 布料失效重算 maid={} 原因=姿态变化 {} -> {}", shortId(maid),
-                        fmt(cloth.fingerprint), fmt(current));
-                cloth.fingerprint = current;
-                cloth.settle(set, viewToWorld);
-            }
         }
+        // No periodic re-solve: the fingerprint check caused 300-step rebuilds whenever her idle animation
+        // nudged the geometry, which is exactly the stutter that got the cloth rolled back. The cache now
+        // only dies on a real change (different model, different bed).
         cloth.draw(pose, buffers, bed.color());
         if (--TICK_LOGS <= 0) {
             TICK_LOGS = 300;

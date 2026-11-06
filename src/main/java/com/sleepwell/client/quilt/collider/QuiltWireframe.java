@@ -28,7 +28,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public final class QuiltWireframe {
     private static final Logger LOGGER = LogUtils.getLogger();
-    private static final boolean ENABLED = !"false".equalsIgnoreCase(System.getProperty("sleepwell.quiltWireframe"));
+    /** Off by default now that the capture is proven: it costs a draw pass and floods the screen. */
+    private static final boolean ENABLED =
+            "true".equalsIgnoreCase(System.getProperty("sleepwell.quiltWireframe"));
     /** Capsule chains were an attempt at cheap collision; the cloth now uses the cubes directly. */
     private static final boolean CAPSULES =
             "true".equalsIgnoreCase(System.getProperty("sleepwell.quiltCapsules"));
