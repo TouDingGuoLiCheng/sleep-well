@@ -66,9 +66,11 @@ public final class PhysicalQuilt {
     /** Half a bed's width, plus the overhang that hangs down the sides. */
     private static final float HALF_WIDTH = 0.72F;
     /** How far short of the pillow end the quilt starts, in blocks (measured from the bed centre). */
-    private static final float HEAD_INSET = 0.72F;
+    private static final float HEAD_INSET = 0.35F;
     /** How far past the bed centre it reaches toward the foot. */
-    private static final float FOOT_REACH = 1.02F;
+    private static final float FOOT_REACH = 1.08F;
+    /** Real thickness of the quilt, rendered as a top sheet, a bottom sheet and stitched edges. */
+    private static final float QUILT_THICKNESS = 0.045F;
     private static final float TILE = 1.0F;
 
     private static final Map<UUID, Cloth> CLOTHS = new HashMap<>();
@@ -227,6 +229,8 @@ public final class PhysicalQuilt {
     private static final class Cloth {
         private final Vector3f[] now = new Vector3f[COLS * ROWS];
         private final Vector3f[] prev = new Vector3f[COLS * ROWS];
+        /** Same points pushed down by the quilt's thickness; refreshed once, when the sheet freezes. */
+        private final Vector3f[] under = new Vector3f[COLS * ROWS];
         private final List<int[]> constraints = new ArrayList<>();
         private final List<float[]> rests = new ArrayList<>();
         private final int count = COLS * ROWS;
@@ -265,6 +269,7 @@ public final class PhysicalQuilt {
                     pinX[index] = (float) p.x;
                     pinY[index] = (float) p.y;
                     pinZ[index] = (float) p.z;
+                    under[index] = new Vector3f((float) p.x, (float) p.y - QUILT_THICKNESS, (float) p.z);
                 }
             }
             constraints.clear();
@@ -350,6 +355,9 @@ public final class PhysicalQuilt {
                 }
             }
             if (!warmup) {
+                for (int i = 0; i < count; i++) {
+                    under[i].set(now[i]).sub(0.0F, QUILT_THICKNESS, 0.0F);
+                }
                 FRAMES++;
                 float speed = 0.0F;
                 for (int i = 0; i < count; i++) {
@@ -532,9 +540,36 @@ public final class PhysicalQuilt {
                     vertex(consumer, entry, now[b], u1, v0, light, shade);
                     vertex(consumer, entry, now[c], u1, v1, light, shade);
                     vertex(consumer, entry, now[d], u0, v1, light, shade);
+                    // Underside, reversed winding: a quilt is cloth with two faces, not a decal.
+                    float dark = shade * 0.62F;
+                    vertex(consumer, entry, under[d], u0, v1, light, dark);
+                    vertex(consumer, entry, under[c], u1, v1, light, dark);
+                    vertex(consumer, entry, under[b], u1, v0, light, dark);
+                    vertex(consumer, entry, under[a], u0, v0, light, dark);
                 }
             }
+            // Stitched edges: connect the two faces so the silhouette has real thickness.
+            for (int col = 0; col + 1 < COLS; col++) {
+                edge(consumer, entry, col, col + 1, 0, true, light);
+                edge(consumer, entry, col, col + 1, ROWS - 1, true, light);
+            }
+            for (int row = 0; row + 1 < ROWS; row++) {
+                edge(consumer, entry, row * COLS, (row + 1) * COLS, 0, false, light);
+                edge(consumer, entry, row * COLS + COLS - 1, (row + 1) * COLS + COLS - 1, 0, false, light);
+            }
             buffers.endBatch(RenderType.entityCutoutNoCull(QuiltRenderer.textureFor(color)));
+        }
+
+        private void edge(VertexConsumer consumer, PoseStack.Pose entry, int i0, int i1, int unused,
+                          boolean across, int light) {
+            Vector3f t0 = now[i0], t1 = now[i1], b0 = under[i0], b1 = under[i1];
+            float u0 = (float) (across ? i0 % COLS : i0 / COLS) / COLS;
+            float u1 = (float) (across ? i1 % COLS : i1 / COLS) / COLS;
+            float shade = 0.55F;
+            vertex(consumer, entry, t0, u0, 0.0F, light, shade);
+            vertex(consumer, entry, t1, u1, 0.0F, light, shade);
+            vertex(consumer, entry, b1, u1, 0.12F, light, shade);
+            vertex(consumer, entry, b0, u0, 0.12F, light, shade);
         }
 
         private static void vertex(VertexConsumer consumer, PoseStack.Pose entry, Vector3f p, float u, float v,
