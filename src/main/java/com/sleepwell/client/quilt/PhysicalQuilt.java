@@ -254,6 +254,15 @@ public final class PhysicalQuilt {
         cloth.bedTop = top;
         cloth.bedHead = new Vec3(head.x, top, head.z);
         cloth.bedFoot = new Vec3(foot.x, top, foot.z);
+        if (!cloth.initialised) {
+            // A solved shape for this model may already exist from an earlier session.
+            if (cloth.adopt(QuiltCache.load(modelKey, set, COLS, ROWS))) {
+                cloth.fingerprint = fingerprint(set);
+                cloth.frozenAt = maid.tickCount;
+                LOGGER.info("[被子] 磁盘缓存命中 maid={} model={}（跳过解算）{}", shortId(maid), modelKey,
+                        bedInfo(maid, bed));
+            }
+        }
         if (!cloth.initialised && SOLVED_THIS_FRAME) {
             // Several maids coming into view at once used to stack ~400 ms of solving into one frame.
             return;
@@ -294,6 +303,7 @@ public final class PhysicalQuilt {
             cloth.initialised = true;
             cloth.frozenAt = maid.tickCount;
             cloth.fingerprint = fingerprint(set);
+            cloth.storeToDisk(modelKey, set);
             LOGGER.info("[被子] 布料解算完成并冻结 maid={} steps={} 耗时={}ms yRange={}..{} 沿床覆盖={} 逐行={}",
                     shortId(maid), WARMUP, String.format(Locale.ROOT, "%.1f",
                             (System.nanoTime() - start) / 1.0E6), fmt(cloth.minY()), fmt(cloth.maxY()),
@@ -586,6 +596,26 @@ public final class PhysicalQuilt {
 
         private boolean hasLocalFrame() {
             return localAlong != null;
+        }
+
+        /** Takes a previously solved shape from disk and lays it out in the current bed. */
+        private boolean adopt(QuiltCache.Frame frame) {
+            if (frame == null || frame.along.length != count) {
+                return false;
+            }
+            localAlong = frame.along;
+            localAcross = frame.across;
+            localHeight = frame.height;
+            retarget(anchor, along, across, bedTop);
+            initialised = true;
+            return true;
+        }
+
+        /** Keeps the solved shape for the next launch. Called once, right after a solve. */
+        private void storeToDisk(String key, ColliderSet set) {
+            if (localAlong != null) {
+                QuiltCache.save(key, set, COLS, ROWS, localAlong, localAcross, localHeight);
+            }
         }
 
         /** Lays the cached shape into another bed: a rigid move, which is all a different bed needs. */
