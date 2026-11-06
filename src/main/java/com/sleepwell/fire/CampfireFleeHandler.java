@@ -75,25 +75,33 @@ public final class CampfireFleeHandler {
             return;
         }
         int radius = CampfireFleePolicy.clampRadius(SleepWellConfig.CAMPFIRE_FLEE_RADIUS.get());
-        Flee flee = FLEES.computeIfAbsent(maid.getUUID(), key -> new Flee(maid, radius));
+        // A campfire keeps hurting her every tick or two. Restarting the flee on every hit reset the stuck
+        // counter and the reference position, so the fallback could never accumulate - which is exactly why
+        // "she never moves and never gets carried out" happened. Only a fresh flee re-seeds that state.
+        Flee flee = FLEES.get(maid.getUUID());
+        boolean fresh = flee == null || flee.target == null;
+        if (fresh) {
+            flee = new Flee(maid, radius);
+            flee.startX = maid.getX();
+            flee.startY = maid.getY();
+            flee.startZ = maid.getZ();
+            flee.target = CampfireFleeSpot.find(level, maid, radius).orElse(null);
+            if (flee.target == null) {
+                FLEES.remove(maid.getUUID());
+                LOGGER.warn("[篝火] 找不到安全落点 maid={} 位置={} 半径={}", shortId(maid), maid.blockPosition(),
+                        radius);
+                return;
+            }
+            FLEES.put(maid.getUUID(), flee);
+            if (DRIVE_LOGS++ < 6) {
+                LOGGER.info("[篝火] 开始逃跑 maid={} 从={} 跑向={} 半径={}", shortId(maid), maid.blockPosition(),
+                        new BlockPos((int) Math.floor(flee.target.x), (int) Math.floor(flee.target.y),
+                                (int) Math.floor(flee.target.z)), radius);
+            }
+        }
         flee.radius = radius;
+        // Every new burn buys another five seconds, but progress already made is kept.
         flee.ticksLeft = CampfireFleePolicy.FLEE_TICKS;
-        flee.ticksOnTarget = 0;
-        flee.stuckTicks = 0;
-        flee.startX = maid.getX();
-        flee.startY = maid.getY();
-        flee.startZ = maid.getZ();
-        flee.target = CampfireFleeSpot.find(level, maid, radius).orElse(null);
-        if (flee.target == null) {
-            FLEES.remove(maid.getUUID());
-            LOGGER.warn("[篝火] 找不到安全落点 maid={} 位置={} 半径={}", shortId(maid), maid.blockPosition(), radius);
-            return;
-        }
-        if (DRIVE_LOGS++ < 6) {
-            LOGGER.info("[篝火] 开始逃跑 maid={} 从={} 跑向={} 半径={}", shortId(maid), maid.blockPosition(),
-                    new BlockPos((int) Math.floor(flee.target.x), (int) Math.floor(flee.target.y),
-                            (int) Math.floor(flee.target.z)), radius);
-        }
         drive(maid, flee.target);
     }
 
