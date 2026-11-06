@@ -532,8 +532,9 @@ public final class MaidColliderCapture {
             }
         }
 
+        // TLM mirrors the model on X: `translateMatrixToBone` negates positionX before scaling by 1/16.
         Matrix4f boneMatrix = new Matrix4f(parent)
-                .translate(posX, posY, posZ)
+                .translate(-posX, posY, posZ)
                 .translate(pivotX, pivotY, pivotZ)
                 .rotateXYZ(rotX, rotY, rotZ)
                 .scale(scaleX, scaleY, scaleZ)
@@ -568,9 +569,10 @@ public final class MaidColliderCapture {
             float a = (corner & 1) != 0 ? 1.0F : 0.0F;
             float b = (corner & 2) != 0 ? 1.0F : 0.0F;
             float c = (corner & 4) != 0 ? 1.0F : 0.0F;
-            float x = (origin.x + dx.x * a + dy.x * b + dz.x * c) / PIXELS;
-            float y = (origin.y + dx.y * a + dy.y * b + dz.y * c) / PIXELS;
-            float z = (origin.z + dx.z * a + dy.z * b + dz.z * c) / PIXELS;
+            // Cube vectors are already in blocks: the renderer feeds them straight into mulPosition.
+            float x = origin.x + dx.x * a + dy.x * b + dz.x * c;
+            float y = origin.y + dx.y * a + dy.y * b + dz.y * c;
+            float z = origin.z + dx.z * a + dy.z * b + dz.z * c;
             Vector3f world = new Vector3f(x, y, z).mulPosition(matrix);
             box.setCorner(corner, world.x, world.y, world.z);
         }
