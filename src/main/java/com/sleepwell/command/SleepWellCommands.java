@@ -25,10 +25,17 @@ public final class SleepWellCommands {
 
     @SubscribeEvent
     public static void onRegisterCommands(RegisterCommandsEvent event) {
-        event.getDispatcher().register(Commands.literal("sleepwell")
-                .then(Commands.literal("nap")
-                        .requires(source -> source.hasPermission(2))
-                        .executes(context -> napNearest(context.getSource()))));
+        com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> root =
+                Commands.literal("sleepwell")
+                        .then(Commands.literal("nap")
+                                .requires(source -> source.hasPermission(2))
+                                .executes(context -> napNearest(context.getSource())));
+        // The quilt diagnostics read client-side state, so they are only offered where that state exists.
+        if (net.minecraftforge.fml.loading.FMLEnvironment.dist.isClient()) {
+            root.then(com.sleepwell.client.QuiltDebugCommand.wireframeNode())
+                    .then(com.sleepwell.client.QuiltDebugCommand.statusNode());
+        }
+        event.getDispatcher().register(root);
     }
 
     private static int napNearest(CommandSourceStack source) {

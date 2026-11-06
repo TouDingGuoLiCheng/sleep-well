@@ -1,7 +1,6 @@
 package com.sleepwell.client;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
-import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.context.CommandContext;
 import com.sleepwell.client.quilt.collider.ColliderSet;
 import com.sleepwell.client.quilt.collider.MaidColliderCapture;
@@ -27,22 +26,22 @@ public final class QuiltDebugCommand {
     private QuiltDebugCommand() {
     }
 
-    public static void onRegisterCommands(net.minecraftforge.client.event.RegisterClientCommandsEvent event) {
-        register(event.getDispatcher());
+    /** {@code /sleepwell wireframe on|off}: hangs off the mod's own command instead of its own root. */
+    public static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> wireframeNode() {
+        return Commands.literal("wireframe")
+                .then(Commands.literal("on").executes(context -> wireframe(context, true)))
+                .then(Commands.literal("off").executes(context -> wireframe(context, false)))
+                .executes(QuiltDebugCommand::help);
     }
 
-    public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
-        dispatcher.register(Commands.literal("swquilt")
-                .then(Commands.literal("wireframe")
-                        .then(Commands.literal("on").executes(context -> wireframe(context, true)))
-                        .then(Commands.literal("off").executes(context -> wireframe(context, false))))
-                .then(Commands.literal("status").executes(QuiltDebugCommand::status))
-                .then(Commands.literal("help").executes(QuiltDebugCommand::help)));
+    /** {@code /sleepwell status}: capture report for every sleeping maid nearby. */
+    public static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> statusNode() {
+        return Commands.literal("status").executes(QuiltDebugCommand::status);
     }
 
     private static int help(CommandContext<CommandSourceStack> context) {
-        say(context, "/swquilt wireframe on|off  — 显示/隐藏采集线框（蓝=身体，暗=软部件）", ChatFormatting.AQUA);
-        say(context, "/swquilt status             — 报告附近睡觉女仆的盒子数与范围", ChatFormatting.AQUA);
+        say(context, "/sleepwell wireframe on|off  — 显示/隐藏采集线框（蓝=身体，暗=软部件）", ChatFormatting.AQUA);
+        say(context, "/sleepwell status            — 报告附近睡觉女仆的盒子数与范围", ChatFormatting.AQUA);
         return 1;
     }
 

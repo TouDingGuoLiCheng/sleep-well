@@ -17,7 +17,6 @@ public final class SleepWellClientSetup {
     @SubscribeEvent
     public static void onClientSetup(FMLClientSetupEvent event) {
         event.enqueueWork(() -> MenuScreens.register(SleepWellContainer.TYPE.get(), SleepWellSettingsScreen::new));
-        // Client command for the quilt diagnostics: "/swquilt wireframe on" needs no restart.
-        net.minecraftforge.common.MinecraftForge.EVENT_BUS.addListener(QuiltDebugCommand::onRegisterCommands);
+
     }
 }
