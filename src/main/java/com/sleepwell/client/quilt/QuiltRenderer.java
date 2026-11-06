@@ -152,6 +152,8 @@ public final class QuiltRenderer {
             return;
         }
         for (EntityMaid maid : sleeping) {
+            // Capture must work whether or not the debug wireframe is on.
+            com.sleepwell.client.quilt.collider.MaidColliderCapture.ensureLayer(maid);
             Bed bed = findBed(level, maid.blockPosition());
             if (bed != null) {
                 if (PHYSICAL) {

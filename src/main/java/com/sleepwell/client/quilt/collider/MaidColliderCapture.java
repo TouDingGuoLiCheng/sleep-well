@@ -410,6 +410,17 @@ public final class MaidColliderCapture {
         SETS.put(id, set);
     }
 
+    /**
+     * Makes sure the capture layer is attached. The wireframe used to be the only caller, so switching the
+     * debug view off silently stopped all capture and the quilt had no collision set at all.
+     */
+    public static void ensureLayer(EntityMaid maid) {
+        EntityRenderer<?> renderer = Minecraft.getInstance().getEntityRenderDispatcher().getRenderer(maid);
+        if (renderer != null) {
+            installLayer(renderer);
+        }
+    }
+
     /** Registers the capture layer on a maid renderer (idempotent, per renderer instance). */
     static void installLayer(Object renderer) {
         Object geo = Reflect.field(renderer, "geckoEntityMaidRenderer");
