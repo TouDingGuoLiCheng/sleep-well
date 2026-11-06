@@ -1056,7 +1056,16 @@ public final class PhysicalQuilt {
             VertexConsumer consumer = buffers.getBuffer(
                     RenderType.entityCutoutNoCull(QuiltRenderer.textureFor(color)));
             PoseStack.Pose entry = pose.last();
-            int light = net.minecraft.client.renderer.LightTexture.FULL_BRIGHT;
+            // Sample the light where each particle actually is. FULL_BRIGHT ignored the world entirely, which is
+            // why the quilt stayed daytime-bright at night and in the rain.
+            net.minecraft.client.multiplayer.ClientLevel level = net.minecraft.client.Minecraft.getInstance().level;
+            int[] lights = new int[count];
+            for (int i = 0; i < count; i++) {
+                lights[i] = level == null
+                        ? net.minecraft.client.renderer.LightTexture.FULL_BRIGHT
+                        : net.minecraft.client.renderer.LevelRenderer.getLightColor(level,
+                                net.minecraft.core.BlockPos.containing(now[i].x, now[i].y + 0.05F, now[i].z));
+            }
             float[] nx = new float[count];
             float[] ny = new float[count];
             float[] nz = new float[count];
@@ -1099,39 +1108,40 @@ public final class PhysicalQuilt {
                     float v1 = (float) (row + 1) / (ROWS - 1) * TILE;
                     // Lit by the surface normal: folds and the head of the bed now read as shape.
                     float shade = 0.55F + 0.45F * Math.min(1.0F, Math.max(0.0F, ny[a]));
-                    vertex(consumer, entry, now[a].x, now[a].y, now[a].z, u0, v0, light, shade);
-                    vertex(consumer, entry, now[b].x, now[b].y, now[b].z, u1, v0, light, shade);
-                    vertex(consumer, entry, now[c].x, now[c].y, now[c].z, u1, v1, light, shade);
-                    vertex(consumer, entry, now[d].x, now[d].y, now[d].z, u0, v1, light, shade);
+                    vertex(consumer, entry, now[a].x, now[a].y, now[a].z, u0, v0, lights[a], shade);
+                    vertex(consumer, entry, now[b].x, now[b].y, now[b].z, u1, v0, lights[b], shade);
+                    vertex(consumer, entry, now[c].x, now[c].y, now[c].z, u1, v1, lights[c], shade);
+                    vertex(consumer, entry, now[d].x, now[d].y, now[d].z, u0, v1, lights[d], shade);
                     // Underside, one thickness below, wound the other way.
                     float under = shade * UNDER_SHADE;
                     vertex(consumer, entry, now[d].x - nx[d] * SHELL, now[d].y - ny[d] * SHELL,
-                            now[d].z - nz[d] * SHELL, u0, v1, light, under);
+                            now[d].z - nz[d] * SHELL, u0, v1, lights[d], under);
                     vertex(consumer, entry, now[c].x - nx[c] * SHELL, now[c].y - ny[c] * SHELL,
-                            now[c].z - nz[c] * SHELL, u1, v1, light, under);
+                            now[c].z - nz[c] * SHELL, u1, v1, lights[c], under);
                     vertex(consumer, entry, now[b].x - nx[b] * SHELL, now[b].y - ny[b] * SHELL,
-                            now[b].z - nz[b] * SHELL, u1, v0, light, under);
+                            now[b].z - nz[b] * SHELL, u1, v0, lights[b], under);
                     vertex(consumer, entry, now[a].x - nx[a] * SHELL, now[a].y - ny[a] * SHELL,
-                            now[a].z - nz[a] * SHELL, u0, v0, light, under);
+                            now[a].z - nz[a] * SHELL, u0, v0, lights[a], under);
                 }
             }
             // Rim: the four borders joined top to bottom, which is where thickness is actually visible.
             float rimShade = 0.62F;
             for (int col = 0; col + 1 < COLS; col++) {
-                rim(consumer, entry, rimShade, light, col, 0, col + 1, 0, nx, ny, nz);
-                rim(consumer, entry, rimShade, light, col, ROWS - 1, col + 1, ROWS - 1, nx, ny, nz);
+                rim(consumer, entry, rimShade, lights, col, 0, col + 1, 0, nx, ny, nz);
+                rim(consumer, entry, rimShade, lights, col, ROWS - 1, col + 1, ROWS - 1, nx, ny, nz);
             }
             for (int row = 0; row + 1 < ROWS; row++) {
-                rim(consumer, entry, rimShade, light, 0, row, 0, row + 1, nx, ny, nz);
-                rim(consumer, entry, rimShade, light, COLS - 1, row, COLS - 1, row + 1, nx, ny, nz);
+                rim(consumer, entry, rimShade, lights, 0, row, 0, row + 1, nx, ny, nz);
+                rim(consumer, entry, rimShade, lights, COLS - 1, row, COLS - 1, row + 1, nx, ny, nz);
             }
             buffers.endBatch(RenderType.entityCutoutNoCull(QuiltRenderer.textureFor(color)));
         }
 
         /** One border quad: particle p at the top, the same particle sunk along its normal, for two partners. */
-        private void rim(VertexConsumer consumer, PoseStack.Pose entry, float shade, int light,
+        private void rim(VertexConsumer consumer, PoseStack.Pose entry, float shade, int[] lights,
                          int colA, int rowA, int colB, int rowB,
                          float[] nx, float[] ny, float[] nz) {
+            int light = lights[rowA * COLS + colA];
             int a = rowA * COLS + colA;
             int b = rowB * COLS + colB;
             float u0 = (float) colA / (COLS - 1) * TILE_U;
