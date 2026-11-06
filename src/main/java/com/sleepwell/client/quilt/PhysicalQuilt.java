@@ -103,7 +103,7 @@ public final class PhysicalQuilt {
      * around. Each pass reports how far the sheet moved, so jitter becomes a number instead of a feeling.
      */
     private static final boolean DYNAMIC =
-            !"false".equalsIgnoreCase(System.getProperty("sleepwell.quiltDynamic"));
+            "true".equalsIgnoreCase(System.getProperty("sleepwell.quiltDynamic"));
     /** Geometry change that is worth a re-solve; anything smaller is jitter, not a new pose. */
     private static final float FINGERPRINT_EPS = 0.02F;
     /** Relaxation steps used when re-solving from the current state instead of from scratch. */
