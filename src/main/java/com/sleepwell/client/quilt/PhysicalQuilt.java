@@ -200,11 +200,13 @@ public final class PhysicalQuilt {
         Cloth cloth = CLOTHS.computeIfAbsent(maid.getUUID(), id -> new Cloth());
         if (cloth.initialised && !modelKey.equals(cloth.modelKey)) {
             // Different model (or skin/model pack) means different geometry: the cached sheet no longer fits.
-            LOGGER.info("[被子] 布料失效重算 maid={} 原因=模型变化 {} -> {}", shortId(maid), cloth.modelKey, modelKey);
+            LOGGER.info("[被子] 布料失效重算 maid={} 原因=模型变化 {} -> {} {}", shortId(maid), cloth.modelKey,
+                    modelKey, bedInfo(maid, bed));
             cloth.initialised = false;
         }
         if (cloth.initialised && cloth.bedKey != null && !cloth.bedKey.equals(bed.head())) {
-            LOGGER.info("[被子] 布料失效重算 maid={} 原因=床位置变化", shortId(maid));
+            LOGGER.info("[被子] 布料失效重算 maid={} 原因=床位置变化 旧床={} {}", shortId(maid),
+                    cloth.bedKey, bedInfo(maid, bed));
             cloth.initialised = false;
         }
         cloth.modelKey = modelKey;
@@ -223,8 +225,9 @@ public final class PhysicalQuilt {
             SOLVED_THIS_FRAME = true;
             cloth.refreshBoxes(set, viewToWorld);
             cloth.reset();
-            LOGGER.info("[被子] 布料新建 maid={} model={} grid={}x{} anchor={} bedTop={} boxes={}",
-                    shortId(maid), modelKey, COLS, ROWS, fmt(cloth.anchor), fmt(cloth.bedTop), set.boxes.size());
+            LOGGER.info("[被子] 布料新建 maid={} model={} grid={}x{} anchor={} bedTop={} boxes={} {}",
+                    shortId(maid), modelKey, COLS, ROWS, fmt(cloth.anchor), fmt(cloth.bedTop), set.boxes.size(),
+                    bedInfo(maid, bed));
             long start = System.nanoTime();
             cloth.settle(set, viewToWorld);
             cloth.initialised = true;
@@ -279,6 +282,24 @@ public final class PhysicalQuilt {
      * bed's own Y has to be added: using the local value alone pinned the whole sheet near world zero,
      * which is how the quilt "disappeared" while sitting at y = 0.57.
      */
+    /**
+     * Where she actually is versus which bed the quilt was laid on. Repeated "床位置变化" rebuilds for one
+     * maid mean her block position keeps crossing boundaries, and the quilt follows whichever bed the lookup
+     * happens to return - which reads as "the quilt is under her" when the two disagree by a whole bed.
+     */
+    private static String bedInfo(EntityMaid maid, QuiltRenderer.Bed bed) {
+        BlockPos head = bed.head();
+        BlockPos foot = bed.foot();
+        double cx = (head.getX() + foot.getX()) * 0.5D + 0.5D;
+        double cz = (head.getZ() + foot.getZ()) * 0.5D + 0.5D;
+        double dx = maid.getX() - cx;
+        double dz = maid.getZ() - cz;
+        return String.format(Locale.ROOT,
+                "她=%.2f,%.2f,%.2f 所在格=%s 床头=%s 床尾=%s 到床中心=%.2f",
+                maid.getX(), maid.getY(), maid.getZ(), maid.blockPosition(), head, foot,
+                Math.sqrt(dx * dx + dz * dz));
+    }
+
     private static double bedTop(QuiltRenderer.Bed bed) {
         net.minecraft.client.multiplayer.ClientLevel level = Minecraft.getInstance().level;
         if (level == null) {
