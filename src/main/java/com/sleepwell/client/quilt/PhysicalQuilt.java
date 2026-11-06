@@ -599,10 +599,23 @@ public final class PhysicalQuilt {
         }
 
         /** Takes a previously solved shape from disk and lays it out in the current bed. */
+        /** Allocates the particle vectors. A fresh Cloth has empty slots until something fills them in. */
+        private void ensureVectors() {
+            for (int i = 0; i < count; i++) {
+                if (now[i] == null) {
+                    now[i] = new Vector3f();
+                    prev[i] = new Vector3f();
+                }
+            }
+        }
+
         private boolean adopt(QuiltCache.Frame frame) {
             if (frame == null || frame.along.length != count) {
                 return false;
             }
+            // A cloth that has never been solved this session has no particle vectors yet; without this the
+            // first cache hit after a restart crashed while re-placing the sheet.
+            ensureVectors();
             localAlong = frame.along;
             localAcross = frame.across;
             localHeight = frame.height;
