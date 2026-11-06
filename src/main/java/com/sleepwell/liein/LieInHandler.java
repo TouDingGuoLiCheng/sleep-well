@@ -6,6 +6,7 @@ import com.github.tartaricacid.touhoulittlemaid.entity.passive.SchedulePos;
 import com.github.tartaricacid.touhoulittlemaid.entity.task.TaskManager;
 import com.sleepwell.SleepWellMod;
 import com.sleepwell.config.SleepWellConfig;
+import com.sleepwell.maid.MaidBubble;
 import com.sleepwell.maid.MaidCapabilities;
 import com.sleepwell.winter.SeasonBridge;
 import net.minecraft.server.level.ServerLevel;
@@ -124,6 +125,7 @@ public final class LieInHandler {
                 return;
             }
             holdBrain(maid, state);
+            MaidBubble.tick(maid, state);
             keepOrEnd(maid, state, now, taskUid);
             return;
         }
@@ -201,6 +203,7 @@ public final class LieInHandler {
         if (!taskChanged && !expired && !gaveUp && !lieInLostBed) {
             return;
         }
+        MaidBubble.forget(maid.getUUID());
         release(maid, state, "back up");
         LOGGER.info("Lie-in: maid {} back up (task changed={}, expired={}, gaveUp={}, lostBed={})",
                 maid.getUUID(), taskChanged, expired, gaveUp, lieInLostBed);
