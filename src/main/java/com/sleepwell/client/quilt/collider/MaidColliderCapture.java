@@ -493,7 +493,14 @@ public final class MaidColliderCapture {
         float floorY = (float) maid.getY();
         java.util.Optional<net.minecraft.core.BlockPos> bedPos = maid.getSleepingPos();
         if (bedPos.isPresent()) {
-            floorY = bedPos.get().getY() + 1.0F;
+            net.minecraft.core.BlockPos pos = bedPos.get();
+            // The bed block is a thin model: its collision/outline shape maxY is the mattress surface.
+            // Using pos.getY() + 1 put the whole outline half a block above her.
+            net.minecraft.world.phys.shapes.VoxelShape shape =
+                    maid.level().getBlockState(pos).getShape(maid.level(), pos);
+            float top = shape.isEmpty() ? 1.0F
+                    : (float) shape.max(net.minecraft.core.Direction.Axis.Y);
+            floorY = pos.getY() + top;
         }
         float shiftX = (float) maid.getX() - (rawBounds[0] + rawBounds[3]) * 0.5F;
         float shiftY = floorY - rawBounds[1];
