@@ -58,6 +58,11 @@ public final class PhysicalQuilt {
     private static final float CELL = 0.5F;
     /** Fraction of tangential speed kept when the cloth rubs against something; 0 = glued. */
     private static final float FRICTION = 0.18F;
+    /**
+     * How far the cloth floats above her skin: this is the duvet's own padding. Without it the sheet lies
+     * straight on a body that is only 0.23 blocks tall, which reads as a flat bed sheet rather than a quilt.
+     */
+    private static final float DUET_PADDING = 0.09F;
     /** Below this average per-substep motion the sheet is considered settled and gets extra damping. */
     private static final float CALM_SPEED = 0.0016F;
     /** One solve, done properly: the sheet is settled once and then frozen (R6). */
@@ -65,8 +70,8 @@ public final class PhysicalQuilt {
     /** How often the frozen quilt is re-checked against her current pose. */
     private static final int RECHECK_TICKS = 100;
     /** How many rows at the pillow end are held in place. */
-    private static final int PINNED_ROWS = 3;
-    private static final float PIN_STRENGTH = 0.22F;
+    private static final int PINNED_ROWS = 1;
+    private static final float PIN_STRENGTH = 0.12F;
     /** Half a bed's width, plus the overhang that hangs down the sides. */
     private static final float HALF_WIDTH = 0.72F;
     /** How far short of the pillow end the quilt starts, in blocks (measured from the bed centre). */
@@ -80,11 +85,18 @@ public final class PhysicalQuilt {
     private static int TICK_LOGS = 300;
     /** Bounded: the skip path can fire every frame and would flood the log. */
     private static int SKIP_LOGS = 5;
+    /** At most one new quilt is solved per frame, which keeps the one-time cost off the frame budget. */
+    private static boolean SOLVED_THIS_FRAME;
 
     /** Anything that changes her rendered geometry must invalidate the cache. */
     private static String modelKey(EntityMaid maid) {
         Object id = com.sleepwell.client.quilt.collider.Reflect.call(maid, "getModelId");
         return id == null ? "unknown" : id.toString();
+    }
+
+    /** Called once per frame by the level stage: the one-solve-per-frame budget starts over here. */
+    public static void beginFrame() {
+        SOLVED_THIS_FRAME = false;
     }
 
     /** Cheap signature of the current collision geometry: total extent, enough to spot a different pose. */
@@ -177,7 +189,12 @@ public final class PhysicalQuilt {
         cloth.bedTop = top;
         cloth.bedHead = new Vec3(head.x, top, head.z);
         cloth.bedFoot = new Vec3(foot.x, top, foot.z);
+        if (!cloth.initialised && SOLVED_THIS_FRAME) {
+            // Several maids coming into view at once used to stack ~400 ms of solving into one frame.
+            return;
+        }
         if (!cloth.initialised) {
+            SOLVED_THIS_FRAME = true;
             cloth.reset();
             LOGGER.info("[被子] 布料新建 maid={} model={} grid={}x{} anchor={} bedTop={} boxes={}",
                     shortId(maid), modelKey, COLS, ROWS, fmt(cloth.anchor), fmt(cloth.bedTop), set.boxes.size());
@@ -272,7 +289,7 @@ public final class PhysicalQuilt {
                     // inset while the foot end still drapes past the mattress.
                     double offsetAlong = -HEAD_INSET + (FOOT_REACH + HEAD_INSET) * v;
                     Vec3 p = anchor.add(across.scale(offsetAcross)).add(along.scale(offsetAlong))
-                            .add(0.0D, 0.42D, 0.0D);
+                            .add(0.0D, 0.14D, 0.0D);
                     int index = row * COLS + col;
                     now[index] = new Vector3f((float) p.x, (float) p.y, (float) p.z);
                     prev[index] = new Vector3f((float) p.x, (float) p.y, (float) p.z);
@@ -439,10 +456,10 @@ public final class PhysicalQuilt {
         private void collideWith(Vector3f p, int[] candidates) {
             for (int box : candidates) {
                 int base = box * 3;
-                float minX = boxMin[base] - THICKNESS, minY = boxMin[base + 1] - THICKNESS,
-                        minZ = boxMin[base + 2] - THICKNESS;
-                float maxX = boxMax[base] + THICKNESS, maxY = boxMax[base + 1] + THICKNESS,
-                        maxZ = boxMax[base + 2] + THICKNESS;
+                float minX = boxMin[base] - DUET_PADDING, minY = boxMin[base + 1] - THICKNESS,
+                        minZ = boxMin[base + 2] - DUET_PADDING;
+                float maxX = boxMax[base] + DUET_PADDING, maxY = boxMax[base + 1] + DUET_PADDING,
+                        maxZ = boxMax[base + 2] + DUET_PADDING;
                 if (p.x < minX || p.x > maxX || p.y < minY || p.y > maxY || p.z < minZ || p.z > maxZ) {
                     continue;
                 }

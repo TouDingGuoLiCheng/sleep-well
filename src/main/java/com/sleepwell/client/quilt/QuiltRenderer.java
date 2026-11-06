@@ -126,6 +126,7 @@ public final class QuiltRenderer {
         // One frame counter for the whole pipeline: a view-space capture is only valid in the frame that
         // produced it, and the cloth needs proof of freshness before it trusts those corners.
         com.sleepwell.client.quilt.collider.MaidColliderCapture.nextFrame();
+        com.sleepwell.client.quilt.PhysicalQuilt.beginFrame();
         if (level == null) {
             return;
         }
