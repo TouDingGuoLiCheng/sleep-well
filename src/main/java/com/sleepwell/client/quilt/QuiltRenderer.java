@@ -44,7 +44,7 @@ import java.util.Map;
 public final class QuiltRenderer {
     private static final org.slf4j.Logger LOGGER = LogUtils.getLogger();
     /** Where the cloth starts, measured from the outer edge of the pillow end. */
-    private static final float HEAD_GAP = 0.15F;
+    private static final float HEAD_GAP = 0.30F;
     private static final float FOOT_GAP = 0.02F;
     /** Half the mattress width: the bed is one block wide, so 0.40 keeps the cloth on the mattress. */
     private static final float HALF_WIDTH = 0.50F;
@@ -94,6 +94,32 @@ public final class QuiltRenderer {
      */
     private static final boolean PHYSICAL =
             "true".equalsIgnoreCase(System.getProperty("sleepwell.physicalQuilt"));
+
+    /** Below this change the quilt ignores the new value entirely: that is the "friction". */
+    private static final float DEADBAND_SPAN = 0.05F;
+    private static final float DEADBAND_WIDTH = 0.02F;
+    private static final float DEADBAND_LIFT = 0.02F;
+    /** Largest change accepted per frame, in blocks: keeps a real pose change smooth instead of snapping. */
+    private static final float MAX_STEP_SPAN = 0.012F;
+    private static final float MAX_STEP_WIDTH = 0.008F;
+    private static final float MAX_STEP_LIFT = 0.006F;
+    private static final java.util.Map<java.util.UUID, float[]> SOFT = new java.util.HashMap<>();
+    private static int SPAN_LOGS;
+
+    private static float soften(EntityMaid maid, int slot, float target, float deadband, float maxStep) {
+        float[] values = SOFT.computeIfAbsent(maid.getUUID(),
+                id -> new float[]{Float.NaN, Float.NaN, Float.NaN, Float.NaN});
+        float current = values[slot];
+        if (Float.isNaN(current)) {
+            values[slot] = target;
+            return target;
+        }
+        if (Math.abs(target - current) <= deadband) {
+            return current;
+        }
+        values[slot] = current + Math.max(-maxStep, Math.min(maxStep, target - current));
+        return values[slot];
+    }
 
     private static int STAGE_LOGS;
     private static int SLEEP_LOGS;
@@ -272,6 +298,20 @@ public final class QuiltRenderer {
         float clothLift = (float) Math.min(0.42D, Math.max(0.14D, box.maxY - headCenter.y + 0.06D));
         float skirt = clothLift + 0.06F;
 
+        // Friction, for the analytic shell: her model breathes and her bones jitter, and every frame the raw
+        // numbers below follow that. A deadband plus a capped change rate makes the quilt sit still under
+        // movement too small to see, while still following a real change of pose.
+        uStart = soften(maid, 0, uStart, DEADBAND_SPAN, MAX_STEP_SPAN);
+        uEnd = soften(maid, 1, uEnd, DEADBAND_SPAN, MAX_STEP_SPAN);
+        halfWidth = soften(maid, 2, halfWidth, DEADBAND_WIDTH, MAX_STEP_WIDTH);
+        clothLift = soften(maid, 3, clothLift, DEADBAND_LIFT, MAX_STEP_LIFT);
+        if (SPAN_LOGS++ < 4) {
+            LOGGER.info("[被子] 覆盖 枕端={} 脚端={} 半宽={} 抬高={}",
+                    String.format(java.util.Locale.ROOT, "%.2f", uStart),
+                    String.format(java.util.Locale.ROOT, "%.2f", uEnd),
+                    String.format(java.util.Locale.ROOT, "%.2f", halfWidth),
+                    String.format(java.util.Locale.ROOT, "%.2f", clothLift));
+        }
         int light = LevelRenderer.getLightColor(level, bed.head());
         ResourceLocation texture = TEXTURES.getOrDefault(bed.color(),
                 new ResourceLocation(SleepWellMod.MOD_ID, "textures/quilt/pink.png"));
