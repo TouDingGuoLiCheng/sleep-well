@@ -536,7 +536,8 @@ public final class MaidColliderCapture {
         Matrix4f boneMatrix = new Matrix4f(parent)
                 .translate(-posX, posY, posZ)
                 .translate(pivotX, pivotY, pivotZ)
-                .rotateXYZ(rotX, rotY, rotZ)
+                // TLM rotates with Quaternionf.rotateZYX(z, y, x): Z first, then Y, then X.
+                .rotateZYX(rotZ, rotY, rotX)
                 .scale(scaleX, scaleY, scaleZ)
                 .translate(-pivotX, -pivotY, -pivotZ);
 
