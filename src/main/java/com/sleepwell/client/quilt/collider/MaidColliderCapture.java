@@ -140,6 +140,105 @@ public final class MaidColliderCapture {
     private MaidColliderCapture() {
     }
 
+    // --- bedrock parts: captured while the model is actually drawn ---------------------------------------
+
+    /**
+     * Model packs that are not gecko (the vanilla-style maids) draw {@code BedrockPart} trees, and the part's
+     * own matrix is the only exact statement of where its cubes end up. The part render hook feeds this list
+     * while one maid render pass is open; the pass closes at the renderer's TAIL.
+     * <p>
+     * Gecko models never touch this: they are drawn as bones, not {@code BedrockPart}s, so the Wine Fox models
+     * keep going through the layer capture exactly as before.
+     */
+    private static List<QuiltBox> partBoxes;
+    private static java.util.Set<Object> partSeen;
+    private static int partPasses;
+
+    /** Opens a capture pass for one maid render. */
+    public static void beginRenderPass(EntityMaid maid) {
+        if (maid.isSleeping()) {
+            partBoxes = new ArrayList<>();
+            partSeen = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+        } else {
+            partBoxes = null;
+            partSeen = null;
+        }
+    }
+
+    /** True while a sleeping maid is being drawn: the part hook only pays for itself then. */
+    public static boolean wantsParts() {
+        return partBoxes != null;
+    }
+
+    /** One {@code BedrockPart} was drawn: record the cubes its matrix places. */
+    public static void partRendered(Object part, Matrix4f matrix) {
+        List<QuiltBox> out = partBoxes;
+        if (out == null || part == null) {
+            return;
+        }
+        if (partSeen != null && !partSeen.add(part)) {
+            return;
+        }
+        Object cubes = Reflect.field(part, "cubes");
+        if (!(cubes instanceof List<?> list) || list.isEmpty()) {
+            return;
+        }
+        for (Object cube : list) {
+            appendBedrockCube(cube, matrix, "part", out);
+        }
+    }
+
+    /** Closes the pass; a full set replaces whatever the reflection paths had produced. */
+    public static void endRenderPass(EntityMaid maid) {
+        List<QuiltBox> boxes = partBoxes;
+        partBoxes = null;
+        partSeen = null;
+        if (boxes == null || boxes.size() < 8) {
+            return;
+        }
+        ColliderSet set = new ColliderSet(boxes, bounds(boxes), stamp(boxes), maid.tickCount, true);
+        set.fromLayer = true;
+        set.viewSpace = true;
+        set.captureFrame = frameCounter();
+        set.viewToWorld = null;
+        set.pendingWorldMatrix = true;
+        set.capsules = Capsules.fit(boxes);
+        SETS.put(maid.getUUID(), set);
+        captures++;
+        if (partPasses++ % 200 == 0) {
+            float[] b = set.bounds;
+            LOGGER.info("[被子] 模型采集 maid={} boxes={} size={}x{}x{}", maid.getUUID(), boxes.size(),
+                    String.format(java.util.Locale.ROOT, "%.2f", b[3] - b[0]),
+                    String.format(java.util.Locale.ROOT, "%.2f", b[4] - b[1]),
+                    String.format(java.util.Locale.ROOT, "%.2f", b[5] - b[2]));
+        }
+    }
+
+    /** One bedrock cube: origin plus three sizes in model pixels, then through the part's matrix. */
+    private static void appendBedrockCube(Object cube, Matrix4f matrix, String name, List<QuiltBox> boxes) {
+        float x = Reflect.floatField(cube, "x");
+        float y = Reflect.floatField(cube, "y");
+        float z = Reflect.floatField(cube, "z");
+        float w = Reflect.floatField(cube, "width");
+        float h = Reflect.floatField(cube, "height");
+        float d = Reflect.floatField(cube, "depth");
+        if (w <= 0.0F || h <= 0.0F || d <= 0.0F) {
+            return;
+        }
+        QuiltBox box = new QuiltBox(name);
+        for (int corner = 0; corner < 8; corner++) {
+            float a = (corner & 1) != 0 ? 1.0F : 0.0F;
+            float b = (corner & 2) != 0 ? 1.0F : 0.0F;
+            float c = (corner & 4) != 0 ? 1.0F : 0.0F;
+            Vector3f local = new Vector3f((x + w * a) / PIXELS, (y + h * b) / PIXELS, (z + d * c) / PIXELS);
+            Vector3f world = local.mulPosition(matrix);
+            box.setCorner(corner, world.x, world.y, world.z);
+        }
+        box.radius = Math.max(QuiltBox.MIN_RADIUS, Math.min(MAX_RADIUS, box.shortestEdge() * 0.5F));
+        boxes.add(box);
+    }
+
+
     /** Called from {@code RenderLivingEvent.Post}, i.e. while the sleeping pose is still on the model. */
     public static void capture(EntityMaid maid, PoseStack poseStack, float partialTick) {
         hookRuns++;

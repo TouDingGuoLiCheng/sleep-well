@@ -23,7 +23,17 @@ public abstract class MaidRendererCaptureMixin {
     private void sleepwell$capture(Mob entity, float entityYaw, float partialTick, PoseStack poseStack,
                                    MultiBufferSource buffer, int packedLight, CallbackInfo ci) {
         if (entity instanceof EntityMaid maid) {
+            MaidColliderCapture.beginRenderPass(maid);
             MaidColliderCapture.captureDuringRender(maid);
+        }
+    }
+
+    /** Closes the part pass: the model has now been drawn, so every part matrix has been seen. */
+    @Inject(method = {"m_7392_", "render"}, at = @At("TAIL"), require = 0, remap = false)
+    private void sleepwell$close(Mob entity, float entityYaw, float partialTick, PoseStack poseStack,
+                                 MultiBufferSource buffer, int packedLight, CallbackInfo ci) {
+        if (entity instanceof EntityMaid maid) {
+            MaidColliderCapture.endRenderPass(maid);
         }
     }
 }

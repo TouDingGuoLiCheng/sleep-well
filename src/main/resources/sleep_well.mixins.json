@@ -10,7 +10,8 @@
     "SchedulePosMixin"
   ],
   "client": [
-    "MaidRendererCaptureMixin"
+    "MaidRendererCaptureMixin",
+    "BedrockPartCaptureMixin"
   ],
   "injectors": {
     "defaultRequire": 1
