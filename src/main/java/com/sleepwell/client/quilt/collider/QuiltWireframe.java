@@ -122,6 +122,9 @@ public final class QuiltWireframe {
                     }
                 }
             }
+            for (Capsule capsule : set.capsules) {
+                capsule(consumer, boxMatrix, capsule);
+            }
         }
         buffers.endBatch(RenderType.lines());
         com.mojang.blaze3d.systems.RenderSystem.enableDepthTest();
@@ -187,6 +190,44 @@ public final class QuiltWireframe {
     private static void vertex(VertexConsumer consumer, Matrix4f matrix, float x, float y, float z,
                                float r, float g, float b) {
         consumer.vertex(matrix, x, y, z).color(r, g, b, 1.0F).normal(0.0F, 1.0F, 0.0F).endVertex();
+    }
+
+    /** Cyan capsule chain: the form the cloth will actually collide with. */
+    private static void capsule(VertexConsumer consumer, Matrix4f matrix, Capsule cap) {
+        float r = cap.hard ? 0.15F : 0.6F;
+        float g = cap.hard ? 0.95F : 0.85F;
+        float b = cap.hard ? 0.95F : 0.2F;
+        org.joml.Vector3f axis = new org.joml.Vector3f(cap.b).sub(cap.a);
+        float len = axis.length();
+        if (len < 1.0E-5F) {
+            return;
+        }
+        axis.div(len);
+        org.joml.Vector3f helper = Math.abs(axis.y) > 0.9F
+                ? new org.joml.Vector3f(1, 0, 0) : new org.joml.Vector3f(0, 1, 0);
+        org.joml.Vector3f u = axis.cross(helper, new org.joml.Vector3f()).normalize();
+        org.joml.Vector3f v = axis.cross(u, new org.joml.Vector3f()).normalize();
+        int steps = 8;
+        for (int ring = 0; ring < 2; ring++) {
+            org.joml.Vector3f center = ring == 0 ? cap.a : cap.b;
+            for (int i = 0; i < steps; i++) {
+                float t0 = (float) (Math.PI * 2.0 * i / steps);
+                float t1 = (float) (Math.PI * 2.0 * (i + 1) / steps);
+                org.joml.Vector3f p0 = new org.joml.Vector3f(center)
+                        .fma((float) Math.cos(t0) * cap.radius, u)
+                        .fma((float) Math.sin(t0) * cap.radius, v);
+                org.joml.Vector3f p1 = new org.joml.Vector3f(center)
+                        .fma((float) Math.cos(t1) * cap.radius, u)
+                        .fma((float) Math.sin(t1) * cap.radius, v);
+                raw(consumer, matrix, p0, r, g, b);
+                raw(consumer, matrix, p1, r, g, b);
+            }
+        }
+    }
+
+    private static void raw(VertexConsumer consumer, Matrix4f matrix, org.joml.Vector3f p,
+                            float r, float g, float b) {
+        consumer.vertex(matrix, p.x, p.y, p.z).color(r, g, b, 1.0F).normal(0.0F, 1.0F, 0.0F).endVertex();
     }
 
     private static void line(VertexConsumer consumer, Matrix4f matrix, QuiltBox box, int corner,

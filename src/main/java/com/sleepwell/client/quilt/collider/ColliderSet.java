@@ -19,6 +19,8 @@ public final class ColliderSet {
     public boolean fromLayer;
     /** Corner coordinates are already in the space the line batch draws in (TLM's own render matrix). */
     public boolean viewSpace;
+    /** Capsule chain fitted from {@link #boxes}: the collision form the cloth actually solves against. */
+    public java.util.List<Capsule> capsules = java.util.List.of();
 
     public ColliderSet(List<QuiltBox> boxes, float[] bounds, long stamp, int tick, boolean direct) {
         this.boxes = boxes;
