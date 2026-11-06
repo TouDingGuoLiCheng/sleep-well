@@ -484,6 +484,18 @@ public final class MaidColliderCapture {
             layerMiss = "noCubes";
             return;
         }
+        // Models disagree about where their origin sits, so let the geometry settle onto her: horizontally
+        // centred on her position, bottom resting at her feet height. That removes the last hand-tuned
+        // offset and keeps every model aligned to the same rules.
+        float[] rawBounds = bounds(boxes);
+        float shiftX = (float) maid.getX() - (rawBounds[0] + rawBounds[3]) * 0.5F;
+        float shiftY = (float) maid.getY() - rawBounds[1];
+        float shiftZ = (float) maid.getZ() - (rawBounds[2] + rawBounds[5]) * 0.5F;
+        for (QuiltBox box : boxes) {
+            for (int corner = 0; corner < 8; corner++) {
+                box.setCorner(corner, box.x(corner) + shiftX, box.y(corner) + shiftY, box.z(corner) + shiftZ);
+            }
+        }
         layerCalls++;
         layerMiss = "-";
         ColliderSet set = new ColliderSet(boxes, bounds(boxes), stamp(boxes), maid.tickCount, true);
