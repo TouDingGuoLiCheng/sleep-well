@@ -219,6 +219,12 @@ public final class PhysicalQuilt {
                     shortId(maid), WARMUP, String.format(Locale.ROOT, "%.1f",
                             (System.nanoTime() - start) / 1.0E6), fmt(cloth.minY()), fmt(cloth.maxY()),
                     cloth.alongSpan(), cloth.rowHeights());
+            float clothTop = cloth.maxY();
+            float bodyTop = cloth.boxMaxY();
+            if (clothTop < bodyTop - 0.02F) {
+                LOGGER.warn("[被子] 校验失败 maid={} 被子最高={} 低于身体顶面={}，她会穿出被子（高度图或采样偏低）",
+                        shortId(maid), fmt(clothTop), fmt(bodyTop));
+            }
         }
         // No periodic re-solve: the fingerprint check caused 300-step rebuilds whenever her idle animation
         // nudged the geometry, which is exactly the stutter that got the cloth rolled back. The cache now
@@ -651,25 +657,9 @@ public final class PhysicalQuilt {
                     height[i] = floor - 1.0F;
                 }
             }
-            float[] smoothed = new float[height.length];
-            for (int z = 0; z < hfNz; z++) {
-                for (int x = 0; x < hfNx; x++) {
-                    float sum = 0.0F;
-                    int count = 0;
-                    for (int dz = -1; dz <= 1; dz++) {
-                        for (int dx = -1; dx <= 1; dx++) {
-                            int sx = x + dx, sz = z + dz;
-                            if (sx < 0 || sz < 0 || sx >= hfNx || sz >= hfNz) {
-                                continue;
-                            }
-                            sum += height[sz * hfNx + sx];
-                            count++;
-                        }
-                    }
-                    smoothed[z * hfNx + x] = sum / count;
-                }
-            }
-            height = smoothed;
+            // Deliberately NOT smoothed: averaging a 3x3 window over 0.08 cells lowered every narrow peak
+            // by ~0.24 blocks of neighbourhood, so the cloth came to rest *inside* her shoulders and knees.
+            // Roundness now comes from the cloth's own bending, which cannot push the surface downwards.
         }
 
         private static int cellIndex(float offset, int size) {
@@ -689,15 +679,13 @@ public final class PhysicalQuilt {
             if (ix < 0 || iz < 0 || ix >= hfNx - 1 || iz >= hfNz - 1) {
                 return Float.NEGATIVE_INFINITY;
             }
-            float tx = fx - ix;
-            float tz = fz - iz;
-            float h00 = height[iz * hfNx + ix];
-            float h10 = height[iz * hfNx + ix + 1];
-            float h01 = height[(iz + 1) * hfNx + ix];
-            float h11 = height[(iz + 1) * hfNx + ix + 1];
-            float top = h00 + (h10 - h00) * tx;
-            float bottom = h01 + (h11 - h01) * tx;
-            return top + (bottom - top) * tz;
+            // Maximum, not interpolation: interpolating between a high cell and an empty neighbour pulls the
+            // surface below her body and lets her poke through the quilt.
+            float best = height[iz * hfNx + ix];
+            best = Math.max(best, height[iz * hfNx + ix + 1]);
+            best = Math.max(best, height[(iz + 1) * hfNx + ix]);
+            best = Math.max(best, height[(iz + 1) * hfNx + ix + 1]);
+            return best;
         }
 
         /** Derives the box's own frame from its eight corners; a rotated cube is not axis aligned. */
