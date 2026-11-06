@@ -75,7 +75,7 @@ public final class PhysicalQuilt {
     /** Below this average per-substep motion the sheet is considered settled and gets extra damping. */
     private static final float CALM_SPEED = 0.0016F;
     /** One solve, done properly: the sheet is settled once and then frozen (R6). */
-    private static final int WARMUP = 300;
+    private static final int WARMUP = 200;
     /** How often the frozen quilt is re-checked against her current pose. */
     private static final int RECHECK_TICKS = 100;
     // No pinned rows: the head edge used to be welded to the initial layout height, which held it in the
