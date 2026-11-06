@@ -15,6 +15,8 @@ public final class ColliderSet {
     public final int tick;
     /** True when built without the render hook, from the model's last animated pose. */
     public final boolean direct;
+    /** True when produced inside the maid's own render pass: that is the only trustworthy source. */
+    public boolean fromLayer;
 
     public ColliderSet(List<QuiltBox> boxes, float[] bounds, long stamp, int tick, boolean direct) {
         this.boxes = boxes;

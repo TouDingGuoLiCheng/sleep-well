@@ -459,6 +459,7 @@ public final class MaidColliderCapture {
         layerCalls++;
         layerMiss = "-";
         ColliderSet set = new ColliderSet(boxes, bounds(boxes), stamp(boxes), maid.tickCount, true);
+        set.fromLayer = true;
         SETS.put(maid.getUUID(), set);
         float[] b = set.bounds;
         com.sleepwell.client.quilt.diag.QuiltTrace.step("e.layer", "boxes=" + boxes.size()

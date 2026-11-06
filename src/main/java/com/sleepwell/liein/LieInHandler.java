@@ -117,6 +117,12 @@ public final class LieInHandler {
         logTransition(id, state, activity, maid.isSleeping());
 
         if (state.active()) {
+            // Night sleep belongs to the schedule, never to a nap: if REST arrives while she is napping,
+            // hand her over so she sleeps through the night instead of waking up "refreshed".
+            if (state.kind() == LieInState.Kind.NAP && resting) {
+                release(maid, state, "schedule rest");
+                return;
+            }
             holdBrain(maid, state);
             keepOrEnd(maid, state, now, taskUid);
             return;
@@ -148,7 +154,9 @@ public final class LieInHandler {
         }
 
         boolean idle = LieInPolicy.idleMode(taskUid, idleUid);
-        if (napEnabled() && idle && !maid.isSleeping() && !resting) {
+        // Naps are a work-time thing only. Rolling them during REST is exactly what woke maids up at
+        // nightfall after they had already napped in the afternoon.
+        if (napEnabled() && idle && !maid.isSleeping() && activity == Activity.WORK) {
             if (state.nextNapCheck() == 0L) {
                 state.setNextNapCheck(now + LieInPolicy.napCheckIntervalTicks(SleepWellConfig.NAP_CHECK_MINUTES.get()));
                 return;

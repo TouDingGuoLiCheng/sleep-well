@@ -68,6 +68,7 @@ public final class QuiltWireframe {
         float maxX = -Float.MAX_VALUE, maxY = -Float.MAX_VALUE, maxZ = -Float.MAX_VALUE;
         org.joml.Vector3f firstBoxWorld = null;
         org.joml.Vector3f firstBoxView = null;
+        StringBuilder maidList = new StringBuilder();
         EntityMaid nearest = null;
         double nearestDistance = Double.MAX_VALUE;
         for (EntityMaid maid : maids) {
@@ -80,11 +81,18 @@ public final class QuiltWireframe {
             if (set == null) {
                 set = MaidColliderCapture.captureDirect(maid, camera, partialTick);
             }
-            if (set == null) {
+            if (set == null || !set.fromLayer) {
+                // Sets built outside her render pass carry the wrong space; drawing them is what put
+                // boxes in the sky. Only the render-layer capture is trusted.
                 missing++;
                 continue;
             }
             boxes += set.boxes.size();
+            if (maidList.length() < 420) {
+                maidList.append(String.format(java.util.Locale.ROOT, " [n=%d %.1f,%.1f,%.1f min=%.1f,%.1f,%.1f]",
+                        set.boxes.size(), maid.getX(), maid.getY(), maid.getZ(),
+                        set.bounds[0], set.bounds[1], set.bounds[2]));
+            }
             // A yellow beacon on every sleeping maid: if the boxes stay invisible but this shows up,
             // the coordinates are fine and the line render type is being swallowed instead.
             marker(consumer, matrix, maid);
@@ -130,7 +138,7 @@ public final class QuiltWireframe {
                     nearest.getZ(), nearSet == null ? -1 : nearSet.boxes.size(),
                     nb == null ? "-" : String.format(java.util.Locale.ROOT, "%.2f,%.2f,%.2f", nb[0], nb[1], nb[2]));
         }
-        drawDiagnostics = " near=" + nearInfo + String.format(java.util.Locale.ROOT,
+        drawDiagnostics = " maids=" + maidList + " near=" + nearInfo + String.format(java.util.Locale.ROOT,
                 " cam=%.2f,%.2f,%.2f viewBox=[%.2f,%.2f,%.2f..%.2f,%.2f,%.2f] firstWorld=%s firstView=%s",
                 camera.x, camera.y, camera.z, minX, minY, minZ, maxX, maxY, maxZ,
                 firstBoxWorld == null ? "-" : firstBoxWorld.toString(),
