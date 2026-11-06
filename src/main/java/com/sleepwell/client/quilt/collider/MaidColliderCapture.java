@@ -277,6 +277,17 @@ public final class MaidColliderCapture {
     }
 
     /** Rebuilds the transform the renderer would have used: dispatcher translate/yaw plus sleeping rotation. */
+    /** Vanilla's mapping from bed direction to the sleeping yaw, degrees. */
+    private static float facingAngle(net.minecraft.core.Direction direction) {
+        return switch (direction) {
+            case SOUTH -> 90.0F;
+            case WEST -> 0.0F;
+            case NORTH -> 270.0F;
+            case EAST -> 180.0F;
+            default -> 0.0F;
+        };
+    }
+
     /** Same composition as {@link #entityMatrix}, but in world space: used by the render-layer capture. */
     private static Matrix4f entityMatrixWorld(EntityMaid maid) {
         Matrix4f matrix = new Matrix4f()
@@ -447,21 +458,23 @@ public final class MaidColliderCapture {
                 .gameRenderer.getMainCamera();
         org.joml.Vector3f cameraPos = new org.joml.Vector3f((float) camera.getPosition().x,
                 (float) camera.getPosition().y, (float) camera.getPosition().z);
-        // Geometry comes from this layer (it is the only place with the real posed bones); the world
-        // transform does NOT. Every attempt to reuse the layer's PoseStack landed the boxes in the sky,
-        // so it is rebuilt here from her own state only: position, body yaw, bed direction, lying 90°.
+        // Geometry comes from this layer (the only place with the real posed bones); the world transform
+        // does not. It is rebuilt exactly the way vanilla `LivingEntityRenderer.setupRotations` does it,
+        // which is what TLM's renderer calls for sleepers:
+        //     SLEEPING ?  Y(getFacingAngle(bed)) * Z(90) * Y(270)
+        //              :  Y(180 - bodyYaw)
+        // Notably the body yaw is NOT used while sleeping: that is why different models ended up facing
+        // different ways, and why the outline never matched the bed.
         org.joml.Vector3f pivot = new org.joml.Vector3f((float) maid.getX(),
                 (float) maid.getY() + 0.2F, (float) maid.getZ());
-        Matrix4f toWorld = new Matrix4f()
-                .translate(pivot)
-                .rotateY((float) Math.toRadians(180.0F - maid.yBodyRot));
+        Matrix4f toWorld = new Matrix4f().translate(pivot);
         net.minecraft.core.Direction bedDirection = maid.getBedOrientation();
-        if (bedDirection != null) {
-            toWorld.rotateY((float) Math.toRadians(-bedDirection.toYRot()));
-            // Lie her down about X, not Z: rotating about Z turned her shoulder width (X) into height,
-            // which is why the outline was 1.6 blocks thick. About X, her front becomes "up" and her
-            // standing height runs along the bed.
-            toWorld.rotateX((float) Math.toRadians(-90.0F));
+        if (maid.isSleeping() && bedDirection != null) {
+            toWorld.rotateY((float) Math.toRadians(facingAngle(bedDirection)));
+            toWorld.rotateZ((float) Math.toRadians(90.0F));
+            toWorld.rotateY((float) Math.toRadians(270.0F));
+        } else {
+            toWorld.rotateY((float) Math.toRadians(180.0F - maid.yBodyRot));
         }
         List<QuiltBox> boxes = new ArrayList<>();
         for (Object root : roots) {
