@@ -96,17 +96,16 @@ public final class QuiltWireframe {
                         set.boxes.size(), maid.getX(), maid.getY(), maid.getZ(),
                         set.bounds[0], set.bounds[1], set.bounds[2]));
             }
+            // View-space sets carry TLM's own render matrix, so they must NOT be pushed through the level
+            // matrix again; world-space fallbacks still are.
+            Matrix4f boxMatrix = set.viewSpace ? new Matrix4f() : matrix;
             for (QuiltBox box : set.boxes) {
                 float r = box.hard ? 1.0F : 0.30F;
                 float g = box.hard ? 0.25F : 0.60F;
                 float b = box.hard ? 0.25F : 1.0F;
                 for (int[] edge : EDGES) {
-                    line(consumer, matrix, box, edge[0], r, g, b, 0.0F, 0.0F, 0.0F);
-                    line(consumer, matrix, box, edge[1], r, g, b, 0.0F, 0.0F, 0.0F);
-                    // Green copy two blocks aside, in open air: the shape can be judged even when the
-                    // original sits buried inside the bed.
-                    line(consumer, matrix, box, edge[0], 0.35F, 1.0F, 0.35F, 2.0F, 0.0F, 0.0F);
-                    line(consumer, matrix, box, edge[1], 0.35F, 1.0F, 0.35F, 2.0F, 0.0F, 0.0F);
+                    line(consumer, boxMatrix, box, edge[0], r, g, b, 0.0F, 0.0F, 0.0F);
+                    line(consumer, boxMatrix, box, edge[1], r, g, b, 0.0F, 0.0F, 0.0F);
                 }
                 for (int i = 0; i < 8; i++) {
                     org.joml.Vector3f view = matrix.transformPosition(

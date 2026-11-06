@@ -458,73 +458,24 @@ public final class MaidColliderCapture {
                 .gameRenderer.getMainCamera();
         org.joml.Vector3f cameraPos = new org.joml.Vector3f((float) camera.getPosition().x,
                 (float) camera.getPosition().y, (float) camera.getPosition().z);
-        // Geometry comes from this layer (the only place with the real posed bones); the world transform
-        // does not. It is rebuilt exactly the way vanilla `LivingEntityRenderer.setupRotations` does it,
-        // which is what TLM's renderer calls for sleepers:
-        //     SLEEPING ?  Y(getFacingAngle(bed)) * Z(90) * Y(270)
-        //              :  Y(180 - bodyYaw)
-        // Notably the body yaw is NOT used while sleeping: that is why different models ended up facing
-        // different ways, and why the outline never matched the bed.
-        org.joml.Vector3f pivot = new org.joml.Vector3f((float) maid.getX(),
-                (float) maid.getY() + 0.2F, (float) maid.getZ());
-        Matrix4f toWorld = new Matrix4f().translate(pivot);
-        net.minecraft.core.Direction bedDirection = maid.getBedOrientation();
-        if (maid.isSleeping() && bedDirection != null) {
-            toWorld.rotateY((float) Math.toRadians(facingAngle(bedDirection)));
-            toWorld.rotateZ((float) Math.toRadians(90.0F));
-            toWorld.rotateY((float) Math.toRadians(270.0F));
-        } else {
-            toWorld.rotateY((float) Math.toRadians(180.0F - maid.yBodyRot));
-        }
+        // Use the exact matrix TLM uses to draw her: the layer's PoseStack maps model space straight into
+        // the space the line batch is drawn in. Copying it verbatim means the outline cannot drift away
+        // from the model, no matter what the bed looks like or where a model's origin sits.
+        Matrix4f viewMatrix = new Matrix4f(pose);
         List<QuiltBox> boxes = new ArrayList<>();
         for (Object root : roots) {
-            walkBone(root, new Matrix4f(toWorld), boxes, 0);
+            walkBone(root, new Matrix4f(viewMatrix), boxes, 0);
         }
         if (boxes.isEmpty()) {
             layerMiss = "noCubes";
             return;
         }
-        // Models disagree about where their origin sits, so let the geometry settle onto her: horizontally
-        // centred on her position, bottom resting at her feet height. That removes the last hand-tuned
-        // offset and keeps every model aligned to the same rules.
-        float[] rawBounds = bounds(boxes);
-        // The bed's top surface is the floor she is lying on; her own Y is where the entity stands, which
-        // for TLM's bed block sits above the mattress and made the whole outline float.
-        float floorY = (float) maid.getY();
-        java.util.Optional<net.minecraft.core.BlockPos> bedPos = maid.getSleepingPos();
-        if (bedPos.isPresent()) {
-            // getSleepingPos points at the *air* block she occupies, not at the bed block itself, so walk
-            // down until something solid turns up and use that surface. Using the air block put the whole
-            // outline exactly one block too high.
-            net.minecraft.core.BlockPos pos = bedPos.get();
-            for (int step = 0; step <= 2; step++) {
-                net.minecraft.core.BlockPos probe = pos.below(step);
-                net.minecraft.world.phys.shapes.VoxelShape shape =
-                        maid.level().getBlockState(probe).getShape(maid.level(), probe);
-                if (!shape.isEmpty()) {
-                    floorY = probe.getY() + (float) shape.max(net.minecraft.core.Direction.Axis.Y);
-                    break;
-                }
-            }
-        }
-        float shiftX = (float) maid.getX() - (rawBounds[0] + rawBounds[3]) * 0.5F;
-        float shiftY = floorY - rawBounds[1];
-        float shiftZ = (float) maid.getZ() - (rawBounds[2] + rawBounds[5]) * 0.5F;
-        if (layerCalls % 600 == 1) {
-            LOGGER.info("[被子] floor maidY={} bedTop={} bedPos={} shiftY={}",
-                    String.format(java.util.Locale.ROOT, "%.2f", maid.getY()),
-                    String.format(java.util.Locale.ROOT, "%.2f", floorY), bedPos.orElse(null),
-                    String.format(java.util.Locale.ROOT, "%.2f", shiftY));
-        }
-        for (QuiltBox box : boxes) {
-            for (int corner = 0; corner < 8; corner++) {
-                box.setCorner(corner, box.x(corner) + shiftX, box.y(corner) + shiftY, box.z(corner) + shiftZ);
-            }
-        }
+        // No centring, no bed probing: the matrix already places every cube exactly where she is drawn.
         layerCalls++;
         layerMiss = "-";
         ColliderSet set = new ColliderSet(boxes, bounds(boxes), stamp(boxes), maid.tickCount, true);
         set.fromLayer = true;
+        set.viewSpace = true;
         SETS.put(maid.getUUID(), set);
         float[] b = set.bounds;
         com.sleepwell.client.quilt.diag.QuiltTrace.step("e.layer", "boxes=" + boxes.size()

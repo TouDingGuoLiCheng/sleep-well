@@ -17,6 +17,8 @@ public final class ColliderSet {
     public final boolean direct;
     /** True when produced inside the maid's own render pass: that is the only trustworthy source. */
     public boolean fromLayer;
+    /** Corner coordinates are already in the space the line batch draws in (TLM's own render matrix). */
+    public boolean viewSpace;
 
     public ColliderSet(List<QuiltBox> boxes, float[] bounds, long stamp, int tick, boolean direct) {
         this.boxes = boxes;
