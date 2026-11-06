@@ -62,7 +62,7 @@ public final class PhysicalQuilt {
      * How far the cloth floats above her skin: this is the duvet's own padding. Without it the sheet lies
      * straight on a body that is only 0.23 blocks tall, which reads as a flat bed sheet rather than a quilt.
      */
-    private static final float DUET_PADDING = 0.09F;
+    private static final float DUET_PADDING = 0.035F;
     /** Below this average per-substep motion the sheet is considered settled and gets extra damping. */
     private static final float CALM_SPEED = 0.0016F;
     /** One solve, done properly: the sheet is settled once and then frozen (R6). */
@@ -280,6 +280,10 @@ public final class PhysicalQuilt {
         /** World-space AABBs of the captured cubes, rebuilt every frame from the latest pose. */
         private float[] boxMin = new float[0];
         private float[] boxMax = new float[0];
+        /** Oriented box form: centre, three unit axes and half extents, all in world space. */
+        private float[] obbCentre = new float[0];
+        private float[] obbAxes = new float[0];
+        private float[] obbHalf = new float[0];
         /** Box indices bucketed by cell, rebuilt once per settle. Turns 408 tests per particle into a few. */
         private final java.util.HashMap<Long, int[]> grid = new java.util.HashMap<>();
 
@@ -492,46 +496,65 @@ public final class PhysicalQuilt {
 
         private void collideWith(Vector3f p, int[] candidates, Vector3f cameFrom) {
             for (int box : candidates) {
-                int base = box * 3;
-                float minX = boxMin[base] - DUET_PADDING, minY = boxMin[base + 1] - THICKNESS,
-                        minZ = boxMin[base + 2] - DUET_PADDING;
-                float maxX = boxMax[base] + DUET_PADDING, maxY = boxMax[base + 1] + DUET_PADDING,
-                        maxZ = boxMax[base + 2] + DUET_PADDING;
-                if (p.x < minX || p.x > maxX || p.y < minY || p.y > maxY || p.z < minZ || p.z > maxZ) {
+                int baseC = box * 3;
+                int baseA = box * 9;
+                float cx = p.x - obbCentre[baseC];
+                float cy = p.y - obbCentre[baseC + 1];
+                float cz = p.z - obbCentre[baseC + 2];
+                // Minimal translation vector in the box's own frame: a rotated cube is no bigger than itself,
+                // which is what removes the air gap the axis-aligned test left around every limb.
+                float bestPen = Float.MAX_VALUE;
+                int bestAxis = -1;
+                float bestSign = 1.0F;
+                boolean inside = true;
+                for (int a = 0; a < 3; a++) {
+                    float ax = obbAxes[baseA + a * 3], ay = obbAxes[baseA + a * 3 + 1],
+                            az = obbAxes[baseA + a * 3 + 2];
+                    float local = cx * ax + cy * ay + cz * az;
+                    float reach = obbHalf[baseC + a] + DUET_PADDING;
+                    float pen = reach - Math.abs(local);
+                    if (pen < 0.0F) {
+                        inside = false;
+                        break;
+                    }
+                    if (pen < bestPen) {
+                        bestPen = pen;
+                        bestAxis = a;
+                        bestSign = local >= 0.0F ? 1.0F : -1.0F;
+                    }
+                }
+                if (!inside || bestAxis < 0) {
                     continue;
                 }
-                // Inside: escape through the nearest face.
-                float dxMin = p.x - minX, dxMax = maxX - p.x;
-                float dyMin = p.y - minY, dyMax = maxY - p.y;
-                float dzMin = p.z - minZ, dzMax = maxZ - p.z;
-                // A particle that arrived from above must leave through the top face. Escaping through the
-                // nearest face instead dropped the sheet inside tails and folded it under her body.
-                if (cameFrom.y >= maxY - 1.0E-4F) {
-                    p.y = maxY;
+                // Leaving through the top is right when the particle came from above; the minimal push is
+                // right otherwise (sides, underneath her).
+                if (cameFrom.y > obbCentre[baseC + 1] + obbHalf[baseC + 1]) {
+                    Vector3f up = new Vector3f(obbAxes[baseA], obbAxes[baseA + 1], obbAxes[baseA + 2]);
+                    if (up.y < 0.0F) {
+                        up.negate();
+                    }
+                    float along = (p.x - obbCentre[baseC]) * up.x + (p.y - obbCentre[baseC + 1]) * up.y
+                            + (p.z - obbCentre[baseC + 2]) * up.z;
+                    if (along < obbHalf[baseC + 1] + DUET_PADDING) {
+                        float push = obbHalf[baseC + 1] + DUET_PADDING - along;
+                        p.x += up.x * push;
+                        p.y += up.y * push;
+                        p.z += up.z * push;
+                    }
                     continue;
                 }
-                float best = Math.min(Math.min(dxMin, dxMax), Math.min(Math.min(dyMin, dyMax),
-                        Math.min(dzMin, dzMax)));
-                if (best == dxMin) {
-                    p.x = minX;
-                } else if (best == dxMax) {
-                    p.x = maxX;
-                } else if (best == dyMin) {
-                    p.y = minY;
-                } else if (best == dyMax) {
-                    p.y = maxY;
-                } else if (best == dzMin) {
-                    p.z = minZ;
-                } else {
-                    p.z = maxZ;
-                }
+                float ax = obbAxes[baseA + bestAxis * 3], ay = obbAxes[baseA + bestAxis * 3 + 1],
+                        az = obbAxes[baseA + bestAxis * 3 + 2];
+                p.x += ax * bestSign * bestPen;
+                p.y += ay * bestSign * bestPen;
+                p.z += az * bestSign * bestPen;
             }
         }
 
+        /** True inside the bed's own footprint: only there may the mattress hold the cloth up. */
         private boolean insideBed(Vector3f p) {
-            Vec3 local = new Vec3(p.x - anchor.x, 0.0D, p.z - anchor.z);
-            double alongOffset = local.dot(along);
-            double acrossOffset = local.dot(across);
+            double alongOffset = (p.x - anchor.x) * along.x + (p.z - anchor.z) * along.z;
+            double acrossOffset = (p.x - anchor.x) * across.x + (p.z - anchor.z) * across.z;
             return Math.abs(alongOffset) <= 1.05D && Math.abs(acrossOffset) <= 0.52D;
         }
 
@@ -540,6 +563,9 @@ public final class PhysicalQuilt {
             if (boxMin.length != n * 3) {
                 boxMin = new float[n * 3];
                 boxMax = new float[n * 3];
+                obbCentre = new float[n * 3];
+                obbAxes = new float[n * 9];
+                obbHalf = new float[n * 3];
             }
             Matrix4f toWorld = viewToWorld;
             for (int i = 0; i < n; i++) {
@@ -563,8 +589,48 @@ public final class PhysicalQuilt {
                 boxMax[base] = maxX;
                 boxMax[base + 1] = maxY;
                 boxMax[base + 2] = maxZ;
+                buildObb(i, box, toWorld);
             }
             buildGrid(n);
+        }
+
+        /** Derives the box's own frame from its eight corners; a rotated cube is not axis aligned. */
+        private void buildObb(int index, QuiltBox box, Matrix4f toWorld) {
+            Vector3f[] corner = new Vector3f[8];
+            Vector3f centre = new Vector3f();
+            for (int i = 0; i < 8; i++) {
+                corner[i] = toWorld.transformPosition(new Vector3f(box.x(i), box.y(i), box.z(i)));
+                centre.add(corner[i]);
+            }
+            centre.mul(1.0F / 8.0F);
+            // A cube's corner order is the usual bit layout, so these three edges are the box axes.
+            Vector3f[] axes = {
+                    new Vector3f(corner[1]).sub(corner[0]),
+                    new Vector3f(corner[2]).sub(corner[0]),
+                    new Vector3f(corner[4]).sub(corner[0])
+            };
+            int baseC = index * 3;
+            obbCentre[baseC] = centre.x;
+            obbCentre[baseC + 1] = centre.y;
+            obbCentre[baseC + 2] = centre.z;
+            int baseA = index * 9;
+            for (int a = 0; a < 3; a++) {
+                if (axes[a].lengthSquared() < 1.0E-9F) {
+                    axes[a].set(a == 0 ? 1 : 0, a == 1 ? 1 : 0, a == 2 ? 1 : 0);
+                }
+                axes[a].normalize();
+                obbAxes[baseA + a * 3] = axes[a].x;
+                obbAxes[baseA + a * 3 + 1] = axes[a].y;
+                obbAxes[baseA + a * 3 + 2] = axes[a].z;
+            }
+            for (int a = 0; a < 3; a++) {
+                float half = 0.0F;
+                for (int i = 0; i < 8; i++) {
+                    Vector3f d = new Vector3f(corner[i]).sub(centre);
+                    half = Math.max(half, Math.abs(d.dot(axes[a])));
+                }
+                obbHalf[baseC + a] = half;
+            }
         }
 
         private void buildGrid(int n) {
