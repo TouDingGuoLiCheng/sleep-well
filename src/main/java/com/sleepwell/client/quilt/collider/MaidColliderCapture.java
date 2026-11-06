@@ -476,6 +476,7 @@ public final class MaidColliderCapture {
         ColliderSet set = new ColliderSet(boxes, bounds(boxes), stamp(boxes), maid.tickCount, true);
         set.fromLayer = true;
         set.viewSpace = true;
+        set.viewToWorld = new Matrix4f(viewMatrix).invert();
         set.capsules = Capsules.fit(boxes);
         if (layerCalls % 600 == 1) {
             LOGGER.info("[被子] " + Capsules.summary(set.capsules));

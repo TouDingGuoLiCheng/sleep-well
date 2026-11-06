@@ -29,6 +29,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class QuiltWireframe {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final boolean ENABLED = !"false".equalsIgnoreCase(System.getProperty("sleepwell.quiltWireframe"));
+    /** Capsule chains were an attempt at cheap collision; the cloth now uses the cubes directly. */
+    private static final boolean CAPSULES =
+            "true".equalsIgnoreCase(System.getProperty("sleepwell.quiltCapsules"));
     private static final AtomicBoolean ANNOUNCED = new AtomicBoolean();
     private static String drawDiagnostics = "";
     private static final int[][] EDGES = {
@@ -122,8 +125,10 @@ public final class QuiltWireframe {
                     }
                 }
             }
-            for (Capsule capsule : set.capsules) {
-                capsule(consumer, boxMatrix, capsule);
+            if (CAPSULES) {
+                for (Capsule capsule : set.capsules) {
+                    capsule(consumer, boxMatrix, capsule);
+                }
             }
         }
         buffers.endBatch(RenderType.lines());

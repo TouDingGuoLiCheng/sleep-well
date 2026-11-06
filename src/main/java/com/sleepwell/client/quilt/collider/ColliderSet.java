@@ -21,6 +21,8 @@ public final class ColliderSet {
     public boolean viewSpace;
     /** Capsule chain fitted from {@link #boxes}: the collision form the cloth actually solves against. */
     public java.util.List<Capsule> capsules = java.util.List.of();
+    /** Maps the captured view-space corners back to world space; needed to collide the cloth in world space. */
+    public org.joml.Matrix4f viewToWorld = new org.joml.Matrix4f();
 
     public ColliderSet(List<QuiltBox> boxes, float[] bounds, long stamp, int tick, boolean direct) {
         this.boxes = boxes;

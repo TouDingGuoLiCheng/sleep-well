@@ -87,6 +87,10 @@ public final class QuiltRenderer {
     private static final int WIDTH_SEGMENTS = 6;
     private static final float FALLBACK_TOP = 0.5125F;
 
+    /** The cloth solver replaces the analytic shell; kept switchable while it is being tuned. */
+    private static final boolean PHYSICAL =
+            !"false".equalsIgnoreCase(System.getProperty("sleepwell.physicalQuilt"));
+
     private static int STAGE_LOGS;
     private static int SLEEP_LOGS;
     private static final Map<DyeColor, ResourceLocation> TEXTURES = new EnumMap<>(DyeColor.class);
@@ -147,7 +151,11 @@ public final class QuiltRenderer {
         for (EntityMaid maid : sleeping) {
             Bed bed = findBed(level, maid.blockPosition());
             if (bed != null) {
-                draw(pose, buffers, level, bed, maid);
+                if (PHYSICAL) {
+                    PhysicalQuilt.render(pose, buffers, bed, maid);
+                } else {
+                    draw(pose, buffers, level, bed, maid);
+                }
             }
         }
         pose.popPose();
@@ -386,6 +394,11 @@ public final class QuiltRenderer {
         return factor;
     }
 
-    private record Bed(BlockPos head, BlockPos foot, DyeColor color) {
+    static ResourceLocation textureFor(DyeColor color) {
+        return TEXTURES.getOrDefault(color,
+                new ResourceLocation(SleepWellMod.MOD_ID, "textures/quilt/pink.png"));
+    }
+
+    record Bed(BlockPos head, BlockPos foot, DyeColor color) {
     }
 }
