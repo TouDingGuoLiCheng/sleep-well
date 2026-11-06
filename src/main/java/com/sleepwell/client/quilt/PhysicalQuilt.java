@@ -60,6 +60,11 @@ public final class PhysicalQuilt {
     private static final float MAX_STEP = 0.05F;
     /** Broadphase cell. Her cubes are small, so a particle only needs to look at its own cell. */
     private static final float CELL = 0.5F;
+    /**
+     * Height field cell. Coarser than her limbs on purpose: the quilt should read as a soft mound over her,
+     * not as a body scan with every limb etched into the cloth.
+     */
+    private static final float HF_CELL = 0.08F;
     /** Fraction of tangential speed kept when the cloth rubs against something; 0 = glued. */
     private static final float FRICTION = 0.18F;
     /**
@@ -284,6 +289,13 @@ public final class PhysicalQuilt {
         /** World-space AABBs of the captured cubes, rebuilt every frame from the latest pose. */
         private float[] boxMin = new float[0];
         private float[] boxMax = new float[0];
+        /** Highest point of her body over the bed plane, sampled on a grid: the only surface the cloth sees. */
+        private float[] height;
+        private int hfNx;
+        private int hfNz;
+        private float hfX0;
+        private float hfZ0;
+
         /** Oriented box form: centre, three unit axes and half extents, all in world space. */
         private float[] obbCentre = new float[0];
         private float[] obbAxes = new float[0];
@@ -473,24 +485,26 @@ public final class PhysicalQuilt {
             b.z -= dz * diff;
         }
 
-        /** Pushes every particle out of the captured cubes and above the mattress. */
+        /**
+         * One monotone test per particle. There is no lateral push at all, so no amount of iteration can
+         * ping-pong the cloth between two overlapping cubes — that oscillation was what made two identical
+         * maids end up with different quilts.
+         */
         private void collide() {
             for (int i = 0; i < count; i++) {
                 Vector3f p = now[i];
-                Vector3f cameFrom = prev[i];
-                int[] candidates = grid.get(key(cell(p.x), cell(p.y), cell(p.z)));
-                if (candidates != null) {
-                    collideWith(p, candidates, cameFrom);
-                }
-                // Same check one cell up: a particle resting exactly on a cell boundary must still see the
-                // cubes just above it.
-                int[] above = grid.get(key(cell(p.x), cell(p.y) + 1, cell(p.z)));
-                if (above != null) {
-                    collideWith(p, above, cameFrom);
-                }
+                float surface = surfaceAt(p.x, p.z);
+                float minY = surface + DUET_PADDING;
+                boolean onBody = surface > Float.NEGATIVE_INFINITY;
                 // Mattress: only inside the bed footprint, so the overhang may still fall down the sides.
                 if (p.y < bedTop + THICKNESS && insideBed(p)) {
                     p.y = (float) (bedTop + THICKNESS);
+                }
+                if (onBody && p.y < minY) {
+                    p.y = minY;
+                }
+                if (onBody || (p.y <= bedTop + THICKNESS && insideBed(p))) {
+                    // Rub: a real quilt stays put because cloth grips what it lies on.
                     Vector3f previous = prev[i];
                     previous.x = p.x + (previous.x - p.x) * FRICTION;
                     previous.z = p.z + (previous.z - p.z) * FRICTION;
@@ -595,7 +609,114 @@ public final class PhysicalQuilt {
                 boxMax[base + 2] = maxZ;
                 buildObb(i, box, toWorld);
             }
-            buildGrid(n);
+            buildHeightField(n);
+        }
+
+        /**
+         * Projects her body onto a height map. Collision then becomes a single "push up if below the
+         * surface" test, which cannot oscillate: it is monotone. The old per-box push ping-ponged between
+         * overlapping cubes, injecting velocity and dragging the whole sheet out of place.
+         */
+        private void buildHeightField(int n) {
+            if (n == 0) {
+                height = null;
+                return;
+            }
+            float minX = Float.MAX_VALUE, maxX = -Float.MAX_VALUE;
+            float minZ = Float.MAX_VALUE, maxZ = -Float.MAX_VALUE;
+            for (int i = 0; i < n; i++) {
+                int base = i * 3;
+                minX = Math.min(minX, boxMin[base]);
+                maxX = Math.max(maxX, boxMax[base]);
+                minZ = Math.min(minZ, boxMin[base + 2]);
+                maxZ = Math.max(maxZ, boxMax[base + 2]);
+            }
+            final float margin = 0.30F;
+            hfX0 = minX - margin;
+            hfZ0 = minZ - margin;
+            hfNx = Math.max(2, (int) Math.ceil((maxX - minX + 2.0F * margin) / HF_CELL) + 1);
+            hfNz = Math.max(2, (int) Math.ceil((maxZ - minZ + 2.0F * margin) / HF_CELL) + 1);
+            height = new float[hfNx * hfNz];
+            java.util.Arrays.fill(height, Float.NEGATIVE_INFINITY);
+            for (int i = 0; i < n; i++) {
+                int base = i * 3;
+                float top = boxMax[base + 1];
+                int x0 = cellIndex(boxMin[base] - hfX0, hfNx);
+                int x1 = cellIndex(boxMax[base] - hfX0, hfNx);
+                int z0 = cellIndex(boxMin[base + 2] - hfZ0, hfNz);
+                int z1 = cellIndex(boxMax[base + 2] - hfZ0, hfNz);
+                for (int z = z0; z <= z1; z++) {
+                    for (int x = x0; x <= x1; x++) {
+                        int index = z * hfNx + x;
+                        if (top > height[index]) {
+                            height[index] = top;
+                        }
+                    }
+                }
+            }
+            // One smoothing pass: a raw max-field makes the quilt look like it was pulled over furniture.
+            float floor = Float.MAX_VALUE;
+            for (float value : height) {
+                if (value != Float.NEGATIVE_INFINITY) {
+                    floor = Math.min(floor, value);
+                }
+            }
+            if (floor == Float.MAX_VALUE) {
+                height = null;
+                return;
+            }
+            for (int i = 0; i < height.length; i++) {
+                if (height[i] == Float.NEGATIVE_INFINITY) {
+                    height[i] = floor - 1.0F;
+                }
+            }
+            float[] smoothed = new float[height.length];
+            for (int z = 0; z < hfNz; z++) {
+                for (int x = 0; x < hfNx; x++) {
+                    float sum = 0.0F;
+                    int count = 0;
+                    for (int dz = -1; dz <= 1; dz++) {
+                        for (int dx = -1; dx <= 1; dx++) {
+                            int sx = x + dx, sz = z + dz;
+                            if (sx < 0 || sz < 0 || sx >= hfNx || sz >= hfNz) {
+                                continue;
+                            }
+                            sum += height[sz * hfNx + sx];
+                            count++;
+                        }
+                    }
+                    smoothed[z * hfNx + x] = sum / count;
+                }
+            }
+            height = smoothed;
+        }
+
+        private static int cellIndex(float offset, int size) {
+            int cell = (int) Math.floor(offset / HF_CELL);
+            return Math.max(0, Math.min(size - 1, cell));
+        }
+
+        /** Bilinear surface height, so the cloth follows a soft mound rather than a staircase. */
+        private float surfaceAt(float x, float z) {
+            if (height == null) {
+                return Float.NEGATIVE_INFINITY;
+            }
+            float fx = (x - hfX0) / HF_CELL;
+            float fz = (z - hfZ0) / HF_CELL;
+            int ix = (int) Math.floor(fx);
+            int iz = (int) Math.floor(fz);
+            if (ix < 0 || iz < 0 || ix >= hfNx - 1 || iz >= hfNz - 1) {
+                return Float.NEGATIVE_INFINITY;
+            }
+            float tx = fx - ix;
+            float tz = fz - iz;
+            float h00 = height[iz * hfNx + ix];
+            float h10 = height[iz * hfNx + ix + 1];
+            float h01 = height[(iz + 1) * hfNx + ix];
+            float h11 = height[(iz + 1) * hfNx + ix + 1];
+            float top = h00 + (h10 - h00) * tx;
+            float bottom = h01 + (h11 - h01) * tx;
+            return top + (bottom - top) * tz;
         }
 
         /** Derives the box's own frame from its eight corners; a rotated cube is not axis aligned. */
