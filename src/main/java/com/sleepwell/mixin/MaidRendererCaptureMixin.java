@@ -23,7 +23,7 @@ public abstract class MaidRendererCaptureMixin {
     private void sleepwell$capture(Mob entity, float entityYaw, float partialTick, PoseStack poseStack,
                                    MultiBufferSource buffer, int packedLight, CallbackInfo ci) {
         if (entity instanceof EntityMaid maid) {
-            MaidColliderCapture.beginRenderPass(maid);
+            MaidColliderCapture.beginRenderPass(maid, poseStack.last().pose());
             MaidColliderCapture.captureDuringRender(maid);
         }
     }

@@ -153,9 +153,17 @@ public final class MaidColliderCapture {
     private static List<QuiltBox> partBoxes;
     private static java.util.Set<Object> partSeen;
     private static int partPasses;
+    /** The matrix the entity renderer itself was handed: the space every part matrix should live in. */
+    private static Matrix4f partHead = new Matrix4f();
+    private static EntityMaid partMaid;
+    private static final java.util.Set<UUID> MATRIX_LOGGED = new java.util.HashSet<>();
 
     /** Opens a capture pass for one maid render. */
-    public static void beginRenderPass(EntityMaid maid) {
+    public static void beginRenderPass(EntityMaid maid, Matrix4f head) {
+        partMaid = maid;
+        if (head != null) {
+            partHead = new Matrix4f(head);
+        }
         if (maid.isSleeping()) {
             partBoxes = new ArrayList<>();
             partSeen = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
@@ -170,12 +178,46 @@ public final class MaidColliderCapture {
         return partBoxes != null;
     }
 
+    /**
+     * Diagnostic for the space question: prints the matrix the renderer was handed next to the first part's
+     * matrix. If the two share a space, the part matrix is a child of the head matrix and the boxes are
+     * already correct; if not, their difference <em>is</em> the adapter, measured rather than guessed.
+     */
+    private static void logMatrices(Matrix4f part) {
+        EntityMaid maid = partMaid;
+        if (maid == null || !MATRIX_LOGGED.add(maid.getUUID())) {
+            return;
+        }
+        Matrix4f delta = new Matrix4f(partHead).invert().mul(new Matrix4f(part));
+        org.joml.Vector3f headT = new Matrix4f(partHead).getTranslation(new org.joml.Vector3f());
+        org.joml.Vector3f partT = new Matrix4f(part).getTranslation(new org.joml.Vector3f());
+        org.joml.Vector3f deltaT = new Matrix4f(delta).getTranslation(new org.joml.Vector3f());
+        String axis = String.format(java.util.Locale.ROOT, "%.2f,%.2f,%.2f / %.2f,%.2f,%.2f / %.2f,%.2f,%.2f",
+                delta.m00(), delta.m10(), delta.m20(),
+                delta.m01(), delta.m11(), delta.m21(),
+                delta.m02(), delta.m12(), delta.m22());
+        LOGGER.info("[被子] 矩阵对照 maid={} pose={} headT=({},{},{}) partT=({},{},{}) deltaT=({},{},{}) "
+                        + "deltaAxis=[{}] det={} maidPos=({},{},{}) cam=({},{},{})",
+                maid.getUUID(), maid.getPose(), fmt3(partHead == null ? 0 : headT.x), fmt3(headT.y), fmt3(headT.z),
+                fmt3(partT.x), fmt3(partT.y), fmt3(partT.z), fmt3(deltaT.x), fmt3(deltaT.y), fmt3(deltaT.z),
+                axis, fmt3(delta.determinant()), fmt3((float) maid.getX()), fmt3((float) maid.getY()),
+                fmt3((float) maid.getZ()),
+                fmt3((float) Minecraft.getInstance().gameRenderer.getMainCamera().getPosition().x),
+                fmt3((float) Minecraft.getInstance().gameRenderer.getMainCamera().getPosition().y),
+                fmt3((float) Minecraft.getInstance().gameRenderer.getMainCamera().getPosition().z));
+    }
+
+    private static String fmt3(float value) {
+        return String.format(java.util.Locale.ROOT, "%.2f", value);
+    }
+
     /** One {@code BedrockPart} was drawn: record the cubes its matrix places. */
     public static void partRendered(Object part, Matrix4f matrix) {
         List<QuiltBox> out = partBoxes;
         if (out == null || part == null) {
             return;
         }
+        logMatrices(matrix);
         if (partSeen != null && !partSeen.add(part)) {
             return;
         }
@@ -193,6 +235,7 @@ public final class MaidColliderCapture {
         List<QuiltBox> boxes = partBoxes;
         partBoxes = null;
         partSeen = null;
+        partMaid = null;
         if (boxes == null || boxes.size() < 8) {
             return;
         }
