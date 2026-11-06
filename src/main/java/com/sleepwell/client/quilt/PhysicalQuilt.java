@@ -102,8 +102,8 @@ public final class PhysicalQuilt {
         Vec3 along = new Vec3(foot.x - head.x, 0.0D, foot.z - head.z).normalize();
         Vec3 across = new Vec3(-along.z, 0.0D, along.x);
         double top = bedTop(bed);
-        // Bed centre, used to place the sheet before the first solve.
-        Vec3 middle = head.add(foot).scale(0.5D).add(0.0D, top, 0.0D);
+        // Bed centre, used to place the sheet before the first solve. `top` is already a world height.
+        Vec3 middle = new Vec3((head.x + foot.x) * 0.5D, top, (head.z + foot.z) * 0.5D);
 
         // The captured corners live in the line batch's space. The level PoseStack maps world into exactly
         // that space, so its inverse is the only correct way back to world coordinates.
@@ -113,8 +113,8 @@ public final class PhysicalQuilt {
         cloth.along = along;
         cloth.across = across;
         cloth.bedTop = top;
-        cloth.bedHead = head.add(0.0D, top, 0.0D);
-        cloth.bedFoot = foot.add(0.0D, top, 0.0D);
+        cloth.bedHead = new Vec3(head.x, top, head.z);
+        cloth.bedFoot = new Vec3(foot.x, top, foot.z);
         if (!cloth.initialised) {
             cloth.reset();
             LOGGER.info("[被子] 布料新建 maid={} grid={}x{} anchor={} bedTop={} boxes={}",
@@ -146,17 +146,25 @@ public final class PhysicalQuilt {
         }
     }
 
+    /**
+     * World height of the mattress surface. The block's shape only reports its local top (0..1), so the
+     * bed's own Y has to be added: using the local value alone pinned the whole sheet near world zero,
+     * which is how the quilt "disappeared" while sitting at y = 0.57.
+     */
     private static double bedTop(QuiltRenderer.Bed bed) {
         net.minecraft.client.multiplayer.ClientLevel level = Minecraft.getInstance().level;
         if (level == null) {
-            return 0.5D;
+            return bed.head().getY() + 0.5125D;
         }
         BlockState headState = level.getBlockState(bed.head());
         BlockState footState = level.getBlockState(bed.foot());
         double a = headState.getShape(level, bed.head()).max(Direction.Axis.Y);
         double b = footState.getShape(level, bed.foot()).max(Direction.Axis.Y);
-        double top = Math.min(a, b);
-        return (top <= 0.0D || top > 0.60D) ? 0.5125D : top;
+        double local = Math.min(a, b);
+        if (local <= 0.0D || local > 0.60D) {
+            local = 0.5125D;
+        }
+        return bed.head().getY() + local;
     }
 
     /** One sheet: positions, previous positions and the constraint list. */
