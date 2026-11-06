@@ -87,9 +87,13 @@ public final class QuiltRenderer {
     private static final int WIDTH_SEGMENTS = 6;
     private static final float FALLBACK_TOP = 0.5125F;
 
-    /** The cloth solver replaces the analytic shell; kept switchable while it is being tuned. */
+    /**
+     * Rolled back to the analytic shell: the XPBD cloth caused stutter and looked worse than what it
+     * replaced. The code is kept behind an opt-in switch so it can be revisited, but it must not be the
+     * default path until it is both smoother and cheaper.
+     */
     private static final boolean PHYSICAL =
-            !"false".equalsIgnoreCase(System.getProperty("sleepwell.physicalQuilt"));
+            "true".equalsIgnoreCase(System.getProperty("sleepwell.physicalQuilt"));
 
     private static int STAGE_LOGS;
     private static int SLEEP_LOGS;
