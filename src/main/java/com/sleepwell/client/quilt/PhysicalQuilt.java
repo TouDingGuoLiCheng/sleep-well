@@ -128,7 +128,9 @@ public final class PhysicalQuilt {
             }
             return;
         }
-        if (set.captureFrame != MaidColliderCapture.frameCounter()) {
+        // Entities are drawn before AFTER_ENTITIES, so a set captured this frame carries the counter of the
+        // previous one. Anything older than that is genuinely stale.
+        if (MaidColliderCapture.frameCounter() - set.captureFrame > 1) {
             // The set comes from an earlier frame, so its view-space corners no longer match the camera;
             // transforming them now is what put the collision boxes 1.5 blocks above the bed. Keep the
             // frozen sheet as it is and wait for a set captured this very frame.
