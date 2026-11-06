@@ -78,6 +78,9 @@ public final class PhysicalQuilt {
     private static final float HEAD_INSET = 0.35F;
     /** How far past the bed centre it reaches toward the foot. */
     private static final float FOOT_REACH = 1.08F;
+    /** Hard caps for the footprint-driven sizing, so one long tail cannot turn the quilt into a tent. */
+    private static final float MAX_HALF_WIDTH = 1.05F;
+    private static final float MAX_FOOT_REACH = 1.75F;
     private static final float TILE = 1.0F;
 
     private static final Map<UUID, Cloth> CLOTHS = new HashMap<>();
@@ -195,6 +198,7 @@ public final class PhysicalQuilt {
         }
         if (!cloth.initialised) {
             SOLVED_THIS_FRAME = true;
+            cloth.refreshBoxes(set, viewToWorld);
             cloth.reset();
             LOGGER.info("[被子] 布料新建 maid={} model={} grid={}x{} anchor={} bedTop={} boxes={}",
                     shortId(maid), modelKey, COLS, ROWS, fmt(cloth.anchor), fmt(cloth.bedTop), set.boxes.size());
@@ -280,14 +284,43 @@ public final class PhysicalQuilt {
         private final java.util.HashMap<Long, int[]> grid = new java.util.HashMap<>();
 
         private void reset() {
+            // Size the sheet from what she actually occupies: a tail or a long pair of legs that sticks out
+            // past the bed would otherwise sit outside the cloth and stay uncovered.
+            float halfWidth = HALF_WIDTH;
+            float footReach = FOOT_REACH;
+            float headInset = HEAD_INSET;
+            int n = boxMin.length / 3;
+            if (n > 0) {
+                float maxAcross = 0.0F;
+                float minAlong = -HEAD_INSET;
+                float maxAlong = FOOT_REACH;
+                for (int i = 0; i < n; i++) {
+                    int base = i * 3;
+                    for (int corner = 0; corner < 8; corner++) {
+                        float x = (corner & 1) == 0 ? boxMin[base] : boxMax[base];
+                        float z = (corner & 2) == 0 ? boxMin[base + 2] : boxMax[base + 2];
+                        double alongOffset = (x - anchor.x) * along.x + (z - anchor.z) * along.z;
+                        double acrossOffset = (x - anchor.x) * across.x + (z - anchor.z) * across.z;
+                        maxAcross = (float) Math.max(maxAcross, Math.abs(acrossOffset));
+                        minAlong = (float) Math.min(minAlong, alongOffset);
+                        maxAlong = (float) Math.max(maxAlong, alongOffset);
+                    }
+                }
+                halfWidth = Math.min(MAX_HALF_WIDTH, Math.max(halfWidth, maxAcross + 0.10F));
+                footReach = Math.min(MAX_FOOT_REACH, Math.max(footReach, maxAlong + 0.12F));
+                // Never let the head end creep onto the pillow: an inset of zero is the limit.
+                headInset = Math.max(0.0F, Math.min(headInset, -minAlong + 0.10F));
+            }
+            LOGGER.info("[被子] 覆盖范围 半宽={} 枕端={} 脚端={}（盒数={}）", fmt(halfWidth), fmt(headInset),
+                    fmt(footReach), n);
             for (int row = 0; row < ROWS; row++) {
                 for (int col = 0; col < COLS; col++) {
                     float u = COLS == 1 ? 0.0F : (float) col / (COLS - 1);
                     float v = ROWS == 1 ? 0.0F : (float) row / (ROWS - 1);
-                    double offsetAcross = (u - 0.5) * 2.0 * HALF_WIDTH;
+                    double offsetAcross = (u - 0.5) * 2.0 * halfWidth;
                     // Along: asymmetric on purpose. A quilt starts below the pillow, so the head end is
                     // inset while the foot end still drapes past the mattress.
-                    double offsetAlong = -HEAD_INSET + (FOOT_REACH + HEAD_INSET) * v;
+                    double offsetAlong = -headInset + (footReach + headInset) * v;
                     Vec3 p = anchor.add(across.scale(offsetAcross)).add(along.scale(offsetAlong))
                             .add(0.0D, 0.14D, 0.0D);
                     int index = row * COLS + col;
