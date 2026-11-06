@@ -99,15 +99,18 @@ public final class PhysicalQuilt {
     // No pinned rows: the head edge used to be welded to the initial layout height, which held it in the
     // air and made the quilt look like a tent. Gravity, the height field and friction alone decide the shape.
     /** Half a bed's width, plus the overhang that hangs down the sides. */
-    private static final float HALF_WIDTH = 0.72F;
+    private static final float HALF_WIDTH = 0.96F;
     /** How far short of the pillow end the quilt starts, in blocks (measured from the bed centre). */
     private static final float HEAD_INSET = 0.35F;
     /** How far past the bed centre it reaches toward the foot. */
     private static final float FOOT_REACH = 1.08F;
     /** Hard caps for the footprint-driven sizing, so one long tail cannot turn the quilt into a tent. */
-    private static final float MAX_HALF_WIDTH = 1.05F;
+    private static final float MAX_HALF_WIDTH = 1.40F;
     private static final float MAX_FOOT_REACH = 1.75F;
     private static final float TILE = 1.0F;
+    /** The sheet is a third wider than the texture was authored for; stretching the UV range by the same
+     *  ratio keeps the checks the same size in world space instead of smearing them sideways. */
+    private static final float TILE_U = TILE * (4.0F / 3.0F);
 
     private static final Map<UUID, Cloth> CLOTHS = new HashMap<>();
     private static int FRAMES;
@@ -1028,8 +1031,8 @@ public final class PhysicalQuilt {
                     int b = a + 1;
                     int c = a + COLS + 1;
                     int d = a + COLS;
-                    float u0 = (float) col / (COLS - 1) * TILE;
-                    float u1 = (float) (col + 1) / (COLS - 1) * TILE;
+                    float u0 = (float) col / (COLS - 1) * TILE_U;
+                    float u1 = (float) (col + 1) / (COLS - 1) * TILE_U;
                     float v0 = (float) row / (ROWS - 1) * TILE;
                     float v1 = (float) (row + 1) / (ROWS - 1) * TILE;
                     // Lit by the surface normal: folds and the head of the bed now read as shape.
@@ -1069,8 +1072,8 @@ public final class PhysicalQuilt {
                          float[] nx, float[] ny, float[] nz) {
             int a = rowA * COLS + colA;
             int b = rowB * COLS + colB;
-            float u0 = (float) colA / (COLS - 1) * TILE;
-            float u1 = (float) colB / (COLS - 1) * TILE;
+            float u0 = (float) colA / (COLS - 1) * TILE_U;
+            float u1 = (float) colB / (COLS - 1) * TILE_U;
             vertex(consumer, entry, now[a].x, now[a].y, now[a].z, u0, 0.0F, light, shade);
             vertex(consumer, entry, now[b].x, now[b].y, now[b].z, u1, 0.0F, light, shade);
             vertex(consumer, entry, now[b].x - nx[b] * SHELL, now[b].y - ny[b] * SHELL,
