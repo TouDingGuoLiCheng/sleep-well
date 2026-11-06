@@ -480,6 +480,17 @@ public final class MaidColliderCapture {
                 + " min=" + String.format(java.util.Locale.ROOT, "%.2f,%.2f,%.2f", b[0], b[1], b[2]));
         layerBounds = new float[]{b[3] - b[0], b[4] - b[1], b[5] - b[2]};
         if (layerCalls % 600 == 1) {
+            // Same bones, model space only: separates "intrinsic size" from "our transform".
+            List<QuiltBox> raw = new ArrayList<>();
+            for (Object root : roots) {
+                walkBone(root, new Matrix4f(), raw, 0);
+            }
+            float[] rb = bounds(raw);
+            LOGGER.info("[被子] model size={} min={} yaw={} bedDir={} posedSize={}",
+                    String.format(java.util.Locale.ROOT, "%.2fx%.2fx%.2f", rb[3] - rb[0], rb[4] - rb[1], rb[5] - rb[2]),
+                    String.format(java.util.Locale.ROOT, "%.2f,%.2f,%.2f", rb[0], rb[1], rb[2]),
+                    maid.yBodyRot, maid.getBedOrientation(),
+                    String.format(java.util.Locale.ROOT, "%.2fx%.2fx%.2f", b[3] - b[0], b[4] - b[1], b[5] - b[2]));
             LOGGER.info("[被子] layer boxes={} size={} min={} maid={} pose={} bed={}", boxes.size(),
                     String.format(java.util.Locale.ROOT, "%.2fx%.2fx%.2f", b[3] - b[0], b[4] - b[1], b[5] - b[2]),
                     String.format(java.util.Locale.ROOT, "%.2f,%.2f,%.2f", b[0], b[1], b[2]),
