@@ -78,9 +78,8 @@ public final class PhysicalQuilt {
     private static final int WARMUP = 300;
     /** How often the frozen quilt is re-checked against her current pose. */
     private static final int RECHECK_TICKS = 100;
-    /** How many rows at the pillow end are held in place. */
-    private static final int PINNED_ROWS = 1;
-    private static final float PIN_STRENGTH = 0.12F;
+    // No pinned rows: the head edge used to be welded to the initial layout height, which held it in the
+    // air and made the quilt look like a tent. Gravity, the height field and friction alone decide the shape.
     /** Half a bed's width, plus the overhang that hangs down the sides. */
     private static final float HALF_WIDTH = 0.72F;
     /** How far short of the pillow end the quilt starts, in blocks (measured from the bed centre). */
@@ -272,9 +271,7 @@ public final class PhysicalQuilt {
         private final List<int[]> constraints = new ArrayList<>();
         private final List<float[]> rests = new ArrayList<>();
         private final int count = COLS * ROWS;
-        private final float[] pinX = new float[COLS * ROWS];
-        private final float[] pinY = new float[COLS * ROWS];
-        private final float[] pinZ = new float[COLS * ROWS];
+
         private boolean initialised;
         private String modelKey = "";
         private BlockPos bedKey;
@@ -349,9 +346,7 @@ public final class PhysicalQuilt {
                     int index = row * COLS + col;
                     now[index] = new Vector3f((float) p.x, (float) p.y, (float) p.z);
                     prev[index] = new Vector3f((float) p.x, (float) p.y, (float) p.z);
-                    pinX[index] = (float) p.x;
-                    pinY[index] = (float) p.y;
-                    pinZ[index] = (float) p.z;
+
                 }
             }
             constraints.clear();
@@ -442,7 +437,6 @@ public final class PhysicalQuilt {
                         project(pair[0], pair[1], rest[0], rest[1]);
                     }
                     collide();
-                    pinHeadEnd();
                 }
             }
             if (!warmup) {
@@ -452,19 +446,6 @@ public final class PhysicalQuilt {
                     speed += now[i].distance(prev[i]);
                 }
                 CALM = speed / count / SUBSTEPS < CALM_SPEED;
-            }
-        }
-
-        /** Rows at the pillow end stay put, the way a quilt is tucked under the pillow. */
-        private void pinHeadEnd() {
-            for (int row = 0; row < PINNED_ROWS; row++) {
-                for (int col = 0; col < COLS; col++) {
-                    int index = row * COLS + col;
-                    Vector3f p = now[index];
-                    p.x += (pinX[index] - p.x) * PIN_STRENGTH;
-                    p.y += (pinY[index] - p.y) * PIN_STRENGTH;
-                    p.z += (pinZ[index] - p.z) * PIN_STRENGTH;
-                }
             }
         }
 
