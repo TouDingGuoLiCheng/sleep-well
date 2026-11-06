@@ -115,7 +115,7 @@ public final class MaidColliderCapture {
                 return;
             }
             captures++;
-            SETS.put(maid.getUUID(), new ColliderSet(boxes, bounds(boxes), stamp(boxes), maid.tickCount, false));
+            store(maid.getUUID(), new ColliderSet(boxes, bounds(boxes), stamp(boxes), maid.tickCount, false));
             if (RENDER_LOGS.getAndIncrement() == 0) {
                 LOGGER.info("[sleep_well] render capture boxes={} model={}",
                         boxes.size(), model.getClass().getSimpleName());
@@ -218,7 +218,7 @@ public final class MaidColliderCapture {
                     if (captureBedrock(living, matrix, legacy)) {
                         ColliderSet set = new ColliderSet(legacy, bounds(legacy), stamp(legacy),
                                 maid.tickCount, true);
-                        SETS.put(maid.getUUID(), set);
+                        store(maid.getUUID(), set);
                         com.sleepwell.client.quilt.diag.QuiltTrace.step("d.bedrock",
                                 "boxes=" + legacy.size() + " parts=" + partCount + " model=" + modelType);
                         return set;
@@ -262,7 +262,7 @@ public final class MaidColliderCapture {
                 return null;
             }
             ColliderSet set = new ColliderSet(boxes, bounds(boxes), stamp(boxes), maid.tickCount, true);
-            SETS.put(maid.getUUID(), set);
+            store(maid.getUUID(), set);
             if (DIRECT_LOGS.getAndIncrement() == 0) {
                 float[] b = set.bounds;
                 LOGGER.info("[sleep_well] direct capture boxes={} center=({},{},{}) maidY={} renderer={}",
@@ -351,7 +351,7 @@ public final class MaidColliderCapture {
             return;
         }
         captures++;
-        SETS.put(maid.getUUID(), new ColliderSet(boxes, bounds(boxes), stamp(boxes), maid.tickCount, false));
+        store(maid.getUUID(), new ColliderSet(boxes, bounds(boxes), stamp(boxes), maid.tickCount, false));
     }
 
     // --- gecko -------------------------------------------------------------
@@ -386,6 +386,18 @@ public final class MaidColliderCapture {
     private static int layerCalls;
     private static String layerMiss = "-";
     private static float[] layerBounds;
+
+    /**
+     * The render-layer capture is the only trustworthy source, so a set built elsewhere must never
+     * replace a fresh one: that overwrite is what kept pushing the wireframe into the sky.
+     */
+    private static void store(UUID id, ColliderSet set) {
+        ColliderSet existing = SETS.get(id);
+        if (existing != null && existing.fromLayer && !set.fromLayer && set.tick - existing.tick <= 3) {
+            return;
+        }
+        SETS.put(id, set);
+    }
 
     /** Registers the capture layer on a maid renderer (idempotent, per renderer instance). */
     static void installLayer(Object renderer) {

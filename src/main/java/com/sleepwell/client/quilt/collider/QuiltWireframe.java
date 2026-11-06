@@ -81,6 +81,9 @@ public final class QuiltWireframe {
             if (set == null) {
                 set = MaidColliderCapture.captureDirect(maid, camera, partialTick);
             }
+            // Beacon first: it is drawn from her own position, so it stays visible no matter what the
+            // captured boxes contain.
+            marker(consumer, matrix, maid);
             if (set == null || !set.fromLayer) {
                 // Sets built outside her render pass carry the wrong space; drawing them is what put
                 // boxes in the sky. Only the render-layer capture is trusted.
@@ -93,9 +96,6 @@ public final class QuiltWireframe {
                         set.boxes.size(), maid.getX(), maid.getY(), maid.getZ(),
                         set.bounds[0], set.bounds[1], set.bounds[2]));
             }
-            // A yellow beacon on every sleeping maid: if the boxes stay invisible but this shows up,
-            // the coordinates are fine and the line render type is being swallowed instead.
-            marker(consumer, matrix, maid);
             for (QuiltBox box : set.boxes) {
                 float r = box.hard ? 1.0F : 0.30F;
                 float g = box.hard ? 0.25F : 0.60F;
