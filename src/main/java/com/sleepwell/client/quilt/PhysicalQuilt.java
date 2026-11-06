@@ -463,6 +463,34 @@ public final class PhysicalQuilt {
                 // No refresh and no grid rebuild inside the loop: the pose cannot change mid-settle.
                 step(set, viewToWorld, true);
             }
+            probeContact();
+        }
+
+        /**
+         * Separates three explanations that look identical on screen: the height field is missing under her,
+         * the field is right but the cloth is not pushed up, or both are right and her visible model is
+         * simply taller than her boxes. Prints the field value above her, her box top there, and the height
+         * of the nearest cloth particle.
+         */
+        private void probeContact() {
+            Vec3 c = boxCentroid();
+            float surface = surfaceAt((float) c.x, (float) c.z);
+            int best = 0;
+            float bestDist = Float.MAX_VALUE;
+            for (int i = 0; i < count; i++) {
+                float dx = now[i].x - (float) c.x;
+                float dz = now[i].z - (float) c.z;
+                float d = dx * dx + dz * dz;
+                if (d < bestDist) {
+                    bestDist = d;
+                    best = i;
+                }
+            }
+            LOGGER.info("[被子] 贴面校验 她XZ={},{} 高度场={} 她盒顶={} 最近质点={} 质点Y={} 水平距={} 被子最高={}",
+                    fmt(c.x), fmt(c.z),
+                    surface == Float.NEGATIVE_INFINITY ? "无表面" : fmt(surface),
+                    fmt(boxMaxY()), best, fmt(now[best].y),
+                    fmt(Math.sqrt(bestDist)), fmt(maxY()));
         }
 
         private void step(ColliderSet set, Matrix4f viewToWorld) {
