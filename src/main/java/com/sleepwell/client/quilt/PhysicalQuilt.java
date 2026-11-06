@@ -77,6 +77,9 @@ public final class PhysicalQuilt {
         // Bed centre, used to place the sheet before the first solve.
         Vec3 middle = head.add(foot).scale(0.5D).add(0.0D, top, 0.0D);
 
+        // The captured corners live in the line batch's space. The level PoseStack maps world into exactly
+        // that space, so its inverse is the only correct way back to world coordinates.
+        Matrix4f viewToWorld = new Matrix4f(pose.last().pose()).invert();
         Cloth cloth = CLOTHS.computeIfAbsent(maid.getUUID(), id -> new Cloth());
         cloth.anchor = middle;
         cloth.along = along;
@@ -86,10 +89,10 @@ public final class PhysicalQuilt {
         cloth.bedFoot = foot.add(0.0D, top, 0.0D);
         if (!cloth.initialised) {
             cloth.reset();
-            cloth.settle(set);
+            cloth.settle(set, viewToWorld);
             cloth.initialised = true;
         } else {
-            cloth.step(set);
+            cloth.step(set, viewToWorld);
         }
         cloth.draw(pose, buffers, bed.color());
         if (--TICK_LOGS <= 0) {
@@ -176,19 +179,19 @@ public final class PhysicalQuilt {
             rests.add(new float[]{rest, stiffness});
         }
 
-        private void settle(ColliderSet set) {
-            refreshBoxes(set);
+        private void settle(ColliderSet set, Matrix4f viewToWorld) {
+            refreshBoxes(set, viewToWorld);
             for (int i = 0; i < WARMUP; i++) {
-                step(set, true);
+                step(set, viewToWorld, true);
             }
         }
 
-        private void step(ColliderSet set) {
-            step(set, false);
+        private void step(ColliderSet set, Matrix4f viewToWorld) {
+            step(set, viewToWorld, false);
         }
 
-        private void step(ColliderSet set, boolean warmup) {
-            refreshBoxes(set);
+        private void step(ColliderSet set, Matrix4f viewToWorld, boolean warmup) {
+            refreshBoxes(set, viewToWorld);
             float sub = DT / SUBSTEPS;
             for (int s = 0; s < SUBSTEPS; s++) {
                 for (int i = 0; i < count; i++) {
@@ -201,6 +204,12 @@ public final class PhysicalQuilt {
                     p.x += vx;
                     p.y += vy + GRAVITY * sub * sub;
                     p.z += vz;
+                    if (Math.abs(p.y - (float) bedTop) > 4.0F || p.distanceSquared(o) > 4.0F) {
+                        // Runaway particle: put it back on the bed instead of letting one bad push fling
+                        // the whole sheet out of the world.
+                        p.set((float) anchor.x, (float) (bedTop + 0.4D), (float) anchor.z);
+                        o.set(p);
+                    }
                 }
                 for (int iter = 0; iter < ITERATIONS; iter++) {
                     for (int c = 0; c < constraints.size(); c++) {
@@ -280,13 +289,13 @@ public final class PhysicalQuilt {
             return Math.abs(alongOffset) <= 1.05D && Math.abs(acrossOffset) <= 0.52D;
         }
 
-        private void refreshBoxes(ColliderSet set) {
+        private void refreshBoxes(ColliderSet set, Matrix4f viewToWorld) {
             int n = set.boxes.size();
             if (boxMin.length != n * 3) {
                 boxMin = new float[n * 3];
                 boxMax = new float[n * 3];
             }
-            Matrix4f toWorld = set.viewToWorld;
+            Matrix4f toWorld = viewToWorld;
             for (int i = 0; i < n; i++) {
                 QuiltBox box = set.boxes.get(i);
                 float minX = Float.MAX_VALUE, minY = Float.MAX_VALUE, minZ = Float.MAX_VALUE;
