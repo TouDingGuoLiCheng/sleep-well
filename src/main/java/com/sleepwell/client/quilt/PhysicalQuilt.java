@@ -173,6 +173,35 @@ public final class PhysicalQuilt {
 
     public static void render(PoseStack pose, MultiBufferSource.BufferSource buffers, QuiltRenderer.Bed bed,
                               EntityMaid maid) {
+        Vec3 head = Vec3.atLowerCornerOf(bed.head()).add(0.5D, 0.0D, 0.5D);
+        Vec3 foot = Vec3.atLowerCornerOf(bed.foot()).add(0.5D, 0.0D, 0.5D);
+        Vec3 along = new Vec3(foot.x - head.x, 0.0D, foot.z - head.z).normalize();
+        Vec3 across = new Vec3(-along.z, 0.0D, along.x);
+        double top = bedTop(bed);
+        Vec3 middle = new Vec3((head.x + foot.x) * 0.5D, top, (head.z + foot.z) * 0.5D);
+
+        String modelKey = modelKey(maid);
+        Cloth cached = CLOTHS.computeIfAbsent(maid.getUUID(), id -> new Cloth());
+        if (cached.initialised && modelKey.equals(cached.modelKey) && cached.hasLocalFrame()) {
+            // Reuse: the sheet was solved once for this model, so it only has to be moved to whatever bed she
+            // is in now. No capture, no gate, no solver - the whole point of the cache.
+            boolean moved = cached.bedKey == null || !cached.bedKey.equals(bed.head());
+            cached.anchor = middle;
+            cached.along = along;
+            cached.across = across;
+            cached.bedTop = top;
+            cached.bedHead = new Vec3(head.x, top, head.z);
+            cached.bedFoot = new Vec3(foot.x, top, foot.z);
+            if (moved) {
+                cached.retarget(middle, along, across, top);
+                cached.bedKey = bed.head();
+                LOGGER.info("[被子] 复用上次解算 maid={} model={} 床={}（跳过解算）", shortId(maid), modelKey,
+                        bed.head());
+            }
+            cached.draw(pose, buffers, bed.color());
+            return;
+        }
+
         ColliderSet set = MaidColliderCapture.get(maid);
         if (set == null || set.boxes.isEmpty()) {
             // Silence here is what made "the quilt vanished" take a log hunt to explain.
@@ -201,14 +230,6 @@ public final class PhysicalQuilt {
             LOGGER.warn("[被子] 碰撞盒偏少 maid={} boxes={}（采集可能漏骨骼，被子会穿透）", shortId(maid),
                     set.boxes.size());
         }
-        Vec3 head = Vec3.atLowerCornerOf(bed.head()).add(0.5D, 0.0D, 0.5D);
-        Vec3 foot = Vec3.atLowerCornerOf(bed.foot()).add(0.5D, 0.0D, 0.5D);
-        Vec3 along = new Vec3(foot.x - head.x, 0.0D, foot.z - head.z).normalize();
-        Vec3 across = new Vec3(-along.z, 0.0D, along.x);
-        double top = bedTop(bed);
-        // Bed centre, used to place the sheet before the first solve. `top` is already a world height.
-        Vec3 middle = new Vec3((head.x + foot.x) * 0.5D, top, (head.z + foot.z) * 0.5D);
-
         // The captured corners live in the line batch's space. The level PoseStack maps world into exactly
         // that space, so its inverse is the only correct way back to world coordinates.
         // The matrix that came with the capture. Recomputing it from the current pose was the bug: a capture
@@ -217,8 +238,8 @@ public final class PhysicalQuilt {
         Matrix4f viewToWorld = set.viewToWorld != null
                 ? new Matrix4f(set.viewToWorld)
                 : new Matrix4f(pose.last().pose()).invert();
-        String modelKey = modelKey(maid);
-        Cloth cloth = CLOTHS.computeIfAbsent(maid.getUUID(), id -> new Cloth());
+        // Reached only when the cache could not serve her: a different model, or a first sleep.
+        Cloth cloth = cached;
         if (cloth.initialised && !modelKey.equals(cloth.modelKey)) {
             // Different model (or skin/model pack) means different geometry: the cached sheet no longer fits.
             LOGGER.info("[被子] 布料失效重算 maid={} 原因=模型变化 {} -> {} {}", shortId(maid), cloth.modelKey,
@@ -373,6 +394,10 @@ public final class PhysicalQuilt {
         /** Consecutive frames in which the capture did not move, so she has stopped reshaping. */
         private int stableFrames;
         private boolean haveLast;
+        /** Solved shape in bed-local coordinates; see captureLocalFrame. */
+        private float[] localAlong;
+        private float[] localAcross;
+        private float[] localHeight;
         private Vec3 lastCentre;
         private int lastBoxes;
         private float lastMinY;
@@ -518,6 +543,7 @@ public final class PhysicalQuilt {
                 step(set, viewToWorld, true);
             }
             probeContact();
+            captureLocalFrame();
         }
 
         /**
@@ -545,6 +571,42 @@ public final class PhysicalQuilt {
                     surface == Float.NEGATIVE_INFINITY ? "无表面" : fmt(surface),
                     fmt(boxMaxY()), best, fmt(now[best].y),
                     fmt(Math.sqrt(bestDist)), fmt(maxY()));
+        }
+
+        /** The solved shape expressed in the bed's own frame, so it can be re-placed without re-solving. */
+        private void captureLocalFrame() {
+            if (localAlong == null) {
+                localAlong = new float[count];
+                localAcross = new float[count];
+                localHeight = new float[count];
+            }
+            for (int i = 0; i < count; i++) {
+                double dx = now[i].x - anchor.x;
+                double dz = now[i].z - anchor.z;
+                localAlong[i] = (float) (dx * along.x + dz * along.z);
+                localAcross[i] = (float) (dx * across.x + dz * across.z);
+                localHeight[i] = (float) (now[i].y - bedTop);
+            }
+        }
+
+        private boolean hasLocalFrame() {
+            return localAlong != null;
+        }
+
+        /** Lays the cached shape into another bed: a rigid move, which is all a different bed needs. */
+        private void retarget(Vec3 newAnchor, Vec3 newAlong, Vec3 newAcross, double newBedTop) {
+            if (localAlong == null) {
+                return;
+            }
+            for (int i = 0; i < count; i++) {
+                float a = localAlong[i];
+                float c = localAcross[i];
+                float x = (float) (newAnchor.x + newAlong.x * a + newAcross.x * c);
+                float z = (float) (newAnchor.z + newAlong.z * a + newAcross.z * c);
+                float y = (float) (newBedTop + localHeight[i]);
+                now[i].set(x, y, z);
+                prev[i].set(x, y, z);
+            }
         }
 
         private void step(ColliderSet set, Matrix4f viewToWorld) {
