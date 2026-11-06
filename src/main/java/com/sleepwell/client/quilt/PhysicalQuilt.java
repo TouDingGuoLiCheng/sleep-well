@@ -46,17 +46,26 @@ public final class PhysicalQuilt {
     private static final int ITERATIONS = 6;
     private static final float GRAVITY = -9.8F;
     private static final float DAMPING = 0.985F;
+    private static final float DAMPING_CALM = 0.86F;
+    /** Set per frame from the measured average speed; not thread state, just a cheap settle detector. */
+    private static boolean CALM;
     private static final float THICKNESS = 0.012F;
     /** Upper bound on how far one particle may move per substep, in blocks. */
     private static final float MAX_STEP = 0.05F;
     /** Fraction of tangential speed kept when the cloth rubs against something; 0 = glued. */
-    private static final float FRICTION = 0.35F;
+    private static final float FRICTION = 0.18F;
+    /** Below this average per-substep motion the sheet is considered settled and gets extra damping. */
+    private static final float CALM_SPEED = 0.0016F;
     private static final int WARMUP = 90;
     /** How many rows at the pillow end are held in place. */
-    private static final int PINNED_ROWS = 2;
-    private static final float PIN_STRENGTH = 0.12F;
+    private static final int PINNED_ROWS = 3;
+    private static final float PIN_STRENGTH = 0.22F;
     /** Half a bed's width, plus the overhang that hangs down the sides. */
-    private static final float HALF_WIDTH = 0.78F;
+    private static final float HALF_WIDTH = 0.72F;
+    /** How far short of the pillow end the quilt starts, in blocks (measured from the bed centre). */
+    private static final float HEAD_INSET = 0.72F;
+    /** How far past the bed centre it reaches toward the foot. */
+    private static final float FOOT_REACH = 1.02F;
     private static final float TILE = 1.0F;
 
     private static final Map<UUID, Cloth> CLOTHS = new HashMap<>();
@@ -139,9 +148,9 @@ public final class PhysicalQuilt {
             float minY = cloth.minY();
             float maxY = cloth.maxY();
             float drift = (float) Math.abs(cloth.centroid().y - (cloth.bedTop + 0.15D));
-            LOGGER.info("[被子] 布料 frame={} p={} boxes={} yRange={}..{} 床面={} 质心高度差={} 悬浮={}",
+            LOGGER.info("[被子] 布料 frame={} p={} boxes={} yRange={}..{} 床面={} 质心高度差={} 悬浮={} 沿床覆盖={} 静止={}",
                     FRAMES, cloth.count, set.boxes.size(), fmt(minY), fmt(maxY), fmt(cloth.bedTop),
-                    fmt(drift), drift > 1.5F ? "是" : "否");
+                    fmt(drift), drift > 1.5F ? "是" : "否", cloth.alongSpan(), CALM ? "是" : "否");
             if (drift > 1.5F) {
                 LOGGER.warn("[被子] 布料整体离床 {} 格（床面 {}，质心 {}）：坐标换算或碰撞盒方向有问题",
                         fmt(drift), fmt(cloth.bedTop), fmt(cloth.centroid().y));
@@ -201,8 +210,9 @@ public final class PhysicalQuilt {
                     float u = COLS == 1 ? 0.0F : (float) col / (COLS - 1);
                     float v = ROWS == 1 ? 0.0F : (float) row / (ROWS - 1);
                     double offsetAcross = (u - 0.5) * 2.0 * HALF_WIDTH;
-                    // Along: from head end to foot end, the bed itself is two blocks.
-                    double offsetAlong = (v - 0.5) * 2.0 * 1.05;
+                    // Along: asymmetric on purpose. A quilt starts below the pillow, so the head end is
+                    // inset while the foot end still drapes past the mattress.
+                    double offsetAlong = -HEAD_INSET + (FOOT_REACH + HEAD_INSET) * v;
                     Vec3 p = anchor.add(across.scale(offsetAcross)).add(along.scale(offsetAlong))
                             .add(0.0D, 0.42D, 0.0D);
                     int index = row * COLS + col;
@@ -258,13 +268,14 @@ public final class PhysicalQuilt {
         private void step(ColliderSet set, Matrix4f viewToWorld, boolean warmup) {
             refreshBoxes(set, viewToWorld);
             float sub = DT / SUBSTEPS;
+            float damping = CALM ? DAMPING_CALM : DAMPING;
             for (int s = 0; s < SUBSTEPS; s++) {
                 for (int i = 0; i < count; i++) {
                     Vector3f p = now[i];
                     Vector3f o = prev[i];
-                    float vx = (p.x - o.x) * DAMPING;
-                    float vy = (p.y - o.y) * DAMPING;
-                    float vz = (p.z - o.z) * DAMPING;
+                    float vx = (p.x - o.x) * damping;
+                    float vy = (p.y - o.y) * damping;
+                    float vz = (p.z - o.z) * damping;
                     o.set(p);
                     p.x += vx;
                     p.y += vy + GRAVITY * sub * sub;
@@ -296,6 +307,11 @@ public final class PhysicalQuilt {
             }
             if (!warmup) {
                 FRAMES++;
+                float speed = 0.0F;
+                for (int i = 0; i < count; i++) {
+                    speed += now[i].distance(prev[i]);
+                }
+                CALM = speed / count / SUBSTEPS < CALM_SPEED;
             }
         }
 
@@ -410,6 +426,18 @@ public final class PhysicalQuilt {
                 boxMax[base + 1] = maxY;
                 boxMax[base + 2] = maxZ;
             }
+        }
+
+        /** How far the sheet spans along the bed, measured from the bed centre, in blocks. */
+        private String alongSpan() {
+            float min = Float.MAX_VALUE;
+            float max = -Float.MAX_VALUE;
+            for (Vector3f p : now) {
+                double offset = (p.x - anchor.x) * along.x + (p.z - anchor.z) * along.z;
+                min = (float) Math.min(min, offset);
+                max = (float) Math.max(max, offset);
+            }
+            return String.format(Locale.ROOT, "%.2f..%.2f", min, max);
         }
 
         private Vec3 centroid() {
