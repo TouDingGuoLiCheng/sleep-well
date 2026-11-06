@@ -98,6 +98,16 @@ public final class PhysicalQuilt {
     private static int SKIP_LOGS = 5;
     /** At most one new quilt is solved per frame, which keeps the one-time cost off the frame budget. */
     private static boolean SOLVED_THIS_FRAME;
+    /**
+     * Dynamic re-solve. Off in normal play; switched on to measure whether the solver still walks the quilt
+     * around. Each pass reports how far the sheet moved, so jitter becomes a number instead of a feeling.
+     */
+    private static final boolean DYNAMIC =
+            !"false".equalsIgnoreCase(System.getProperty("sleepwell.quiltDynamic"));
+    /** Geometry change that is worth a re-solve; anything smaller is jitter, not a new pose. */
+    private static final float FINGERPRINT_EPS = 0.02F;
+    /** Relaxation steps used when re-solving from the current state instead of from scratch. */
+    private static final int RELAX_STEPS = 60;
 
     /** Anything that changes her rendered geometry must invalidate the cache. */
     private static String modelKey(EntityMaid maid) {
@@ -225,8 +235,18 @@ public final class PhysicalQuilt {
                 LOGGER.warn("[被子] 校验失败 maid={} 被子最高={} 低于身体顶面={}，她会穿出被子（高度图或采样偏低）",
                         shortId(maid), fmt(clothTop), fmt(bodyTop));
             }
+        } else if (DYNAMIC && maid.tickCount - cloth.frozenAt >= RECHECK_TICKS) {
+            cloth.frozenAt = maid.tickCount;
+            float current = fingerprint(set);
+            if (Math.abs(current - cloth.fingerprint) > FINGERPRINT_EPS) {
+                float moved = cloth.relax(set, viewToWorld, RELAX_STEPS);
+                LOGGER.info("[被子] 动态重算 maid={} 位移={}格 指纹={} -> {}", shortId(maid), fmt(moved),
+                        fmt(cloth.fingerprint), fmt(current));
+                cloth.fingerprint = current;
+            }
         }
-        // No periodic re-solve: the fingerprint check caused 300-step rebuilds whenever her idle animation
+        // No full rebuild: a periodic 300-step rebuild was the stutter, and it also re-laid the sheet.
+        // The path above only relaxes from where the cloth already is.
         // nudged the geometry, which is exactly the stutter that got the cloth rolled back. The cache now
         // only dies on a real change (different model, different bed).
         cloth.draw(pose, buffers, bed.color());
@@ -384,6 +404,27 @@ public final class PhysicalQuilt {
             float rest = now[a].distance(now[b]);
             constraints.add(new int[]{a, b});
             rests.add(new float[]{rest, stiffness});
+        }
+
+        /** Continues solving from the current positions; returns the largest distance any particle moved. */
+        private float relax(ColliderSet set, Matrix4f viewToWorld, int steps) {
+            float[] before = new float[count * 3];
+            for (int i = 0; i < count; i++) {
+                before[i * 3] = now[i].x;
+                before[i * 3 + 1] = now[i].y;
+                before[i * 3 + 2] = now[i].z;
+            }
+            for (int i = 0; i < steps; i++) {
+                step(set, viewToWorld, false);
+            }
+            float moved = 0.0F;
+            for (int i = 0; i < count; i++) {
+                float dx = now[i].x - before[i * 3];
+                float dy = now[i].y - before[i * 3 + 1];
+                float dz = now[i].z - before[i * 3 + 2];
+                moved = Math.max(moved, (float) Math.sqrt(dx * dx + dy * dy + dz * dz));
+            }
+            return moved;
         }
 
         private void settle(ColliderSet set, Matrix4f viewToWorld) {
