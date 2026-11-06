@@ -79,6 +79,10 @@ public final class CampfireFleeHandler {
         flee.radius = radius;
         flee.ticksLeft = CampfireFleePolicy.FLEE_TICKS;
         flee.ticksOnTarget = 0;
+        flee.stuckTicks = 0;
+        flee.startX = maid.getX();
+        flee.startY = maid.getY();
+        flee.startZ = maid.getZ();
         flee.target = CampfireFleeSpot.find(level, maid, radius).orElse(null);
         if (flee.target == null) {
             FLEES.remove(maid.getUUID());
@@ -115,6 +119,21 @@ public final class CampfireFleeHandler {
         if (CampfireFleePolicy.arrived(maid.position().distanceToSqr(flee.target))) {
             stop(maid);
             return;
+        }
+        // The brain's MoveToTargetSink owns the navigator and rewrites the walk target later in the same tick,
+        // so the path we issue can be ignored outright. If she has not actually moved, carrying her out is the
+        // only thing that keeps her out of the flames.
+        if (maid.position().distanceToSqr(flee.startX, flee.startY, flee.startZ) < 0.25D) {
+            if (++flee.stuckTicks > CampfireFleePolicy.STUCK_TICKS) {
+                LOGGER.warn("[篝火] 寻路无效，直接把女仆移出火堆 maid={} 从={} 到={}", shortId(maid),
+                        maid.blockPosition(), flee.target);
+                maid.teleportTo(flee.target.x, flee.target.y, flee.target.z);
+                maid.getNavigation().stop();
+                stop(maid);
+                return;
+            }
+        } else {
+            flee.stuckTicks = 0;
         }
         if (--flee.ticksLeft <= 0) {
             stop(maid);
@@ -166,6 +185,10 @@ public final class CampfireFleeHandler {
         private int radius;
         private int ticksLeft;
         private int ticksOnTarget;
+        private int stuckTicks;
+        private double startX;
+        private double startY;
+        private double startZ;
         private Vec3 target;
 
         private Flee(EntityMaid maid, int radius) {

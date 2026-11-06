@@ -14,6 +14,8 @@ public final class CampfireFleePolicy {
     public static final int FLEE_TICKS = 100;
     /** Pick a new landing spot when the current one is not reached within this many ticks. */
     public static final int RETARGET_TICKS = 40;
+    /** Ticks a flee may go without any real movement before the maid is carried out instead. */
+    public static final int STUCK_TICKS = 20;
     /** Close enough to the landing spot (squared): 1.5 blocks. */
     public static final double ARRIVED_SQR = 2.25D;
     /** Never pick a spot closer than 3 blocks, otherwise she just shuffles one block off the fire. */
