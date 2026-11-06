@@ -56,7 +56,10 @@ public final class PhysicalQuilt {
     private static final float FRICTION = 0.18F;
     /** Below this average per-substep motion the sheet is considered settled and gets extra damping. */
     private static final float CALM_SPEED = 0.0016F;
-    private static final int WARMUP = 90;
+    /** One solve, done properly: the sheet is settled once and then frozen (R6). */
+    private static final int WARMUP = 300;
+    /** How often the frozen quilt is re-checked against her current pose. */
+    private static final int RECHECK_TICKS = 100;
     /** How many rows at the pillow end are held in place. */
     private static final int PINNED_ROWS = 3;
     private static final float PIN_STRENGTH = 0.22F;
@@ -73,6 +76,18 @@ public final class PhysicalQuilt {
     private static int TICK_LOGS = 300;
     /** Bounded: the skip path can fire every frame and would flood the log. */
     private static int SKIP_LOGS = 5;
+
+    /** Anything that changes her rendered geometry must invalidate the cache. */
+    private static String modelKey(EntityMaid maid) {
+        Object id = com.sleepwell.client.quilt.collider.Reflect.call(maid, "getModelId");
+        return id == null ? "unknown" : id.toString();
+    }
+
+    /** Cheap signature of the current collision geometry: total extent, enough to spot a different pose. */
+    private static float fingerprint(ColliderSet set) {
+        float[] bounds = set.bounds;
+        return (bounds[3] - bounds[0]) + (bounds[4] - bounds[1]) + (bounds[5] - bounds[2]);
+    }
 
     private static String shortId(EntityMaid maid) {
         String id = maid.getUUID().toString();
@@ -124,7 +139,19 @@ public final class PhysicalQuilt {
         // The captured corners live in the line batch's space. The level PoseStack maps world into exactly
         // that space, so its inverse is the only correct way back to world coordinates.
         Matrix4f viewToWorld = new Matrix4f(pose.last().pose()).invert();
+        String modelKey = modelKey(maid);
         Cloth cloth = CLOTHS.computeIfAbsent(maid.getUUID(), id -> new Cloth());
+        if (cloth.initialised && !modelKey.equals(cloth.modelKey)) {
+            // Different model (or skin/model pack) means different geometry: the cached sheet no longer fits.
+            LOGGER.info("[被子] 布料失效重算 maid={} 原因=模型变化 {} -> {}", shortId(maid), cloth.modelKey, modelKey);
+            cloth.initialised = false;
+        }
+        if (cloth.initialised && cloth.bedKey != null && !cloth.bedKey.equals(bed.head())) {
+            LOGGER.info("[被子] 布料失效重算 maid={} 原因=床位置变化", shortId(maid));
+            cloth.initialised = false;
+        }
+        cloth.modelKey = modelKey;
+        cloth.bedKey = bed.head();
         cloth.anchor = middle;
         cloth.along = along;
         cloth.across = across;
@@ -133,14 +160,27 @@ public final class PhysicalQuilt {
         cloth.bedFoot = new Vec3(foot.x, top, foot.z);
         if (!cloth.initialised) {
             cloth.reset();
-            LOGGER.info("[被子] 布料新建 maid={} grid={}x{} anchor={} bedTop={} boxes={}",
-                    shortId(maid), COLS, ROWS, fmt(cloth.anchor), fmt(cloth.bedTop), set.boxes.size());
+            LOGGER.info("[被子] 布料新建 maid={} model={} grid={}x{} anchor={} bedTop={} boxes={}",
+                    shortId(maid), modelKey, COLS, ROWS, fmt(cloth.anchor), fmt(cloth.bedTop), set.boxes.size());
+            long start = System.nanoTime();
             cloth.settle(set, viewToWorld);
             cloth.initialised = true;
-            LOGGER.info("[被子] 布料静解算完成 maid={} steps={} yRange={}..{} 质心={}",
-                    shortId(maid), WARMUP, fmt(cloth.minY()), fmt(cloth.maxY()), fmt(cloth.centroid()));
-        } else {
-            cloth.step(set, viewToWorld);
+            cloth.frozenAt = maid.tickCount;
+            cloth.fingerprint = fingerprint(set);
+            LOGGER.info("[被子] 布料解算完成并冻结 maid={} steps={} 耗时={}ms yRange={}..{} 沿床覆盖={}",
+                    shortId(maid), WARMUP, String.format(Locale.ROOT, "%.1f",
+                            (System.nanoTime() - start) / 1.0E6), fmt(cloth.minY()), fmt(cloth.maxY()),
+                    cloth.alongSpan());
+        } else if (maid.tickCount - cloth.frozenAt >= RECHECK_TICKS) {
+            // Frozen afterwards: the only per-tick work is this cheap comparison, and only every few seconds.
+            cloth.frozenAt = maid.tickCount;
+            float current = fingerprint(set);
+            if (Math.abs(current - cloth.fingerprint) > 0.05F) {
+                LOGGER.info("[被子] 布料失效重算 maid={} 原因=姿态变化 {} -> {}", shortId(maid),
+                        fmt(cloth.fingerprint), fmt(current));
+                cloth.fingerprint = current;
+                cloth.settle(set, viewToWorld);
+            }
         }
         cloth.draw(pose, buffers, bed.color());
         if (--TICK_LOGS <= 0) {
@@ -194,6 +234,10 @@ public final class PhysicalQuilt {
         private final float[] pinY = new float[COLS * ROWS];
         private final float[] pinZ = new float[COLS * ROWS];
         private boolean initialised;
+        private String modelKey = "";
+        private BlockPos bedKey;
+        private int frozenAt;
+        private float fingerprint;
         private Vec3 anchor = Vec3.ZERO;
         private Vec3 along = Vec3.ZERO;
         private Vec3 across = Vec3.ZERO;
