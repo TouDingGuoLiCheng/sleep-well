@@ -11,9 +11,10 @@ import org.joml.Vector3f;
 /** Turns the per-cube boxes of one pose into capsule chains, grouped by bone. */
 public final class Capsules {
     /** Longest segment the cloth steps over; longer bones are split so a capsule never spans a whole leg. */
-    private static final float MAX_SEGMENT = 0.6F;
+    private static final float MAX_SEGMENT = 0.45F;
     private static final float MIN_RADIUS = 0.03F;
-    private static final float MAX_RADIUS = 0.55F;
+    /** A limb is a few pixels thick; anything fatter than this is a fitting bug, not anatomy. */
+    private static final float MAX_RADIUS = 0.24F;
 
     private static final String[] SOFT = {
             "hair", "tail", "ear", "wing", "ribbon", "bow", "skirt", "dress", "cloth", "cape",
@@ -62,16 +63,22 @@ public final class Capsules {
             length = dz;
         }
         // Radius so the capsule swallows every cube of the bone, not just its axis.
+        // Thickness is the larger of the two extents across the axis — NOT their diagonal, which inflated
+        // every capsule by sqrt(2) and made the body look armoured in tin cans.
         float across;
         if (dx == length) {
-            across = (float) Math.sqrt(dy * dy + dz * dz) * 0.5F;
+            across = Math.max(dy, dz) * 0.5F;
         } else if (dy == length) {
-            across = (float) Math.sqrt(dx * dx + dz * dz) * 0.5F;
+            across = Math.max(dx, dz) * 0.5F;
         } else {
-            across = (float) Math.sqrt(dx * dx + dy * dy) * 0.5F;
+            across = Math.max(dx, dy) * 0.5F;
         }
         float radius = Math.min(MAX_RADIUS, Math.max(MIN_RADIUS, across));
         Vector3f center = new Vector3f((minX + maxX) * 0.5F, (minY + maxY) * 0.5F, (minZ + maxZ) * 0.5F);
+        if (length < 0.05F) {
+            // A speck of a bone: a capsule there would only add noise to the cloth solve.
+            return;
+        }
         float half = Math.max(length * 0.5F, 0.001F);
         int segments = Math.max(1, (int) Math.ceil(length / MAX_SEGMENT));
         float step = length / segments;
