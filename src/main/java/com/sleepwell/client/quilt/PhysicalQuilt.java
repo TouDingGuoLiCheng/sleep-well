@@ -313,6 +313,9 @@ public final class PhysicalQuilt {
             }
             LOGGER.info("[被子] 覆盖范围 半宽={} 枕端={} 脚端={}（盒数={}）", fmt(halfWidth), fmt(headInset),
                     fmt(footReach), n);
+            // Drop it from above her tallest point: starting level with the mattress put the sheet inside her
+            // body and inside any tail, and the collision then pushed those particles downwards.
+            double startY = Math.max(bedTop + 0.14D, boxMaxY() + 0.12D);
             for (int row = 0; row < ROWS; row++) {
                 for (int col = 0; col < COLS; col++) {
                     float u = COLS == 1 ? 0.0F : (float) col / (COLS - 1);
@@ -321,8 +324,8 @@ public final class PhysicalQuilt {
                     // Along: asymmetric on purpose. A quilt starts below the pillow, so the head end is
                     // inset while the foot end still drapes past the mattress.
                     double offsetAlong = -headInset + (footReach + headInset) * v;
-                    Vec3 p = anchor.add(across.scale(offsetAcross)).add(along.scale(offsetAlong))
-                            .add(0.0D, 0.14D, 0.0D);
+                    Vec3 p = new Vec3(anchor.x + across.x * offsetAcross + along.x * offsetAlong, startY,
+                            anchor.z + across.z * offsetAcross + along.z * offsetAlong);
                     int index = row * COLS + col;
                     now[index] = new Vector3f((float) p.x, (float) p.y, (float) p.z);
                     prev[index] = new Vector3f((float) p.x, (float) p.y, (float) p.z);
@@ -466,15 +469,16 @@ public final class PhysicalQuilt {
         private void collide() {
             for (int i = 0; i < count; i++) {
                 Vector3f p = now[i];
+                Vector3f cameFrom = prev[i];
                 int[] candidates = grid.get(key(cell(p.x), cell(p.y), cell(p.z)));
                 if (candidates != null) {
-                    collideWith(p, candidates);
+                    collideWith(p, candidates, cameFrom);
                 }
                 // Same check one cell up: a particle resting exactly on a cell boundary must still see the
                 // cubes just above it.
                 int[] above = grid.get(key(cell(p.x), cell(p.y) + 1, cell(p.z)));
                 if (above != null) {
-                    collideWith(p, above);
+                    collideWith(p, above, cameFrom);
                 }
                 // Mattress: only inside the bed footprint, so the overhang may still fall down the sides.
                 if (p.y < bedTop + THICKNESS && insideBed(p)) {
@@ -486,7 +490,7 @@ public final class PhysicalQuilt {
             }
         }
 
-        private void collideWith(Vector3f p, int[] candidates) {
+        private void collideWith(Vector3f p, int[] candidates, Vector3f cameFrom) {
             for (int box : candidates) {
                 int base = box * 3;
                 float minX = boxMin[base] - DUET_PADDING, minY = boxMin[base + 1] - THICKNESS,
@@ -500,6 +504,12 @@ public final class PhysicalQuilt {
                 float dxMin = p.x - minX, dxMax = maxX - p.x;
                 float dyMin = p.y - minY, dyMax = maxY - p.y;
                 float dzMin = p.z - minZ, dzMax = maxZ - p.z;
+                // A particle that arrived from above must leave through the top face. Escaping through the
+                // nearest face instead dropped the sheet inside tails and folded it under her body.
+                if (cameFrom.y >= maxY - 1.0E-4F) {
+                    p.y = maxY;
+                    continue;
+                }
                 float best = Math.min(Math.min(dxMin, dxMax), Math.min(Math.min(dyMin, dyMax),
                         Math.min(dzMin, dzMax)));
                 if (best == dxMin) {
