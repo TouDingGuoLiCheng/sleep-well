@@ -44,6 +44,8 @@ public final class PhysicalQuilt {
     private static final float DT = 1.0F / 60.0F;
     private static final int SUBSTEPS = 4;
     private static final int ITERATIONS = 6;
+    /** Fewer sweeps while settling: the sheet only has to look right, not converge to machine precision. */
+    private static final int WARMUP_ITERATIONS = 3;
     private static final float GRAVITY = -9.8F;
     private static final float DAMPING = 0.985F;
     private static final float DAMPING_CALM = 0.86F;
@@ -52,6 +54,8 @@ public final class PhysicalQuilt {
     private static final float THICKNESS = 0.012F;
     /** Upper bound on how far one particle may move per substep, in blocks. */
     private static final float MAX_STEP = 0.05F;
+    /** Broadphase cell. Her cubes are small, so a particle only needs to look at its own cell. */
+    private static final float CELL = 0.5F;
     /** Fraction of tangential speed kept when the cloth rubs against something; 0 = glued. */
     private static final float FRICTION = 0.18F;
     /** Below this average per-substep motion the sheet is considered settled and gets extra damping. */
@@ -240,6 +244,8 @@ public final class PhysicalQuilt {
         /** World-space AABBs of the captured cubes, rebuilt every frame from the latest pose. */
         private float[] boxMin = new float[0];
         private float[] boxMax = new float[0];
+        /** Box indices bucketed by cell, rebuilt once per settle. Turns 408 tests per particle into a few. */
+        private final java.util.HashMap<Long, int[]> grid = new java.util.HashMap<>();
 
         private void reset() {
             for (int row = 0; row < ROWS; row++) {
@@ -293,7 +299,12 @@ public final class PhysicalQuilt {
 
         private void settle(ColliderSet set, Matrix4f viewToWorld) {
             refreshBoxes(set, viewToWorld);
+            refreshBoxes(set, viewToWorld);
+            LOGGER.info("[被子] 碰撞校验 布质心={} 盒质心={} 间距={} 盒数={}",
+                    fmt(centroid()), fmt(boxCentroid()), fmt(centroid().distanceTo(boxCentroid())),
+                    boxMin.length / 3);
             for (int i = 0; i < WARMUP; i++) {
+                // No refresh and no grid rebuild inside the loop: the pose cannot change mid-settle.
                 step(set, viewToWorld, true);
             }
         }
@@ -303,7 +314,9 @@ public final class PhysicalQuilt {
         }
 
         private void step(ColliderSet set, Matrix4f viewToWorld, boolean warmup) {
-            refreshBoxes(set, viewToWorld);
+            if (!warmup) {
+                refreshBoxes(set, viewToWorld);
+            }
             float sub = DT / SUBSTEPS;
             float damping = CALM ? DAMPING_CALM : DAMPING;
             for (int s = 0; s < SUBSTEPS; s++) {
@@ -332,7 +345,8 @@ public final class PhysicalQuilt {
                         o.set(p);
                     }
                 }
-                for (int iter = 0; iter < ITERATIONS; iter++) {
+                int iterations = warmup ? WARMUP_ITERATIONS : ITERATIONS;
+                for (int iter = 0; iter < iterations; iter++) {
                     for (int c = 0; c < constraints.size(); c++) {
                         int[] pair = constraints.get(c);
                         float[] rest = rests.get(c);
@@ -386,43 +400,54 @@ public final class PhysicalQuilt {
         private void collide() {
             for (int i = 0; i < count; i++) {
                 Vector3f p = now[i];
-                for (int box = 0, n = boxMin.length / 3; box < n; box++) {
-                    int base = box * 3;
-                    float minX = boxMin[base] - THICKNESS, minY = boxMin[base + 1] - THICKNESS,
-                            minZ = boxMin[base + 2] - THICKNESS;
-                    float maxX = boxMax[base] + THICKNESS, maxY = boxMax[base + 1] + THICKNESS,
-                            maxZ = boxMax[base + 2] + THICKNESS;
-                    if (p.x < minX || p.x > maxX || p.y < minY || p.y > maxY || p.z < minZ || p.z > maxZ) {
-                        continue;
-                    }
-                    // Inside: escape through the nearest face.
-                    float dxMin = p.x - minX, dxMax = maxX - p.x;
-                    float dyMin = p.y - minY, dyMax = maxY - p.y;
-                    float dzMin = p.z - minZ, dzMax = maxZ - p.z;
-                    float best = Math.min(Math.min(dxMin, dxMax), Math.min(Math.min(dyMin, dyMax),
-                            Math.min(dzMin, dzMax)));
-                    if (best == dxMin) {
-                        p.x = minX;
-                    } else if (best == dxMax) {
-                        p.x = maxX;
-                    } else if (best == dyMin) {
-                        p.y = minY;
-                    } else if (best == dyMax) {
-                        p.y = maxY;
-                    } else if (best == dzMin) {
-                        p.z = minZ;
-                    } else {
-                        p.z = maxZ;
-                    }
+                int[] candidates = grid.get(key(cell(p.x), cell(p.y), cell(p.z)));
+                if (candidates != null) {
+                    collideWith(p, candidates);
+                }
+                // Same check one cell up: a particle resting exactly on a cell boundary must still see the
+                // cubes just above it.
+                int[] above = grid.get(key(cell(p.x), cell(p.y) + 1, cell(p.z)));
+                if (above != null) {
+                    collideWith(p, above);
                 }
                 // Mattress: only inside the bed footprint, so the overhang may still fall down the sides.
                 if (p.y < bedTop + THICKNESS && insideBed(p)) {
                     p.y = (float) (bedTop + THICKNESS);
-                    // Rub: a real quilt stays put because cloth grips the mattress. Killing most of the
-                    // tangential velocity here is what stops the sheet from skating across the bed.
                     Vector3f previous = prev[i];
                     previous.x = p.x + (previous.x - p.x) * FRICTION;
                     previous.z = p.z + (previous.z - p.z) * FRICTION;
+                }
+            }
+        }
+
+        private void collideWith(Vector3f p, int[] candidates) {
+            for (int box : candidates) {
+                int base = box * 3;
+                float minX = boxMin[base] - THICKNESS, minY = boxMin[base + 1] - THICKNESS,
+                        minZ = boxMin[base + 2] - THICKNESS;
+                float maxX = boxMax[base] + THICKNESS, maxY = boxMax[base + 1] + THICKNESS,
+                        maxZ = boxMax[base + 2] + THICKNESS;
+                if (p.x < minX || p.x > maxX || p.y < minY || p.y > maxY || p.z < minZ || p.z > maxZ) {
+                    continue;
+                }
+                // Inside: escape through the nearest face.
+                float dxMin = p.x - minX, dxMax = maxX - p.x;
+                float dyMin = p.y - minY, dyMax = maxY - p.y;
+                float dzMin = p.z - minZ, dzMax = maxZ - p.z;
+                float best = Math.min(Math.min(dxMin, dxMax), Math.min(Math.min(dyMin, dyMax),
+                        Math.min(dzMin, dzMax)));
+                if (best == dxMin) {
+                    p.x = minX;
+                } else if (best == dxMax) {
+                    p.x = maxX;
+                } else if (best == dyMin) {
+                    p.y = minY;
+                } else if (best == dyMax) {
+                    p.y = maxY;
+                } else if (best == dzMin) {
+                    p.z = minZ;
+                } else {
+                    p.z = maxZ;
                 }
             }
         }
@@ -463,6 +488,55 @@ public final class PhysicalQuilt {
                 boxMax[base + 1] = maxY;
                 boxMax[base + 2] = maxZ;
             }
+            buildGrid(n);
+        }
+
+        private void buildGrid(int n) {
+            grid.clear();
+            java.util.HashMap<Long, java.util.ArrayList<Integer>> buckets = new java.util.HashMap<>();
+            for (int i = 0; i < n; i++) {
+                int base = i * 3;
+                int x0 = cell(boxMin[base]), x1 = cell(boxMax[base]);
+                int y0 = cell(boxMin[base + 1]), y1 = cell(boxMax[base + 1]);
+                int z0 = cell(boxMin[base + 2]), z1 = cell(boxMax[base + 2]);
+                for (int x = x0; x <= x1; x++) {
+                    for (int y = y0; y <= y1; y++) {
+                        for (int z = z0; z <= z1; z++) {
+                            buckets.computeIfAbsent(key(x, y, z), k -> new java.util.ArrayList<>()).add(i);
+                        }
+                    }
+                }
+            }
+            for (java.util.Map.Entry<Long, java.util.ArrayList<Integer>> entry : buckets.entrySet()) {
+                int[] values = new int[entry.getValue().size()];
+                for (int i = 0; i < values.length; i++) {
+                    values[i] = entry.getValue().get(i);
+                }
+                grid.put(entry.getKey(), values);
+            }
+        }
+
+        private static int cell(float value) {
+            return (int) Math.floor(value / CELL);
+        }
+
+        private static long key(int x, int y, int z) {
+            return ((long) (x & 0x1FFFFF) << 42) | ((long) (y & 0x1FFFFF) << 21) | (z & 0x1FFFFF);
+        }
+
+        private Vec3 boxCentroid() {
+            int n = boxMin.length / 3;
+            if (n == 0) {
+                return Vec3.ZERO;
+            }
+            double x = 0, y = 0, z = 0;
+            for (int i = 0; i < n; i++) {
+                int base = i * 3;
+                x += (boxMin[base] + boxMax[base]) * 0.5D;
+                y += (boxMin[base + 1] + boxMax[base + 1]) * 0.5D;
+                z += (boxMin[base + 2] + boxMax[base + 2]) * 0.5D;
+            }
+            return new Vec3(x / n, y / n, z / n);
         }
 
         /** How far the sheet spans along the bed, measured from the bed centre, in blocks. */
