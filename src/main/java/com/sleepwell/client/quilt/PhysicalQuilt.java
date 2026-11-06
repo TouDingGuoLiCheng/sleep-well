@@ -186,10 +186,10 @@ public final class PhysicalQuilt {
             cloth.initialised = true;
             cloth.frozenAt = maid.tickCount;
             cloth.fingerprint = fingerprint(set);
-            LOGGER.info("[被子] 布料解算完成并冻结 maid={} steps={} 耗时={}ms yRange={}..{} 沿床覆盖={}",
+            LOGGER.info("[被子] 布料解算完成并冻结 maid={} steps={} 耗时={}ms yRange={}..{} 沿床覆盖={} 逐行={}",
                     shortId(maid), WARMUP, String.format(Locale.ROOT, "%.1f",
                             (System.nanoTime() - start) / 1.0E6), fmt(cloth.minY()), fmt(cloth.maxY()),
-                    cloth.alongSpan());
+                    cloth.alongSpan(), cloth.rowHeights());
         }
         // No periodic re-solve: the fingerprint check caused 300-step rebuilds whenever her idle animation
         // nudged the geometry, which is exactly the stutter that got the cloth rolled back. The cache now
@@ -315,9 +315,9 @@ public final class PhysicalQuilt {
         private void settle(ColliderSet set, Matrix4f viewToWorld) {
             refreshBoxes(set, viewToWorld);
             refreshBoxes(set, viewToWorld);
-            LOGGER.info("[被子] 碰撞校验 布质心={} 盒质心={} 间距={} 盒数={}",
+            LOGGER.info("[被子] 碰撞校验 布质心={} 盒质心={} 间距={} 盒数={} 盒Y范围={}..{}",
                     fmt(centroid()), fmt(boxCentroid()), fmt(centroid().distanceTo(boxCentroid())),
-                    boxMin.length / 3);
+                    boxMin.length / 3, fmt(boxMinY()), fmt(boxMaxY()));
             for (int i = 0; i < WARMUP; i++) {
                 // No refresh and no grid rebuild inside the loop: the pose cannot change mid-settle.
                 step(set, viewToWorld, true);
@@ -538,6 +538,34 @@ public final class PhysicalQuilt {
 
         private static long key(int x, int y, int z) {
             return ((long) (x & 0x1FFFFF) << 42) | ((long) (y & 0x1FFFFF) << 21) | (z & 0x1FFFFF);
+        }
+
+        private float boxMinY() {
+            float min = Float.MAX_VALUE;
+            for (int i = 0; i < boxMin.length / 3; i++) {
+                min = Math.min(min, boxMin[i * 3 + 1]);
+            }
+            return min;
+        }
+
+        private float boxMaxY() {
+            float max = -Float.MAX_VALUE;
+            for (int i = 0; i < boxMin.length / 3; i++) {
+                max = Math.max(max, boxMax[i * 3 + 1]);
+            }
+            return max;
+        }
+
+        /** Height of the middle particle of every fourth row: shows at a glance whether the sheet sagged. */
+        private String rowHeights() {
+            StringBuilder out = new StringBuilder();
+            for (int row = 0; row < ROWS; row += 4) {
+                if (out.length() > 0) {
+                    out.append(' ');
+                }
+                out.append(fmt(now[row * COLS + COLS / 2].y));
+            }
+            return out.toString();
         }
 
         private Vec3 boxCentroid() {
