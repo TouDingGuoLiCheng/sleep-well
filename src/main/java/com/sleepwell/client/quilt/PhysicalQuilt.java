@@ -82,8 +82,12 @@ public final class PhysicalQuilt {
      * which is what made the quilt look like it was under her. Solve only once the capture agrees with her.
      */
     private static final int STABLE_FRAMES = 2;
-    private static final float STABLE_OFFSET = 0.20F;
-    private static final float STABLE_OFFSET_Y = 0.25F;
+    /** Frame-to-frame motion below this means she has stopped moving. Compared with itself, never with her
+     *  entity position: an asymmetric model (a big costume, a tail) has its box centroid permanently offset,
+     *  and requiring agreement with the entity made the gate impossible to pass for exactly those models. */
+    private static final float STABLE_MOVE = 0.03F;
+    private static final int STABLE_BOXES = 2;
+    private static final float STABLE_RANGE = 0.02F;
     /** Never wait forever: a model that never settles still deserves a quilt (and a warning). */
     private static final int STABLE_GIVE_UP = 60;
     /** How often the frozen quilt is re-checked against her current pose. */
@@ -234,18 +238,28 @@ public final class PhysicalQuilt {
         if (!cloth.initialised) {
             cloth.refreshBoxes(set, viewToWorld);
             Vec3 centre = cloth.boxCentroid();
-            float offXZ = (float) Math.sqrt((centre.x - maid.getX()) * (centre.x - maid.getX())
-                    + (centre.z - maid.getZ()) * (centre.z - maid.getZ()));
-            float offY = (float) Math.abs(centre.y - maid.getY());
-            boolean agrees = offXZ < STABLE_OFFSET && offY < STABLE_OFFSET_Y;
-            cloth.stableFrames = agrees ? cloth.stableFrames + 1 : 0;
+            int boxes = set.boxes.size();
+            float topY = cloth.boxMaxY();
+            float lowY = cloth.boxMinY();
+            float moved = cloth.haveLast ? (float) centre.distanceTo(cloth.lastCentre) : Float.MAX_VALUE;
+            boolean still = cloth.haveLast
+                    && moved < STABLE_MOVE
+                    && Math.abs(boxes - cloth.lastBoxes) <= STABLE_BOXES
+                    && Math.abs(topY - cloth.lastMaxY) < STABLE_RANGE
+                    && Math.abs(lowY - cloth.lastMinY) < STABLE_RANGE;
+            cloth.haveLast = true;
+            cloth.lastCentre = centre;
+            cloth.lastBoxes = boxes;
+            cloth.lastMaxY = topY;
+            cloth.lastMinY = lowY;
+            cloth.stableFrames = still ? cloth.stableFrames + 1 : 0;
             if (cloth.stableFrames < STABLE_FRAMES && ++cloth.waitFrames < STABLE_GIVE_UP) {
                 // She is still lying down. The capture is exactly as mid-motion as she is, so wait.
                 return;
             }
             if (cloth.stableFrames < STABLE_FRAMES) {
-                LOGGER.warn("[被子] 采集姿态始终未稳定 maid={} 水平偏={} 垂直偏={}，仍然按当前姿态解算",
-                        shortId(maid), fmt(offXZ), fmt(offY));
+                LOGGER.warn("[被子] 采集姿态始终未稳定 maid={} 帧间位移={} 盒数={} 高度范围={}..{}，仍然按当前姿态解算",
+                        shortId(maid), fmt(moved), boxes, fmt(lowY), fmt(topY));
             }
             SOLVED_THIS_FRAME = true;
             cloth.reset();
@@ -349,8 +363,13 @@ public final class PhysicalQuilt {
         private final int count = COLS * ROWS;
 
         private boolean initialised;
-        /** Consecutive frames whose capture agreed with her entity position. */
+        /** Consecutive frames in which the capture did not move, so she has stopped reshaping. */
         private int stableFrames;
+        private boolean haveLast;
+        private Vec3 lastCentre;
+        private int lastBoxes;
+        private float lastMinY;
+        private float lastMaxY;
         /** Frames spent waiting for that agreement, so the gate cannot starve the quilt. */
         private int waitFrames;
         private String modelKey = "";
