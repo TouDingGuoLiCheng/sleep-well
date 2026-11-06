@@ -14,22 +14,30 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * <p>
  * Non-gecko maid models (the vanilla-style packs) are {@code BedrockPart} trees, and the matrix inside the
  * render call is the only exact statement of where a part's cubes land - reconstructing it from the parts'
- * fields meant guessing at vanilla's sleeping transform, which is why those maids came out with no outline
- * at all. Reading the matrix the game actually used removes that guesswork.
+ * fields meant guessing at vanilla's sleeping transform, which is why those maids came out with no outline at
+ * all. Reading the matrix the game actually used removes that guesswork.
+ * <p>
+ * {@code BedrockPart} has two {@code render} overloads, so each handler names its own descriptor: mixin keys
+ * handlers by name, and two handlers sharing a name is what made the last build fail to launch.
  * <p>
  * The hook is a no-op unless a sleeping maid render pass is open, so normal movement costs one boolean.
  */
 @Mixin(BedrockPart.class)
 public abstract class BedrockPartCaptureMixin {
-    @Inject(method = "render", at = @At("HEAD"), require = 0, remap = false)
-    private void sleepwell$partRender(PoseStack poseStack, VertexConsumer consumer, int light, int overlay,
-                                      CallbackInfo ci) {
+    private static final String FLAT =
+            "render(Lcom/mojang/blaze3d/vertex/PoseStack;Lcom/mojang/blaze3d/vertex/VertexConsumer;II)V";
+    private static final String TINT =
+            "render(Lcom/mojang/blaze3d/vertex/PoseStack;Lcom/mojang/blaze3d/vertex/VertexConsumer;IIFFFF)V";
+
+    @Inject(method = FLAT, at = @At("HEAD"), require = 0, remap = false)
+    private void sleepwell$partRenderFlat(PoseStack poseStack, VertexConsumer consumer, int light, int overlay,
+                                          CallbackInfo ci) {
         capture(poseStack);
     }
 
-    @Inject(method = "render", at = @At("HEAD"), require = 0, remap = false)
-    private void sleepwell$partRender(PoseStack poseStack, VertexConsumer consumer, int light, int overlay,
-                                      float r, float g, float b, float a, CallbackInfo ci) {
+    @Inject(method = TINT, at = @At("HEAD"), require = 0, remap = false)
+    private void sleepwell$partRenderTint(PoseStack poseStack, VertexConsumer consumer, int light, int overlay,
+                                          float red, float green, float blue, float alpha, CallbackInfo ci) {
         capture(poseStack);
     }
 
