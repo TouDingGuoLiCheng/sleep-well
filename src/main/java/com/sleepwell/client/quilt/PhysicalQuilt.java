@@ -39,8 +39,12 @@ public final class PhysicalQuilt {
     private static final Logger LOGGER = LogUtils.getLogger();
 
     /** Grid resolution: across the bed first, then along it. */
-    private static final int COLS = 15;
-    private static final int ROWS = 19;
+    /**
+     * Grid resolution. This is the real limit on how closely the sheet can follow her: the particle spacing
+     * must be finer than her limbs (~0.1 blocks) or the cloth simply bridges over every gap and looks hollow.
+     */
+    private static final int COLS = 23;
+    private static final int ROWS = 31;
     private static final float DT = 1.0F / 60.0F;
     private static final int SUBSTEPS = 4;
     private static final int ITERATIONS = 6;
@@ -62,7 +66,7 @@ public final class PhysicalQuilt {
      * How far the cloth floats above her skin: this is the duvet's own padding. Without it the sheet lies
      * straight on a body that is only 0.23 blocks tall, which reads as a flat bed sheet rather than a quilt.
      */
-    private static final float DUET_PADDING = 0.035F;
+    private static final float DUET_PADDING = 0.022F;
     /** Below this average per-substep motion the sheet is considered settled and gets extra damping. */
     private static final float CALM_SPEED = 0.0016F;
     /** One solve, done properly: the sheet is settled once and then frozen (R6). */
@@ -354,10 +358,10 @@ public final class PhysicalQuilt {
                         add(a + 1, a + COLS, 0.6F);
                     }
                     if (col + 2 < COLS) {
-                        add(a, a + 2, 0.18F);
+                        add(a, a + 2, 0.07F);
                     }
                     if (row + 2 < ROWS) {
-                        add(a, a + COLS * 2, 0.12F);
+                        add(a, a + COLS * 2, 0.05F);
                     }
                 }
             }
