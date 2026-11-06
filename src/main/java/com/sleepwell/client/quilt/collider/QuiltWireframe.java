@@ -145,6 +145,10 @@ public final class QuiltWireframe {
                 }
             }
         }
+        // A cube at a known place in the same batch. If this one shows and the maid boxes do not, the
+        // batch is fine and the boxes are off screen; if it does not show either, nothing at this stage is
+        // reaching the screen and the whole overlay needs a different hook.
+        referenceCube(consumer);
         buffers.endBatch(RenderType.lines());
         com.mojang.blaze3d.systems.RenderSystem.enableDepthTest();
         int tick = Minecraft.getInstance().player == null ? 0 : Minecraft.getInstance().player.tickCount;
@@ -159,7 +163,8 @@ public final class QuiltWireframe {
                     nearest.getZ(), nearSet == null ? -1 : nearSet.boxes.size(),
                     nb == null ? "-" : String.format(java.util.Locale.ROOT, "%.2f,%.2f,%.2f", nb[0], nb[1], nb[2]));
         }
-        drawDiagnostics = " maids=" + maidList + " near=" + nearInfo + String.format(java.util.Locale.ROOT,
+        drawDiagnostics = " ref=(0.0,-0.4,-3.0)" + " maids=" + maidList + " near=" + nearInfo
+                + String.format(java.util.Locale.ROOT,
                 " cam=%.2f,%.2f,%.2f viewBox=[%.2f,%.2f,%.2f..%.2f,%.2f,%.2f] firstWorld=%s firstView=%s",
                 camera.x, camera.y, camera.z, minX, minY, minZ, maxX, maxY, maxZ,
                 firstBoxWorld == null ? "-" : firstBoxWorld.toString(),
@@ -256,6 +261,30 @@ public final class QuiltWireframe {
     private static void raw(VertexConsumer consumer, Matrix4f matrix, org.joml.Vector3f p,
                             float r, float g, float b) {
         consumer.vertex(matrix, p.x, p.y, p.z).color(r, g, b, 1.0F).normal(0.0F, 1.0F, 0.0F).endVertex();
+    }
+
+    /** 0.2-block cube three blocks in front of the eye, drawn exactly like the maid boxes. */
+    private static void referenceCube(VertexConsumer consumer) {
+        float cx = 0.0F;
+        float cy = -0.4F;
+        float cz = -3.0F;
+        float h = 0.1F;
+        float[][] corners = new float[8][];
+        for (int i = 0; i < 8; i++) {
+            corners[i] = new float[]{
+                    cx + ((i & 1) == 0 ? -h : h),
+                    cy + ((i & 2) == 0 ? -h : h),
+                    cz + ((i & 4) == 0 ? -h : h)};
+        }
+        for (int[] edge : EDGES) {
+            for (int end : edge) {
+                float[] corner = corners[end];
+                consumer.vertex(new Matrix4f(), corner[0], corner[1], corner[2])
+                        .color(1.0F, 1.0F, 0.0F, 1.0F)
+                        .normal(0.0F, 1.0F, 0.0F)
+                        .endVertex();
+            }
+        }
     }
 
     private static void line(VertexConsumer consumer, Matrix4f matrix, QuiltBox box, int corner,
