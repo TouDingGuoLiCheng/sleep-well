@@ -107,9 +107,11 @@ public final class QuiltWireframe {
             }
             boxes += set.boxes.size();
             if (maidList.length() < 420) {
-                maidList.append(String.format(java.util.Locale.ROOT, " [n=%d %.1f,%.1f,%.1f min=%.1f,%.1f,%.1f]",
+                maidList.append(String.format(java.util.Locale.ROOT,
+                        " [n=%d %.1f,%.1f,%.1f min=%.1f,%.1f,%.1f view=%s layer=%s space=%s]",
                         set.boxes.size(), maid.getX(), maid.getY(), maid.getZ(),
-                        set.bounds[0], set.bounds[1], set.bounds[2]));
+                        set.bounds[0], set.bounds[1], set.bounds[2],
+                        set.viewSpace, set.fromLayer, set.viewToWorld == null ? "none" : "set"));
             }
             // View-space sets carry TLM's own render matrix, so they must NOT be pushed through the level
             // matrix again; world-space fallbacks still are.
