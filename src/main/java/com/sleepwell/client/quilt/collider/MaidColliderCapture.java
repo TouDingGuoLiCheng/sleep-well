@@ -458,6 +458,23 @@ public final class MaidColliderCapture {
         FRAME++;
     }
 
+    /**
+     * Converts every set captured earlier in <em>this</em> frame into world space, using this frame's pose.
+     * <p>
+     * Must be called from the level stage while the camera pose of the frame is known. The cloth used to
+     * invert a <em>newer</em> pose at solve time, so a capture taken one frame earlier was converted with a
+     * camera that had already moved - and the error was frozen into the quilt for the whole sleep.
+     */
+    public static void resolveWorldMatrices(Matrix4f framePose) {
+        Matrix4f inverse = new Matrix4f(framePose).invert();
+        for (ColliderSet set : SETS.values()) {
+            if (set.pendingWorldMatrix) {
+                set.viewToWorld = new Matrix4f(inverse);
+                set.pendingWorldMatrix = false;
+            }
+        }
+    }
+
     static void captureFromLayer(com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid maid,
                                  Object geoEntity, Matrix4f pose) {
         layerRuns++;
@@ -500,7 +517,9 @@ public final class MaidColliderCapture {
         set.fromLayer = true;
         set.viewSpace = true;
         set.captureFrame = frameCounter();
-        set.viewToWorld = new Matrix4f(viewMatrix).invert();
+        // Converted at the end of this very frame; see resolveWorldMatrices.
+        set.viewToWorld = null;
+        set.pendingWorldMatrix = true;
         set.capsules = Capsules.fit(boxes);
         if (layerCalls % 600 == 1) {
             LOGGER.info("[被子] " + Capsules.summary(set.capsules));

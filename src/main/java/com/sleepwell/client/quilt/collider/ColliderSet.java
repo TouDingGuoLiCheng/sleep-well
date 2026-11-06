@@ -21,8 +21,10 @@ public final class ColliderSet {
     public boolean viewSpace;
     /** Capsule chain fitted from {@link #boxes}: the collision form the cloth actually solves against. */
     public java.util.List<Capsule> capsules = java.util.List.of();
-    /** Maps the captured view-space corners back to world space; needed to collide the cloth in world space. */
-    public org.joml.Matrix4f viewToWorld = new org.joml.Matrix4f();
+    /** Maps the captured view-space corners back to world space; filled at the end of the capturing frame. */
+    public org.joml.Matrix4f viewToWorld;
+    /** Set while this frame's pose has not been applied yet; see MaidColliderCapture.resolveWorldMatrices. */
+    public boolean pendingWorldMatrix;
     /**
      * The render frame this set was captured in. View-space corners are only valid together with the pose
      * of that very frame; using a stale set with a newer camera shifts the whole body.

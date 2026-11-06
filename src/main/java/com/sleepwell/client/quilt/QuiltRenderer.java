@@ -147,6 +147,9 @@ public final class QuiltRenderer {
         pose.pushPose();
         pose.translate(-camera.x, -camera.y, -camera.z);
         MultiBufferSource.BufferSource buffers = Minecraft.getInstance().renderBuffers().bufferSource();
+        // The captures of this frame happened minutes? no - milliseconds ago, with this very pose. Converting
+        // them now is exact; converting them on a later frame was the defect.
+        com.sleepwell.client.quilt.collider.MaidColliderCapture.resolveWorldMatrices(pose.last().pose());
         QuiltWireframe.draw(pose, buffers, sleeping, camera, event.getPartialTick());
         if (sleeping.isEmpty()) {
             pose.popPose();

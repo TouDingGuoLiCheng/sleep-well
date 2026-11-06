@@ -190,7 +190,12 @@ public final class PhysicalQuilt {
 
         // The captured corners live in the line batch's space. The level PoseStack maps world into exactly
         // that space, so its inverse is the only correct way back to world coordinates.
-        Matrix4f viewToWorld = new Matrix4f(pose.last().pose()).invert();
+        // The matrix that came with the capture. Recomputing it from the current pose was the bug: a capture
+        // taken one frame earlier was converted with a camera that had already moved, which slid the whole
+        // body sideways under a frozen quilt.
+        Matrix4f viewToWorld = set.viewToWorld != null
+                ? new Matrix4f(set.viewToWorld)
+                : new Matrix4f(pose.last().pose()).invert();
         String modelKey = modelKey(maid);
         Cloth cloth = CLOTHS.computeIfAbsent(maid.getUUID(), id -> new Cloth());
         if (cloth.initialised && !modelKey.equals(cloth.modelKey)) {
