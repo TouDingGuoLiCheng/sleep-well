@@ -1159,6 +1159,17 @@ public final class PhysicalQuilt {
         }
 
         private void draw(PoseStack pose, MultiBufferSource.BufferSource buffers, DyeColor color) {
+            // 染色被子把床的色号烘进顶点色：不依赖着色器全局状态，绘制顺序再乱也不会漏色。
+            if (style.dyeTinted) {
+                int rgb = color.getTextColor();
+                quiltTintR = ((rgb >> 16) & 0xFF) / 255.0F;
+                quiltTintG = ((rgb >> 8) & 0xFF) / 255.0F;
+                quiltTintB = (rgb & 0xFF) / 255.0F;
+            } else {
+                quiltTintR = 1.0F;
+                quiltTintG = 1.0F;
+                quiltTintB = 1.0F;
+            }
             VertexConsumer consumer = buffers.getBuffer(
                     RenderType.entityCutoutNoCull(style.texture()));
             PoseStack.Pose entry = pose.last();
@@ -1260,10 +1271,14 @@ public final class PhysicalQuilt {
                     now[a].z - nz[a] * style.shell, u0, style.rimV, light, shade);
         }
 
+        /** 当前绘制批次的被子色调；染色被子取床色，花纹被子恒为 1。渲染线程单批，静态即可。 */
+        private static float quiltTintR = 1.0F;
+        private static float quiltTintG = 1.0F;
+        private static float quiltTintB = 1.0F;
         private static void vertex(VertexConsumer consumer, PoseStack.Pose entry, float x, float y, float z,
                                    float u, float v, int light, float shade) {
             consumer.vertex(entry.pose(), x, y, z)
-                    .color(shade, shade, shade, 1.0F)
+                    .color(shade * quiltTintR, shade * quiltTintG, shade * quiltTintB, 1.0F)
                     .uv(u, v)
                     .overlayCoords(net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY)
                     .uv2(light)
