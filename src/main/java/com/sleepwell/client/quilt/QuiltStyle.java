@@ -102,6 +102,13 @@ public final class QuiltStyle {
     public static final QuiltStyle SUMMER_SUNFLOWER = register(new QuiltStyle("summer_sunflower", "夏之被",
             "summer_sunflower", false, Tiling.WHOLE, 1.0F, 1.0F, false, 0.038F, 0.76F, 0.66F, 0.16F));
 
+    /**
+     * Autumn: a printed scene chosen by the artwork itself - low evening light through a forest,
+     * warm and quiet. Whole-sheet like the spring and summer quilts.
+     */
+    public static final QuiltStyle AUTUMN = register(new QuiltStyle("autumn", "秋之被",
+            "autumn", false, Tiling.WHOLE, 1.0F, 1.0F, false, 0.038F, 0.76F, 0.66F, 0.16F));
+
     private static QuiltStyle register(QuiltStyle style) {
         REGISTRY.put(style.id, style);
         return style;
