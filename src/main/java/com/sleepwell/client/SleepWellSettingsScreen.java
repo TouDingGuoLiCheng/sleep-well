@@ -475,8 +475,10 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
             boolean hovered = this.active && isHoveredOrFocused();
             RenderSystem.enableBlend();
             RenderSystem.defaultBlendFunc();
-            graphics.fill(x, y, x + w, y + h, hovered ? 0x8C33405E : 0x66141A2B);
-            graphics.renderOutline(x, y, w, h, hovered ? 0xD8FFFFFF : 0x77FFFFFF);
+            // No plate of its own: the row's plate is already there, and a second outline reads as a broken button.
+            if (hovered) {
+                graphics.fill(x, y + 2, x + w, y + h - 2, 0x55FFFFFF);
+            }
             int cell = 5;
             int px = x + (w - cell * 2) / 2;
             int py = y + (h - cell * 2) / 2;
@@ -508,8 +510,10 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
             int color = this.active ? (hovered ? 0xFFFFFFFF : 0xE8F2EEE4) : 0x8C8C8C;
             RenderSystem.enableBlend();
             RenderSystem.defaultBlendFunc();
-            graphics.fill(x, y, x + w, y + h, hovered ? 0x8C33405E : 0x66141A2B);
-            graphics.renderOutline(x, y, w, h, hovered ? 0xD8FFFFFF : 0x77FFFFFF);
+            // Same as the quilt icon: the row plate carries the box, the gear only draws itself.
+            if (hovered) {
+                graphics.fill(x, y + 2, x + w, y + h - 2, 0x55FFFFFF);
+            }
             // Body, four teeth, then a dark hub punched back out.
             graphics.fill(cx - 3, cy - 3, cx + 3, cy + 3, color);
             graphics.fill(cx - 5, cy - 1, cx + 5, cy + 1, color);
