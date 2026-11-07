@@ -187,6 +187,7 @@ public final class PhysicalQuilt {
         String modelKey = modelKey(maid) + "|" + shape.id;
         Cloth cached = CLOTHS.computeIfAbsent(maid.getUUID(), id -> new Cloth());
         cached.style = shape;
+        cached.border = com.sleepwell.client.ClientQuiltStyles.borderOf(maid);
         if (cached.initialised && modelKey.equals(cached.modelKey) && cached.hasLocalFrame()) {
             // Reuse: the sheet was solved once for this model, so it only has to be moved to whatever bed she
             // is in now. No capture, no gate, no solver - the whole point of the cache.
@@ -429,6 +430,8 @@ public final class PhysicalQuilt {
         private BlockPos bedKey;
         /** The quilt this sheet is wearing: textures, thickness and width all come from here. */
         private QuiltStyle style = QuiltStyle.THICK_GINGHAM;
+        /** The border sewn around her quilt; empty means the artwork covers the whole sheet. */
+        private String border = "";
         private int frozenAt;
         private float fingerprint;
         private Vec3 anchor = Vec3.ZERO;
@@ -1171,7 +1174,7 @@ public final class PhysicalQuilt {
                 quiltTintB = 1.0F;
             }
             VertexConsumer consumer = buffers.getBuffer(
-                    RenderType.entityCutoutNoCull(style.texture()));
+                    RenderType.entityCutoutNoCull(QuiltTextures.texture(style, border)));
             PoseStack.Pose entry = pose.last();
             // Sample the light where each particle actually is. FULL_BRIGHT ignored the world entirely, which is
             // why the quilt stayed daytime-bright at night and in the rain.
@@ -1251,7 +1254,7 @@ public final class PhysicalQuilt {
                 rim(consumer, entry, rimShade, lights, 0, row, 0, row + 1, nx, ny, nz);
                 rim(consumer, entry, rimShade, lights, COLS - 1, row, COLS - 1, row + 1, nx, ny, nz);
             }
-            buffers.endBatch(RenderType.entityCutoutNoCull(style.texture()));
+            buffers.endBatch(RenderType.entityCutoutNoCull(QuiltTextures.texture(style, border)));
         }
 
         /** One border quad: particle p at the top, the same particle sunk along its normal, for two partners. */
