@@ -23,9 +23,14 @@ import java.util.Locale;
 public final class QuiltCache {
     private static final Logger LOGGER = LoggerFactory.getLogger("sleep_well/quiltCache");
     private static final String DIR_NAME = "sleep_well/quilt_cache";
-    /** A frame is only reused when the footprint it came from matches this closely. */
-    private static final float SIZE_EPS = 0.05F;
-    private static final int BOX_EPS = 8;
+    /**
+     * Footprint tolerance. Absolute 0.12 blocks plus 25 % of the measured size: a pose that shifts by a few
+     * centimetres must not throw away a solved sheet, but a genuinely different body (a model swap, a size
+     * change) still has to be re-solved.
+     */
+    private static final float SIZE_EPS = 0.12F;
+    private static final float SIZE_REL = 0.25F;
+    private static final int BOX_EPS = 12;
 
     private QuiltCache() {
     }
@@ -62,6 +67,12 @@ public final class QuiltCache {
         return modelKey.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "_");
     }
 
+    /** One axis of the footprint: within a fixed slack, or within a quarter of the larger of the two. */
+    private static boolean close(float stored, float current) {
+        float slack = SIZE_EPS + SIZE_REL * Math.max(Math.abs(stored), Math.abs(current));
+        return Math.abs(stored - current) <= slack;
+    }
+
     /** Loads a frame for this model and footprint, or null when there is none worth trusting. */
     public static Frame load(String modelKey, ColliderSet set, int cols, int rows) {
         if (modelKey == null || set == null) {
@@ -83,9 +94,9 @@ public final class QuiltCache {
             float dy = set.bounds[4] - set.bounds[1];
             float dz = set.bounds[5] - set.bounds[2];
             boolean same = Math.abs(tag.getInt("boxes") - set.boxes.size()) <= BOX_EPS
-                    && Math.abs(tag.getFloat("dx") - dx) < SIZE_EPS
-                    && Math.abs(tag.getFloat("dy") - dy) < SIZE_EPS
-                    && Math.abs(tag.getFloat("dz") - dz) < SIZE_EPS;
+                    && close(tag.getFloat("dx"), dx)
+                    && close(tag.getFloat("dy"), dy)
+                    && close(tag.getFloat("dz"), dz);
             if (!same) {
                 LOGGER.info("[被子] 缓存不匹配，重新解算 model={} 盒子 {}->{} 尺寸 {}x{}x{}->{}x{}x{}",
                         modelKey, tag.getInt("boxes"), set.boxes.size(), tag.getFloat("dx"),
