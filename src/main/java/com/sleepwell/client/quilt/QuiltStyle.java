@@ -109,6 +109,13 @@ public final class QuiltStyle {
     public static final QuiltStyle AUTUMN = register(new QuiltStyle("autumn", "秋之被",
             "autumn", false, Tiling.WHOLE, 1.0F, 1.0F, false, 0.038F, 0.76F, 0.66F, 0.16F));
 
+    /**
+     * Winter: a printed scene - snow, pines, moonlight and falling flakes. Whole-sheet like the
+     * other seasonal quilts.
+     */
+    public static final QuiltStyle WINTER = register(new QuiltStyle("winter", "冬之被",
+            "winter", false, Tiling.WHOLE, 1.0F, 1.0F, false, 0.038F, 0.76F, 0.66F, 0.16F));
+
     private static QuiltStyle register(QuiltStyle style) {
         REGISTRY.put(style.id, style);
         return style;
