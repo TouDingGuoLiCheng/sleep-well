@@ -70,11 +70,11 @@ public final class QuiltStyle {
     private static final java.util.Map<String, QuiltStyle> REGISTRY = new java.util.LinkedHashMap<>();
 
     /**
-     * The default quilt: a plain sheet. Its texture is a white sheet that the renderer multiplies by this
-     * quilt's colour, so every solid colour is one registration and no extra artwork.
+     * The default quilt: a plain sheet that takes the bed's dye, so a maid on a blue bed is covered in blue
+     * and nobody has to pick a colour to get a matching quilt.
      */
     public static final QuiltStyle SOLID = register(new QuiltStyle("solid", "素色被",
-            "solid_white", false, Tiling.WHOLE, 1.0F, 1.0F, false, 0.038F, 0.76F, 0.66F, 0.16F));
+            "solid_white", true, Tiling.WHOLE, 1.0F, 1.0F, false, 0.038F, 0.76F, 0.66F, 0.16F));
 
     /** The original gingham cloth: the bed's dye picks its colour, so it still matches the bed it sits on. */
     public static final QuiltStyle THICK_GINGHAM = register(new QuiltStyle("thick_gingham", "厚实格子被",
