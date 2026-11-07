@@ -156,12 +156,7 @@ public final class QuiltWireframe {
         // which space this stage actually draws in:
         //   yellow  - camera-relative, identity matrix (what the viewSpace sets assume)
         //   magenta - world space, pushed through the level matrix (what a world-space set would need)
-        referenceCube(consumer, new Matrix4f(), 0.0F, -0.4F, -3.0F, 1.0F, 1.0F, 0.0F);
-        net.minecraft.client.Camera cam = Minecraft.getInstance().gameRenderer.getMainCamera();
-        org.joml.Vector3f eye = cam.getPosition().toVector3f();
-        org.joml.Vector3f look = cam.getLookVector();
-        referenceCube(consumer, matrix, eye.x + look.x * 3.0F, eye.y + look.y * 3.0F - 0.4F,
-                eye.z + look.z * 3.0F, 1.0F, 0.0F, 1.0F);
+
         buffers.endBatch(RenderType.lines());
         com.mojang.blaze3d.systems.RenderSystem.enableDepthTest();
         int tick = Minecraft.getInstance().player == null ? 0 : Minecraft.getInstance().player.tickCount;

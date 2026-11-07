@@ -239,6 +239,18 @@ public final class MaidColliderCapture {
         if (boxes == null || boxes.size() < 8) {
             return;
         }
+        // The part matrices carry camera-relative coordinates the camera has NOT rotated yet: the vanilla
+        // renderer only translates the pose stack, the rotation happens when the level batch is uploaded. The
+        // gecko layer hands out already-rotated coordinates, which is why wine fox boxes were visible and
+        // these were not - present, correct, and drawn off to the side.
+        org.joml.Quaternionf camRot = Minecraft.getInstance().gameRenderer.getMainCamera().rotation();
+        for (QuiltBox box : boxes) {
+            for (int i = 0; i < 8; i++) {
+                org.joml.Vector3f corner = camRot.transform(
+                        new org.joml.Vector3f(box.x(i), box.y(i), box.z(i)), new org.joml.Vector3f());
+                box.setCorner(i, corner.x, corner.y, corner.z);
+            }
+        }
         ColliderSet set = new ColliderSet(boxes, bounds(boxes), stamp(boxes), maid.tickCount, true);
         set.fromLayer = true;
         set.viewSpace = true;
