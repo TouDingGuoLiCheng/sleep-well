@@ -88,6 +88,13 @@ public final class QuiltStyle {
             "spring_blossom", false, Tiling.TILED, 2.0F, 2.0F, false, 0.028F, 0.82F, 0.72F, 0.16F));
 
     /**
+     * Spring: a printed scene - blue sky, a warm sun, cherry boughs and a flower meadow. Like the
+     * summer quilt it is laid once across the whole sheet instead of tiling.
+     */
+    public static final QuiltStyle SPRING_CHERRY = register(new QuiltStyle("spring_cherry", "春之被",
+            "spring_cherry", false, Tiling.WHOLE, 1.0F, 1.0F, false, 0.038F, 0.76F, 0.66F, 0.16F));
+
+    /**
      * Summer: a printed scene rather than a repeating cloth - blue sky, big cumulus and a sunflower
      * field. The artwork is laid once across the whole sheet, so there is nothing to tile and the
      * drawing keeps its own composition.
