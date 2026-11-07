@@ -7,6 +7,7 @@ import com.sleepwell.gui.SleepWellContainer;
 import com.sleepwell.network.SaveSettingPacket;
 import com.sleepwell.client.quilt.QuiltBorder;
 import com.sleepwell.client.quilt.QuiltStyle;
+import com.sleepwell.client.quilt.QuiltTextures;
 import com.sleepwell.network.SaveQuiltBorderPacket;
 import com.sleepwell.network.SaveQuiltStylePacket;
 import com.sleepwell.network.SaveSkipTasksPacket;
@@ -89,10 +90,12 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
     private static final int WALL_COLS = 2;
     private static final int WALL_CELL_W = 52;
     /** Two lines of text no longer fit: the plate shows the name only, the note moved to a hover hint. */
-    private static final int WALL_CELL_H = 24;
+    private static final int WALL_CELL_H = 34;
     private static final int WALL_GAP = 4;
+    /** Edge of the quilt thumbnail inside a plate. */
+    private static final int THUMB = 20;
     /** The border column, right of the divider: five plates, tighter than the quilts. */
-    private static final int BORDER_CELL_H = 20;
+    private static final int BORDER_CELL_H = 26;
     private static final int BORDER_GAP = 4;
     /** Space between the quilt grid and the divider, then the border column itself. */
     private static final int WALL_SPLIT = 8;
@@ -128,12 +131,13 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
         }
     }
 
+    /** The wall is a full-window overlay: thumbs need more room than the row grid has. */
     private int wallLeft() {
-        return this.leftPos + ROW_X;
+        return this.leftPos + 6;
     }
 
     private int wallTop() {
-        return this.topPos + FIRST_ROW_Y;
+        return this.topPos + 14;
     }
 
     private int wallCellX(int index) {
@@ -150,6 +154,7 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
         RenderSystem.defaultBlendFunc();
         List<QuiltStyle> styles = QuiltStyle.all();
         String current = this.chosenQuilt != null ? this.chosenQuilt : this.menu.quiltStyle();
+        String currentBorder = currentBorder();
         for (int i = 0; i < styles.size(); i++) {
             QuiltStyle style = styles.get(i);
             boolean locked = this.menu.quiltLocked() && !style.isDefault();
@@ -162,20 +167,23 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
             graphics.fill(x, y, x + WALL_CELL_W, y + 1, 0x55FFFFFF);
             graphics.renderOutline(x, y, WALL_CELL_W, WALL_CELL_H,
                     selected ? 0xFFF2E27A : (hovered ? 0xD8FFFFFF : 0x77FFFFFF));
-            graphics.drawString(this.font, (selected ? "✔ " : "") + style.displayName, x + 4, y + 8,
-                    locked ? 0x8C8C8C : 0xF2EEE4, false);
+            // The face itself as the plate's art: a player picks by look, not by reading names.
+            blitScaled(graphics, QuiltTextures.texture(style, currentBorder), x + (WALL_CELL_W - THUMB) / 2,
+                    y + 3, THUMB);
+            graphics.drawCenteredString(this.font, (selected ? "✔" : "") + style.displayName,
+                    x + WALL_CELL_W / 2, y + WALL_CELL_H - 10,
+                    locked ? 0x8C8C8C : 0xF2EEE4);
         }
         graphics.drawString(this.font, Component.translatable("gui.sleep_well.quilt_title"),
                 wallLeft(), wallTop() - 12, TITLE_COLOR, false);
 
         // The divider is what tells a player the wall has two halves now: faces left, borders right.
         graphics.fill(borderX() - WALL_SPLIT + 2, wallTop() - 10,
-                borderX() - WALL_SPLIT + 3, wallTop() + 116, 0x66F2E27A);
+                borderX() - WALL_SPLIT + 3, wallTop() + 152, 0x66F2E27A);
         graphics.drawString(this.font, Component.translatable("gui.sleep_well.border_title"),
                 borderX(), wallTop() - 12, TITLE_COLOR, false);
 
         List<QuiltBorder> borders = QuiltBorder.all();
-        String currentBorder = currentBorder();
         for (int i = 0; i < borders.size(); i++) {
             QuiltBorder border = borders.get(i);
             boolean locked = this.menu.quiltLocked() && !border.isNone();
@@ -188,10 +196,29 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
             graphics.fill(x, y, x + WALL_CELL_W, y + 1, 0x55FFFFFF);
             graphics.renderOutline(x, y, WALL_CELL_W, BORDER_CELL_H,
                     selected ? 0xFFF2E27A : (hovered ? 0xD8FFFFFF : 0x77FFFFFF));
-            graphics.drawString(this.font, (selected ? "✔ " : "") + border.displayName, x + 4, y + 6,
+            if (!border.isNone()) {
+                blitCrop(graphics, border.texture(), x + 4, y + 5, 0, QuiltBorder.BAND, 16);
+            }
+            graphics.drawString(this.font, (selected ? "✔ " : "") + border.displayName, x + 24, y + 9,
                     locked ? 0x8C8C8C : 0xF2EEE4, false);
         }
         RenderSystem.disableBlend();
+    }
+
+    /** Draws a whole texture into a square of the given size, so a 192x256 face still reads as an icon. */
+    private static void blitScaled(GuiGraphics graphics, ResourceLocation texture, int x, int y, int size) {
+        com.mojang.blaze3d.vertex.PoseStack pose = graphics.pose();
+        pose.pushPose();
+        pose.translate(x, y, 0.0F);
+        pose.scale(size / 192.0F, size / 256.0F, 1.0F);
+        graphics.blit(texture, 0, 0, 0, 0, 192, 256, 192, 256);
+        pose.popPose();
+    }
+
+    /** Crops a small square out of a texture untouched, for the border swatches. */
+    private static void blitCrop(GuiGraphics graphics, ResourceLocation texture, int x, int y,
+                                 int u, int v, int size) {
+        graphics.blit(texture, x, y, u, v, size, size, 220, 284);
     }
 
     /** The left edge of the border column, right of the quilt grid and the divider. */
