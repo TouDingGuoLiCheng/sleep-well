@@ -106,12 +106,20 @@ public final class QuiltWireframe {
                 continue;
             }
             boxes += set.boxes.size();
-            if (maidList.length() < 420) {
+            if (maidList.length() < 700) {
+                // What this maid's boxes SHOULD look like in each candidate space, so the stored corners can
+                // be matched to one of them by arithmetic instead of by drawing probes.
+                org.joml.Quaternionf camRot = Minecraft.getInstance().gameRenderer.getMainCamera().rotation();
+                org.joml.Vector3f rel = new org.joml.Vector3f((float) (maid.getX() - camera.x),
+                        (float) (maid.getY() - camera.y), (float) (maid.getZ() - camera.z));
+                org.joml.Vector3f rotated = camRot.transform(new org.joml.Vector3f(rel), new org.joml.Vector3f());
                 maidList.append(String.format(java.util.Locale.ROOT,
-                        " [n=%d %.1f,%.1f,%.1f min=%.1f,%.1f,%.1f view=%s layer=%s space=%s]",
+                        " [n=%d pos=%.1f,%.1f,%.1f min=%.1f,%.1f,%.1f rel=%.1f,%.1f,%.1f rot=%.1f,%.1f,%.1f"
+                                + " view=%s layer=%s]",
                         set.boxes.size(), maid.getX(), maid.getY(), maid.getZ(),
                         set.bounds[0], set.bounds[1], set.bounds[2],
-                        set.viewSpace, set.fromLayer, set.viewToWorld == null ? "none" : "set"));
+                        rel.x, rel.y, rel.z, rotated.x, rotated.y, rotated.z,
+                        set.viewSpace, set.fromLayer));
             }
             // View-space sets carry TLM's own render matrix, so they must NOT be pushed through the level
             // matrix again; world-space fallbacks still are.
