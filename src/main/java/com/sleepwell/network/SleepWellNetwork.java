@@ -38,5 +38,10 @@ public final class SleepWellNetwork {
                 .decoder(SaveQuiltStylePacket::decode)
                 .consumerMainThread(SaveQuiltStylePacket::handle)
                 .add();
+        CHANNEL.messageBuilder(SyncQuiltStylePacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncQuiltStylePacket::encode)
+                .decoder(SyncQuiltStylePacket::decode)
+                .consumerMainThread(SyncQuiltStylePacket::handle)
+                .add();
     }
 }

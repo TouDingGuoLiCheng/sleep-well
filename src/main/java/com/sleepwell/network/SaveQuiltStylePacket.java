@@ -53,6 +53,10 @@ public final class SaveQuiltStylePacket {
                 return;
             }
             MaidCapabilities.of(maid).setQuiltStyle(style.id);
+            // The capability does not sync itself, so push the new value to everyone who can see her.
+            SleepWellNetwork.CHANNEL.send(
+                    net.minecraftforge.network.PacketDistributor.TRACKING_ENTITY.with(() -> maid),
+                    new SyncQuiltStylePacket(maid.getId(), style.id));
         });
     }
 }
