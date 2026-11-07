@@ -572,8 +572,8 @@ public final class PhysicalQuilt {
          * and cache the sheet exactly once.
          */
         private boolean settleChunk(ColliderSet set, Matrix4f viewToWorld) {
-            // Her pose can drift between slices, so the box field is refreshed per chunk, not per step.
-            refreshBoxes(set, viewToWorld);
+            // The box field is built once in beginSettle and kept for the whole solve: refreshing it mid-way
+            // would let a drifting pose pull the sheet around while it is still falling.
             int steps = Math.min(SETTLE_CHUNK, settleStepsLeft);
             for (int i = 0; i < steps; i++) {
                 step(set, viewToWorld, true);
