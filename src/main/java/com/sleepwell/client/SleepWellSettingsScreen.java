@@ -5,6 +5,8 @@ import com.sleepwell.SleepWellMod;
 import com.sleepwell.config.SleepWellConfig;
 import com.sleepwell.gui.SleepWellContainer;
 import com.sleepwell.network.SaveSettingPacket;
+import com.sleepwell.client.quilt.QuiltStyle;
+import com.sleepwell.network.SaveQuiltStylePacket;
 import com.sleepwell.network.SaveSkipTasksPacket;
 import com.sleepwell.network.SleepWellNetwork;
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -54,9 +56,18 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
         super(container, inventory, title);
     }
 
+    /** Which page this screen is showing; the tab row uses it to mark the right tab as selected. */
+    public int page() {
+        return this.menu.page();
+    }
+
     @Override
     protected void init() {
         super.init();
+        if (this.menu.page() == com.sleepwell.network.OpenSettingsPacket.PAGE_QUILT) {
+            buildQuiltWall();
+            return;
+        }
         toggles.clear();
         addToggle(0, this.menu.sleepFallback(), "gui.sleep_well.sleep_fallback", FIRST_ROW_Y, ROW_W);
         addToggle(1, this.menu.campfireFlee(), "gui.sleep_well.campfire_flee", FIRST_ROW_Y + ROW_STEP, ROW_W);
@@ -73,6 +84,39 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
         this.gear = this.addRenderableWidget(new GearButton(this.leftPos + ROW_X + ROW_W - GEAR_W,
                 this.topPos + FIRST_ROW_Y + ROW_STEP * 2, GEAR_W, ROW_H, b -> openPicker()));
         this.gear.active = this.menu.sereneSeasons();
+    }
+
+    /**
+     * The quilt wall: one plate per quilt, three to a row. Selected carries a tick, a locked quilt is greyed
+     * out and does nothing. Placeholder art for now - the plates are the same acrylic style as the switches.
+     */
+    private void buildQuiltWall() {
+        List<QuiltStyle> styles = QuiltStyle.all();
+        int cols = 3;
+        int cellW = 52;
+        int cellH = 34;
+        int gap = 4;
+        for (int i = 0; i < styles.size(); i++) {
+            QuiltStyle style = styles.get(i);
+            int col = i % cols;
+            int row = i / cols;
+            int x = this.leftPos + ROW_X + col * (cellW + gap);
+            int y = this.topPos + FIRST_ROW_Y + row * (cellH + gap);
+            boolean locked = this.menu.quiltLocked() && !style.isDefault();
+            boolean selected = style.id.equals(this.menu.quiltStyle());
+            Component text = Component.literal((selected ? "✔ " : "") + style.displayName
+                    + (locked ? " 🔒" : ""));
+            Button cell = new SoftButton(x, y, cellW, cellH, text, b -> pickQuilt(style, locked));
+            cell.active = !locked;
+            this.addRenderableWidget(cell);
+        }
+    }
+
+    private void pickQuilt(QuiltStyle style, boolean locked) {
+        if (locked) {
+            return;
+        }
+        SleepWellNetwork.CHANNEL.sendToServer(new SaveQuiltStylePacket(this.menu.entityId(), style.id));
     }
 
     private Button addToggle(int key, boolean initial, String labelKey, int y, int width) {
@@ -189,8 +233,10 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
 
     @Override
     protected void renderLabels(GuiGraphics graphics, int mouseX, int mouseY) {
-        graphics.drawString(this.font, Component.translatable("gui.sleep_well.title"),
-                ROW_X, TITLE_Y, TITLE_COLOR, false);
+        Component title = this.menu.page() == com.sleepwell.network.OpenSettingsPacket.PAGE_QUILT
+                ? Component.translatable("gui.sleep_well.quilt_title")
+                : Component.translatable("gui.sleep_well.title");
+        graphics.drawString(this.font, title, ROW_X, TITLE_Y, TITLE_COLOR, false);
     }
 
     /**

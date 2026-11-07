@@ -15,4 +15,5 @@
   "gui.sleep_well.done": "Done",
   "gui.sleep_well.no_tasks": "No work tasks to pick from",
   "gui.sleep_well.skip_count": "%s of %s selected"
+  "gui.sleep_well.quilt_title": "Quilts",
 }

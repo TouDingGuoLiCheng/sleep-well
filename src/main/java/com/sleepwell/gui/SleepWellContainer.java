@@ -28,10 +28,15 @@ public class SleepWellContainer extends AbstractMaidContainer {
     private final boolean winterSkip;
     private final boolean lieIn;
     private final boolean sereneSeasons;
+    /** 0 = the switch page, 1 = the quilt wall. Both tabs share this container. */
+    private final int page;
+    private final String quiltStyle;
+    private final boolean quiltLocked;
 
     public SleepWellContainer(int id, Inventory inventory, int entityId,
                               boolean sleepFallback, boolean campfireFlee, boolean winterSkip,
-                              boolean lieIn, boolean sereneSeasons) {
+                              boolean lieIn, boolean sereneSeasons, int page, String quiltStyle,
+                              boolean quiltLocked) {
         super(TYPE.get(), id, inventory, entityId);
         this.entityId = entityId;
         this.sleepFallback = sleepFallback;
@@ -39,6 +44,22 @@ public class SleepWellContainer extends AbstractMaidContainer {
         this.winterSkip = winterSkip;
         this.lieIn = lieIn;
         this.sereneSeasons = sereneSeasons;
+        this.page = page;
+        this.quiltStyle = quiltStyle;
+        this.quiltLocked = quiltLocked;
+    }
+
+    public int page() {
+        return page;
+    }
+
+    public String quiltStyle() {
+        return quiltStyle;
+    }
+
+    /** True when the config locks every non-default quilt: the wall greys those out. */
+    public boolean quiltLocked() {
+        return quiltLocked;
     }
 
     public int entityId() {
@@ -72,23 +93,36 @@ public class SleepWellContainer extends AbstractMaidContainer {
     }
 
     public static void writeData(FriendlyByteBuf buf, int entityId, boolean sleepFallback,
-                                 boolean campfireFlee, boolean winterSkip, boolean lieIn, boolean sereneSeasons) {
+                                 boolean campfireFlee, boolean winterSkip, boolean lieIn, boolean sereneSeasons,
+                                 int page, String quiltStyle, boolean quiltLocked) {
         buf.writeVarInt(entityId);
         buf.writeBoolean(sleepFallback);
         buf.writeBoolean(campfireFlee);
         buf.writeBoolean(winterSkip);
         buf.writeBoolean(lieIn);
         buf.writeBoolean(sereneSeasons);
+        buf.writeVarInt(page);
+        buf.writeUtf(quiltStyle, 64);
+        buf.writeBoolean(quiltLocked);
     }
 
     private static SleepWellContainer fromNetwork(int windowId, Inventory inventory, FriendlyByteBuf buf) {
         int entityId = buf.readVarInt();
-        return new SleepWellContainer(windowId, inventory, entityId,
-                buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean());
+        boolean sleepFallback = buf.readBoolean();
+        boolean campfireFlee = buf.readBoolean();
+        boolean winterSkip = buf.readBoolean();
+        boolean lieIn = buf.readBoolean();
+        boolean sereneSeasons = buf.readBoolean();
+        int page = buf.readVarInt();
+        String quiltStyle = buf.readUtf(64);
+        boolean quiltLocked = buf.readBoolean();
+        return new SleepWellContainer(windowId, inventory, entityId, sleepFallback, campfireFlee, winterSkip,
+                lieIn, sereneSeasons, page, quiltStyle, quiltLocked);
     }
 
     public static MenuProvider create(int entityId, boolean sleepFallback, boolean campfireFlee,
-                                      boolean winterSkip, boolean lieIn, boolean sereneSeasons) {
+                                      boolean winterSkip, boolean lieIn, boolean sereneSeasons,
+                                      int page, String quiltStyle, boolean quiltLocked) {
         return new MenuProvider() {
             @Override
             public Component getDisplayName() {
@@ -97,8 +131,8 @@ public class SleepWellContainer extends AbstractMaidContainer {
 
             @Override
             public SleepWellContainer createMenu(int id, Inventory inventory, Player player) {
-                return new SleepWellContainer(id, inventory, entityId,
-                        sleepFallback, campfireFlee, winterSkip, lieIn, sereneSeasons);
+                return new SleepWellContainer(id, inventory, entityId, sleepFallback, campfireFlee, winterSkip,
+                        lieIn, sereneSeasons, page, quiltStyle, quiltLocked);
             }
         };
     }
