@@ -7,22 +7,28 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Client-side mirror of every maid's chosen quilt.
+ * Client-side mirror of every maid's chosen quilt and border.
  * <p>
  * The server owns the setting; this map only exists so the renderer can read it without a capability that
- * never reaches this side. Missing entries fall through to the default quilt.
+ * never reaches this side. Missing entries fall through to the default quilt and no border.
  */
 public final class ClientQuiltStyles {
     private static final Map<Integer, String> STYLES = new ConcurrentHashMap<>();
+    private static final Map<Integer, String> BORDERS = new ConcurrentHashMap<>();
 
     private ClientQuiltStyles() {
     }
 
-    public static void put(int entityId, String styleId) {
+    public static void put(int entityId, String styleId, String borderId) {
         if (styleId == null || styleId.isEmpty()) {
             STYLES.remove(entityId);
         } else {
             STYLES.put(entityId, styleId);
+        }
+        if (borderId == null || borderId.isEmpty()) {
+            BORDERS.remove(entityId);
+        } else {
+            BORDERS.put(entityId, borderId);
         }
     }
 
@@ -40,7 +46,16 @@ public final class ClientQuiltStyles {
         return Minecraft.getInstance().level == null ? null : STYLES.get(entity.getId());
     }
 
+    /** The border id sewn around her quilt, or an empty string when she has none. */
+    public static String borderOf(Entity entity) {
+        if (entity == null) {
+            return "";
+        }
+        return BORDERS.getOrDefault(entity.getId(), "");
+    }
+
     public static void clear() {
         STYLES.clear();
+        BORDERS.clear();
     }
 }

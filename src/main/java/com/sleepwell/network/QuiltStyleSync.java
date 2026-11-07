@@ -23,8 +23,9 @@ public final class QuiltStyleSync {
             return;
         }
         String id = MaidCapabilities.of(maid).quiltStyle();
+        String border = MaidCapabilities.of(maid).quiltBorder();
         SleepWellNetwork.CHANNEL.send(
                 net.minecraftforge.network.PacketDistributor.PLAYER.with(() -> player),
-                new SyncQuiltStylePacket(maid.getId(), id));
+                new SyncQuiltStylePacket(maid.getId(), id, border));
     }
 }

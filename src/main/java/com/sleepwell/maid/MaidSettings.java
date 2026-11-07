@@ -12,12 +12,14 @@ public final class MaidSettings implements INBTSerializable<CompoundTag> {
     public static final String TAG_SAVED_TASK = "SavedTask";
     public static final String TAG_LIE_IN = "LieIn";
     public static final String TAG_QUILT_STYLE = "QuiltStyle";
+    public static final String TAG_QUILT_BORDER = "QuiltBorder";
     public static final String DEFAULT_QUILT = "solid";
 
     private boolean winterSkip;
     private boolean lieIn = true;
     private String savedTaskId = "";
     private String quiltStyle = DEFAULT_QUILT;
+    private String quiltBorder = "";
 
     public MaidSettings(boolean winterSkip) {
         this(winterSkip, true);
@@ -64,6 +66,15 @@ public final class MaidSettings implements INBTSerializable<CompoundTag> {
         this.quiltStyle = quiltStyle == null || quiltStyle.isEmpty() ? DEFAULT_QUILT : quiltStyle;
     }
 
+    /** Which border is sewn around her quilt; empty means none, which is what every old save has. */
+    public String quiltBorder() {
+        return quiltBorder == null ? "" : quiltBorder;
+    }
+
+    public void setQuiltBorder(String quiltBorder) {
+        this.quiltBorder = quiltBorder == null ? "" : quiltBorder;
+    }
+
     @Override
     public CompoundTag serializeNBT() {
         CompoundTag tag = new CompoundTag();
@@ -71,6 +82,7 @@ public final class MaidSettings implements INBTSerializable<CompoundTag> {
         tag.putString(TAG_SAVED_TASK, savedTaskId);
         tag.putBoolean(TAG_LIE_IN, lieIn);
         tag.putString(TAG_QUILT_STYLE, quiltStyle());
+        tag.putString(TAG_QUILT_BORDER, quiltBorder());
         return tag;
     }
 
@@ -81,5 +93,7 @@ public final class MaidSettings implements INBTSerializable<CompoundTag> {
         // Missing tag = a maid from before this switch existed: she defaults to allowed.
         lieIn = !tag.contains(TAG_LIE_IN) || tag.getBoolean(TAG_LIE_IN);
         quiltStyle = tag.contains(TAG_QUILT_STYLE) ? tag.getString(TAG_QUILT_STYLE) : DEFAULT_QUILT;
+        // Missing tag = a maid from before borders existed: no border, no visual change.
+        quiltBorder = tag.contains(TAG_QUILT_BORDER) ? tag.getString(TAG_QUILT_BORDER) : "";
     }
 }
