@@ -87,6 +87,14 @@ public final class QuiltStyle {
     public static final QuiltStyle SPRING_BLOSSOM = register(new QuiltStyle("spring_blossom", "春之被",
             "spring_blossom", false, Tiling.TILED, 2.0F, 2.0F, false, 0.028F, 0.82F, 0.72F, 0.16F));
 
+    /**
+     * Summer: a printed scene rather than a repeating cloth - blue sky, big cumulus and a sunflower
+     * field. The artwork is laid once across the whole sheet, so there is nothing to tile and the
+     * drawing keeps its own composition.
+     */
+    public static final QuiltStyle SUMMER_SUNFLOWER = register(new QuiltStyle("summer_sunflower", "夏之被",
+            "summer_sunflower", false, Tiling.WHOLE, 1.0F, 1.0F, false, 0.038F, 0.76F, 0.66F, 0.16F));
+
     private static QuiltStyle register(QuiltStyle style) {
         REGISTRY.put(style.id, style);
         return style;
