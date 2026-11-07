@@ -12,7 +12,7 @@ public final class MaidSettings implements INBTSerializable<CompoundTag> {
     public static final String TAG_SAVED_TASK = "SavedTask";
     public static final String TAG_LIE_IN = "LieIn";
     public static final String TAG_QUILT_STYLE = "QuiltStyle";
-    public static final String DEFAULT_QUILT = "thick_gingham";
+    public static final String DEFAULT_QUILT = "solid";
 
     private boolean winterSkip;
     private boolean lieIn = true;

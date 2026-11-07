@@ -27,6 +27,10 @@ public final class QuiltStyle {
     public final String id;
     /** Name shown to players. */
     public final String displayName;
+    /** Texture file under {@code textures/quilt/}; solid quilts use the plain white sheet. */
+    public final String textureId;
+    /** True when the bed's dye tints this quilt: a gingham quilt follows the bed, the themed ones do not. */
+    public final boolean dyeTinted;
     /** Repeat the pattern (seamless artwork) or stretch it once over the whole sheet. */
     public final Tiling tiling;
     /** How many times the texture repeats across the cloth, which is what keeps a pattern square. */
@@ -43,10 +47,13 @@ public final class QuiltStyle {
     /** Texture height used by the rim strips. */
     public final float rimV;
 
-    private QuiltStyle(String id, String displayName, Tiling tiling, float repeatU, float repeatV,
-                       boolean wideAcross, float shell, float underShade, float rimShade, float rimV) {
+    private QuiltStyle(String id, String displayName, String textureId, boolean dyeTinted, Tiling tiling,
+                       float repeatU, float repeatV, boolean wideAcross, float shell, float underShade,
+                       float rimShade, float rimV) {
         this.id = id;
         this.displayName = displayName;
+        this.textureId = textureId;
+        this.dyeTinted = dyeTinted;
         this.tiling = tiling;
         this.repeatU = repeatU;
         this.repeatV = repeatV;
@@ -62,16 +69,23 @@ public final class QuiltStyle {
     /** Every quilt that exists, in display order. Adding a quilt means one more line here. */
     private static final java.util.Map<String, QuiltStyle> REGISTRY = new java.util.LinkedHashMap<>();
 
-    /** The default quilt, and the one every maid wears until she picks another. */
+    /**
+     * The default quilt: a plain sheet. Its texture is a white sheet that the renderer multiplies by this
+     * quilt's colour, so every solid colour is one registration and no extra artwork.
+     */
+    public static final QuiltStyle SOLID = register(new QuiltStyle("solid", "素色被",
+            "solid_white", false, Tiling.WHOLE, 1.0F, 1.0F, false, 0.038F, 0.76F, 0.66F, 0.16F));
+
+    /** The original gingham cloth: the bed's dye picks its colour, so it still matches the bed it sits on. */
     public static final QuiltStyle THICK_GINGHAM = register(new QuiltStyle("thick_gingham", "厚实格子被",
-            Tiling.TILED, 4.0F / 3.0F, 1.0F, true, 0.045F, 0.72F, 0.62F, 0.16F));
+            "thick_gingham", true, Tiling.TILED, 4.0F / 3.0F, 1.0F, true, 0.045F, 0.72F, 0.62F, 0.16F));
 
     /**
      * Spring: a thin, narrow cover in off-white with a fine green check and scattered petals - the one you
      * pull over yourself on a night that has stopped being cold but is not yet warm.
      */
     public static final QuiltStyle SPRING_BLOSSOM = register(new QuiltStyle("spring_blossom", "春之被",
-            Tiling.TILED, 2.0F, 2.0F, false, 0.028F, 0.82F, 0.72F, 0.16F));
+            "spring_blossom", false, Tiling.TILED, 2.0F, 2.0F, false, 0.028F, 0.82F, 0.72F, 0.16F));
 
     private static QuiltStyle register(QuiltStyle style) {
         REGISTRY.put(style.id, style);
@@ -81,7 +95,7 @@ public final class QuiltStyle {
     /** The quilt with this id, or the default one when the id is unknown (an old save, a removed quilt). */
     public static QuiltStyle of(String id) {
         QuiltStyle found = id == null ? null : REGISTRY.get(id);
-        return found == null ? THICK_GINGHAM : found;
+        return found == null ? SOLID : found;
     }
 
     /** Every quilt, default first: the GUI wall renders this list. */
@@ -90,7 +104,7 @@ public final class QuiltStyle {
     }
 
     public boolean isDefault() {
-        return THICK_GINGHAM.id.equals(id);
+        return SOLID.id.equals(id);
     }
 
     /** How many texture repeats span the cloth across, and along. */
@@ -104,6 +118,6 @@ public final class QuiltStyle {
 
     /** Every quilt owns exactly one texture; the bed's dye is no longer involved. */
     public ResourceLocation texture() {
-        return new ResourceLocation("sleep_well", "textures/quilt/" + id + ".png");
+        return new ResourceLocation("sleep_well", "textures/quilt/" + textureId + ".png");
     }
 }
