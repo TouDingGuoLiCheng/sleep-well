@@ -168,8 +168,11 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
             graphics.renderOutline(x, y, WALL_CELL_W, WALL_CELL_H,
                     selected ? 0xFFF2E27A : (hovered ? 0xD8FFFFFF : 0x77FFFFFF));
             // The face itself as the plate's art: a player picks by look, not by reading names.
-            blitScaled(graphics, QuiltTextures.texture(style, currentBorder), x + (WALL_CELL_W - THUMB) / 2,
-                    y + 3, THUMB);
+            boolean banded = !QuiltBorder.of(currentBorder).isNone();
+            blitScaled(graphics, QuiltTextures.texture(style, currentBorder),
+                    x + (WALL_CELL_W - THUMB) / 2, y + 3, THUMB,
+                    banded ? 192 + QuiltBorder.BAND * 2 : 192,
+                    banded ? 256 + QuiltBorder.BAND * 2 : 256);
             graphics.drawCenteredString(this.font, (selected ? "✔" : "") + style.displayName,
                     x + WALL_CELL_W / 2, y + WALL_CELL_H - 10,
                     locked ? 0x8C8C8C : 0xF2EEE4);
@@ -205,13 +208,19 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
         RenderSystem.disableBlend();
     }
 
-    /** Draws a whole texture into a square of the given size, so a 192x256 face still reads as an icon. */
-    private static void blitScaled(GuiGraphics graphics, ResourceLocation texture, int x, int y, int size) {
+    /**
+     * Draws a whole texture into a square of the given size, keeping its aspect ratio: the faces are tall, and
+     * squashing one into a square icon makes every sunflower look wrong.
+     */
+    private static void blitScaled(GuiGraphics graphics, ResourceLocation texture, int x, int y, int size,
+                                   int sourceWidth, int sourceHeight) {
+        float scale = size / (float) sourceHeight;
+        float drawnWidth = sourceWidth * scale;
         com.mojang.blaze3d.vertex.PoseStack pose = graphics.pose();
         pose.pushPose();
-        pose.translate(x, y, 0.0F);
-        pose.scale(size / 192.0F, size / 256.0F, 1.0F);
-        graphics.blit(texture, 0, 0, 0, 0, 192, 256, 192, 256);
+        pose.translate(x + (size - drawnWidth) * 0.5F, y, 0.0F);
+        pose.scale(scale, scale, 1.0F);
+        graphics.blit(texture, 0, 0, 0, 0, sourceWidth, sourceHeight, sourceWidth, sourceHeight);
         pose.popPose();
     }
 
