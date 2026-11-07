@@ -56,7 +56,6 @@ public final class MaidColliderCapture {
     private static volatile String LAST_MISS = "";
     private static volatile int hookRuns;
     private static volatile int captures;
-    private static final java.util.concurrent.atomic.AtomicInteger DIRECT_LOGS = new java.util.concurrent.atomic.AtomicInteger();
     private static volatile int renderRuns;
 
     /**
@@ -68,38 +67,31 @@ public final class MaidColliderCapture {
             return;
         }
         renderRuns++;
-        com.sleepwell.client.quilt.diag.QuiltTrace.step("4.mixinHead", "uuid=" + maid.getUUID());
         try {
             EntityRenderer<?> renderer = Minecraft.getInstance().getEntityRenderDispatcher().getRenderer(maid);
-            com.sleepwell.client.quilt.diag.QuiltTrace.step("5.renderer", describe(renderer));
             Object gecko = renderer == null ? null : Reflect.field(renderer, "geckoEntityMaidRenderer");
-            com.sleepwell.client.quilt.diag.QuiltTrace.step("6.geckoField", describe(gecko));
             Object animatable = gecko == null ? null : Reflect.call(gecko, "getAnimatableEntity", maid);
             String via = "renderer";
             if (animatable == null) {
                 animatable = animatableViaCapability(maid);
                 via = "capability";
             }
-            com.sleepwell.client.quilt.diag.QuiltTrace.step("7.animatable", describe(animatable) + " via=" + via);
             Object model = MODELS.get(maid.getUUID());
             if (model == null && animatable != null) {
                 model = Reflect.call(animatable, "getGeoModel");
             }
             if (model == null && animatable != null) {
                 Object updated = Reflect.call(animatable, "updateModel");
-                com.sleepwell.client.quilt.diag.QuiltTrace.step("8a.updateModel", describe(updated));
                 model = Reflect.call(animatable, "getCurrentModel");
             }
             if (model != null) {
                 MODELS.put(maid.getUUID(), model);
             }
-            com.sleepwell.client.quilt.diag.QuiltTrace.step("8.model", describe(model));
             if (model == null) {
                 miss("render:model", "animatable=" + describe(animatable) + " renderer=" + describe(renderer));
                 return;
             }
             List<?> roots = Reflect.list(model, "topLevelBones");
-            com.sleepwell.client.quilt.diag.QuiltTrace.step("9.roots", "n=" + (roots == null ? -1 : roots.size()));
             if (roots == null || roots.isEmpty()) {
                 miss("render:roots", model.getClass().getName());
                 return;
@@ -111,7 +103,6 @@ public final class MaidColliderCapture {
             for (Object root : roots) {
                 walkBone(root, new Matrix4f(entity), boxes, 0);
             }
-            com.sleepwell.client.quilt.diag.QuiltTrace.step("10.walked", "boxes=" + boxes.size());
             if (boxes.isEmpty()) {
                 miss("render:empty", "bones walked but no cubes");
                 return;
@@ -258,169 +249,6 @@ public final class MaidColliderCapture {
     }
 
 
-    /** Called from {@code RenderLivingEvent.Post}, i.e. while the sleeping pose is still on the model. */
-    public static void capture(EntityMaid maid, PoseStack poseStack, float partialTick) {
-        hookRuns++;
-        try {
-            doCapture(maid, poseStack, partialTick);
-        } catch (Throwable error) {
-            miss("capture:" + error.getClass().getSimpleName(), error.toString());
-        }
-    }
-
-    /**
-     * Mixin-free fallback: read her model at {@code RenderLevelStageEvent} time, where the bones still hold
-     * the last animated (sleeping) pose, and rebuild the entity transform ourselves.
-     * <p>
-     * Vanilla's sleeping transform is {@code T(0,-eye,0) · RY(-bedDir) · RZ(-90)} inside the dispatcher's
-     * {@code RY(180 - bodyYaw)}, so it can be reconstructed without hooking anything. Throttled because a
-     * reflection walk per frame per maid is not free.
-     */
-    public static ColliderSet captureDirect(EntityMaid maid, net.minecraft.world.phys.Vec3 camera, float partialTick) {
-        ColliderSet cached = SETS.get(maid.getUUID());
-        if (cached != null && maid.tickCount - cached.tick < 5) {
-            return cached;
-        }
-        try {
-            EntityRenderer<?> renderer = Minecraft.getInstance().getEntityRenderDispatcher().getRenderer(maid);
-            if (renderer != null) {
-                // The layer is the only place that sees posed geometry, so make sure it is installed early.
-                installLayer(renderer);
-            }
-            if (renderer == null) {
-                miss("direct:renderer", "dispatcher returned null");
-                return null;
-            }
-            Object gecko = Reflect.field(renderer, "geckoEntityMaidRenderer");
-            if (gecko == null) {
-                miss("direct:geckoField", dumpFields(renderer));
-                return null;
-            }
-            Object animatable = Reflect.call(gecko, "getAnimatableEntity", maid);
-            if (animatable == null) {
-                // The renderer route can come back empty (capability not yet resolved, or a signature change);
-                // the capability itself is public and gives the same GeckoMaidEntity.
-                animatable = animatableViaCapability(maid);
-            }
-            if (animatable == null) {
-                miss("direct:animatable", gecko.getClass().getName() + " -> " + dumpMethods(gecko, "getAnimatableEntity"));
-                return null;
-            }
-            Object model = MODELS.get(maid.getUUID());
-            if (model == null) {
-                model = Reflect.call(animatable, "getGeoModel");
-            }
-            Object updated = null;
-            Object location = null;
-            if (model == null) {
-                updated = Reflect.call(animatable, "updateModel");
-                model = Reflect.call(animatable, "getCurrentModel");
-                location = Reflect.call(animatable, "getModelLocation");
-                com.sleepwell.client.quilt.diag.QuiltTrace.step("d.updateModel",
-                        "returned=" + updated + " model=" + describe(model) + " " + geoCache(location));
-            }
-            int partCount = -1;
-            String modelType = "?";
-            if (model == null) {
-                // Not every maid uses a gecko model: legacy model packs (e.g. fox_miko) render through
-                // BedrockModel, and the gecko cache simply has no entry for them.
-                if (renderer instanceof LivingEntityRenderer<?, ?> living) {
-                    List<QuiltBox> legacy = new ArrayList<>();
-                    Matrix4f matrix = entityMatrix(maid, camera, partialTick);
-                    Object rawParts = bedrockParts(living.getModel());
-                    partCount = rawParts instanceof Map<?, ?> map ? map.size() : -1;
-                    Object flat = Reflect.field(living.getModel(), "shouldRender");
-                    int flatCount = flat instanceof List<?> list ? list.size() : -1;
-                    partCount = partCount * 1000 + Math.max(flatCount, 0);
-                    modelType = describe(living.getModel()) + "(flat=" + flatCount + ")";
-                    if (captureBedrock(living, matrix, legacy)) {
-                        ColliderSet set = new ColliderSet(legacy, bounds(legacy), stamp(legacy),
-                                maid.tickCount, true);
-                        store(maid.getUUID(), set);
-                        com.sleepwell.client.quilt.diag.QuiltTrace.step("d.bedrock",
-                                "boxes=" + legacy.size() + " parts=" + partCount + " model=" + modelType);
-                        return set;
-                    }
-                }
-                if (!DUMPED) {
-                    DUMPED = true;
-                    if (renderer instanceof LivingEntityRenderer<?, ?> living) {
-                        LOGGER.info("[被子] dump model: {}", dumpFields(living.getModel(), 24));
-                    }
-                    LOGGER.info("[被子] dump renderer: {}", dumpFields(renderer, 18));
-                    Object geckoRenderer = Reflect.field(renderer, "geckoEntityMaidRenderer");
-                    LOGGER.info("[被子] dump geckoRenderer: {}", dumpFields(geckoRenderer, 20));
-                    Object geckoAnimatable = Reflect.call(geckoRenderer, "getAnimatableEntity", maid);
-                    LOGGER.info("[被子] dump animatable: {}", dumpFields(geckoAnimatable, 26));
-                    LOGGER.info("[被子] animatable loc={} geoModel={} currentModel={}",
-                            Reflect.call(geckoAnimatable, "getModelLocation"),
-                            describe(Reflect.call(geckoAnimatable, "getGeoModel")),
-                            describe(Reflect.call(geckoAnimatable, "getCurrentModel")));
-                    logCacheKeys();
-                }
-                miss("direct:geoModel", "updateModel=" + updated + " parts=" + partCount
-                        + " model=" + modelType
-                        + " " + geoCache(location)
-                        + " ysm=" + describe(Reflect.field(renderer, "ysmMaidRenderer")));
-                return null;
-            }
-            MODELS.put(maid.getUUID(), model);
-            List<?> roots = Reflect.list(model, "topLevelBones");
-            if (roots == null || roots.isEmpty()) {
-                miss("direct:roots", model.getClass().getName());
-                return null;
-            }
-            Matrix4f entity = entityMatrix(maid, camera, partialTick);
-            List<QuiltBox> boxes = new ArrayList<>();
-            for (Object root : roots) {
-                walkBone(root, new Matrix4f(entity), boxes, 0);
-            }
-            if (boxes.isEmpty()) {
-                miss("direct:empty", "bones walked but no cubes");
-                return null;
-            }
-            ColliderSet set = new ColliderSet(boxes, bounds(boxes), stamp(boxes), maid.tickCount, true);
-            store(maid.getUUID(), set);
-            if (DIRECT_LOGS.getAndIncrement() == 0) {
-                float[] b = set.bounds;
-                LOGGER.info("[sleep_well] direct capture boxes={} center=({},{},{}) maidY={} renderer={}",
-                        boxes.size(), (b[0] + b[3]) / 2.0F, (b[1] + b[4]) / 2.0F, (b[2] + b[5]) / 2.0F,
-                        maid.getY(), renderer.getClass().getSimpleName());
-            }
-            return set;
-        } catch (Throwable error) {
-            miss("direct:" + error.getClass().getSimpleName(), error.toString());
-            return null;
-        }
-    }
-
-    /** Rebuilds the transform the renderer would have used: dispatcher translate/yaw plus sleeping rotation. */
-    /** Vanilla's mapping from bed direction to the sleeping yaw, degrees. */
-    private static float facingAngle(net.minecraft.core.Direction direction) {
-        return switch (direction) {
-            case SOUTH -> 90.0F;
-            case WEST -> 0.0F;
-            case NORTH -> 270.0F;
-            case EAST -> 180.0F;
-            default -> 0.0F;
-        };
-    }
-
-    /** Same composition as {@link #entityMatrix}, but in world space: used by the render-layer capture. */
-    private static Matrix4f entityMatrixWorld(EntityMaid maid) {
-        Matrix4f matrix = new Matrix4f()
-                .translate((float) maid.getX(), (float) maid.getY(), (float) maid.getZ())
-                .rotateY((float) Math.toRadians(180.0F - maid.yBodyRot));
-        net.minecraft.core.Direction bed = maid.getBedOrientation();
-        if (maid.isSleeping() && bed != null) {
-            float eye = maid.getEyeHeight(net.minecraft.world.entity.Pose.STANDING) - 0.1F;
-            matrix.translate(0.0F, -eye, 0.0F);
-            matrix.rotateY((float) Math.toRadians(-bed.toYRot()));
-            matrix.rotateZ((float) Math.toRadians(-90.0F));
-        }
-        return matrix;
-    }
-
     private static Matrix4f entityMatrix(EntityMaid maid, net.minecraft.world.phys.Vec3 camera, float partialTick) {
         net.minecraft.world.phys.Vec3 position = maid.getPosition(partialTick).subtract(camera);
         float yaw = net.minecraft.util.Mth.rotLerp(partialTick, maid.yBodyRotO, maid.yBodyRot);
@@ -461,51 +289,7 @@ public final class MaidColliderCapture {
         SETS.remove(id);
     }
 
-    private static void doCapture(EntityMaid maid, PoseStack poseStack, float partialTick) {
-        Matrix4f entity = new Matrix4f(poseStack.last().pose());
-        selfCheck(maid, entity, partialTick);
-
-        EntityRenderer<?> renderer = Minecraft.getInstance().getEntityRenderDispatcher().getRenderer(maid);
-        if (!(renderer instanceof LivingEntityRenderer<?, ?> living)) {
-            miss("renderer", renderer == null ? "null" : renderer.getClass().getName());
-            return;
-        }
-        List<QuiltBox> boxes = new ArrayList<>();
-        boolean gecko = captureGecko(maid, renderer, entity, boxes);
-        if (!gecko) {
-            captureBedrock(living, entity, boxes);
-        }
-        if (boxes.isEmpty()) {
-            miss("empty", "no cubes captured for " + living.getModel().getClass().getSimpleName());
-            return;
-        }
-        captures++;
-        store(maid.getUUID(), new ColliderSet(boxes, bounds(boxes), stamp(boxes), maid.tickCount, false));
-    }
-
     // --- gecko -------------------------------------------------------------
-
-    private static boolean captureGecko(EntityMaid maid, Object renderer, Matrix4f entity, List<QuiltBox> boxes) {
-        Object geckoRenderer = Reflect.field(renderer, "geckoEntityMaidRenderer");
-        if (geckoRenderer == null) {
-            return false;
-        }
-        Object animatable = Reflect.call(geckoRenderer, "getAnimatableEntity", maid);
-        Object model = animatable == null ? null : Reflect.call(animatable, "getGeoModel");
-        if (model == null) {
-            miss("geckoModel", "getGeoModel returned null");
-            return false;
-        }
-        List<?> roots = Reflect.list(model, "topLevelBones");
-        if (roots == null || roots.isEmpty()) {
-            miss("geckoRoots", model.getClass().getName());
-            return false;
-        }
-        for (Object root : roots) {
-            walkBone(root, new Matrix4f(entity), boxes, 0);
-        }
-        return true;
-    }
 
     // --- gecko render layer: the only hook that sees the real, posed geometry ---------------------------------
 
@@ -645,10 +429,6 @@ public final class MaidColliderCapture {
         }
         SETS.put(maid.getUUID(), set);
         float[] b = set.bounds;
-        com.sleepwell.client.quilt.diag.QuiltTrace.step("e.layer", "boxes=" + boxes.size()
-                + " roots=" + roots.size() + " size=" + String.format(java.util.Locale.ROOT,
-                "%.2fx%.2fx%.2f", b[3] - b[0], b[4] - b[1], b[5] - b[2])
-                + " min=" + String.format(java.util.Locale.ROOT, "%.2f,%.2f,%.2f", b[0], b[1], b[2]));
         layerBounds = new float[]{b[3] - b[0], b[4] - b[1], b[5] - b[2]};
         if (layerCalls % 600 == 1) {
             // Same bones, model space only: separates "intrinsic size" from "our transform".
@@ -754,62 +534,6 @@ public final class MaidColliderCapture {
 
     // --- bedrock (legacy models) -------------------------------------------
 
-    private static boolean captureBedrock(LivingEntityRenderer<?, ?> living, Matrix4f entity, List<QuiltBox> boxes) {
-        Map<?, ?> parts = bedrockParts(living.getModel());
-        if (parts == null || parts.isEmpty()) {
-            // Some packs are built without a name map; the flat draw list still holds every part.
-            Object flat = Reflect.field(living.getModel(), "shouldRender");
-            if (flat instanceof List<?> list && !list.isEmpty()) {
-                for (Object part : list) {
-                    Object source = unwrapPart(part);
-                    appendPartTree(source, partMatrix(source, entity), boxes, 0);
-                }
-            }
-            return !boxes.isEmpty();
-        }
-        Map<Object, Object> unwrapped = new java.util.LinkedHashMap<>();
-        for (Map.Entry<?, ?> entry : parts.entrySet()) {
-            unwrapped.put(entry.getKey(), unwrapPart(entry.getValue()));
-        }
-        java.util.Set<Object> children = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
-        for (Object part : unwrapped.values()) {
-            List<?> kids = Reflect.list(part, "children");
-            if (kids != null) {
-                children.addAll(kids);
-            }
-        }
-        for (Map.Entry<Object, Object> entry : unwrapped.entrySet()) {
-            if (!children.contains(entry.getValue())) {
-                walkBedrockPart(String.valueOf(entry.getKey()), entry.getValue(), new Matrix4f(entity), boxes, 0);
-            }
-        }
-        return !boxes.isEmpty();
-    }
-
-    /** Full transform of one part: every ancestor's translate/rotate/scale, root first. */
-    private static Matrix4f partMatrix(Object part, Matrix4f entity) {
-        java.util.ArrayDeque<Object> chain = new java.util.ArrayDeque<>();
-        Object cursor = part;
-        int guard = 0;
-        while (cursor != null && guard++ < 32) {
-            chain.addFirst(cursor);
-            cursor = Reflect.field(cursor, "parent");
-        }
-        Matrix4f matrix = new Matrix4f(entity);
-        for (Object node : chain) {
-            matrix.translate(orZero(Reflect.floatField(node, "x")) / PIXELS,
-                            orZero(Reflect.floatField(node, "y")) / PIXELS,
-                            orZero(Reflect.floatField(node, "z")) / PIXELS)
-                    .rotateXYZ((float) Math.toRadians(orZero(Reflect.floatField(node, "xRot"))),
-                            (float) Math.toRadians(orZero(Reflect.floatField(node, "yRot"))),
-                            (float) Math.toRadians(orZero(Reflect.floatField(node, "zRot"))))
-                    .scale(defaultOne(Reflect.floatField(node, "xScale")),
-                            defaultOne(Reflect.floatField(node, "yScale")),
-                            defaultOne(Reflect.floatField(node, "zScale")));
-        }
-        return matrix;
-    }
-
     /** Emits cubes for one part and recurses into its children with the same matrix chain. */
     private static void appendPartTree(Object part, Matrix4f matrix, List<QuiltBox> boxes, int depth) {
         if (part == null || depth > 32) {
@@ -833,22 +557,6 @@ public final class MaidColliderCapture {
         }
     }
 
-    private static boolean DUMPED;
-    private static boolean POSE_LOGGED;
-
-    /** One-shot listing of every gecko model key, so a missed lookup can be matched against real names. */
-    private static void logCacheKeys() {
-        try {
-            Object cache = Class.forName("com.github.tartaricacid.touhoulittlemaid.geckolib3.resource.GeckoLibCache")
-                    .getMethod("getInstance").invoke(null);
-            Object models = Reflect.call(cache, "getGeoModels");
-            if (models instanceof Map<?, ?> map) {
-                LOGGER.info("[被子] gecko cache keys ({}): {}", map.size(), map.keySet());
-            }
-        } catch (Throwable error) {
-            LOGGER.info("[被子] gecko cache dump failed: {}", error.toString());
-        }
-    }
 
     /** Compact one-line field dump: enough to see which field actually holds the geometry. */
     static String dumpFields(Object target, int max) {
@@ -930,12 +638,6 @@ public final class MaidColliderCapture {
         return fallback;
     }
 
-    /** {@code ModelRendererWrapper} hides the part behind a getter; plain parts pass through. */
-    private static Object unwrapPart(Object value) {
-        Object inner = Reflect.call(value, "getModelRenderer");
-        return inner != null ? inner : value;
-    }
-
     /** Legacy (bedrock-format) models: part transforms are public fields, cube sizes are in pixels. */
     private static void walkBedrockPart(String name, Object part, Matrix4f parent, List<QuiltBox> boxes, int depth) {
         if (part == null || depth > 32) {
@@ -994,22 +696,6 @@ public final class MaidColliderCapture {
     }
 
     // --- helpers -----------------------------------------------------------
-
-    /** Verifies the PoseStack still carries the entity transform; logs once when it does not. */
-    private static void selfCheck(EntityMaid maid, Matrix4f entity, float partialTick) {
-        Vector3f origin = new Vector3f(0.0F, 0.0F, 0.0F).mulPosition(entity);
-        Vec3 camera = Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
-        Vec3 expected = maid.getPosition(partialTick).subtract(camera);
-        double distance = Math.sqrt(
-                (origin.x - expected.x) * (origin.x - expected.x)
-                        + (origin.y - expected.y) * (origin.y - expected.y)
-                        + (origin.z - expected.z) * (origin.z - expected.z));
-        if (distance > 2.0D) {
-            miss("matrix", String.format(Locale.ROOT, "pose stack origin off by %.2f blocks "
-                    + "(got %.2f/%.2f/%.2f expected %.2f/%.2f/%.2f)",
-                    distance, origin.x, origin.y, origin.z, expected.x, expected.y, expected.z));
-        }
-    }
 
     private static boolean isHard(String name) {
         String lower = name.toLowerCase(Locale.ROOT);
@@ -1106,18 +792,6 @@ public final class MaidColliderCapture {
             type = type.getSuperclass();
         }
         return builder.append('}').toString();
-    }
-
-    /** Lists the overloads for a method name plus the exception each one threw, if any. */
-    private static String dumpMethods(Object target, String name) {
-        StringBuilder builder = new StringBuilder();
-        for (java.lang.reflect.Method method : target.getClass().getMethods()) {
-            if (!method.getName().equals(name)) {
-                continue;
-            }
-            builder.append(java.util.Arrays.toString(method.getParameterTypes())).append("; ");
-        }
-        return builder.length() == 0 ? "no method " + name : builder.toString();
     }
 
     private static void miss(String key, String detail) {

@@ -61,7 +61,6 @@ public final class QuiltWireframe {
 
     public static void draw(PoseStack pose, MultiBufferSource.BufferSource buffers, List<EntityMaid> maids,
                             net.minecraft.world.phys.Vec3 camera, float partialTick) {
-        com.sleepwell.client.quilt.diag.QuiltTrace.step("11.wireframe", "enabled=" + enabled + " maids=" + maids.size());
         if (!enabled || maids.isEmpty()) {
             if (ANNOUNCED.compareAndSet(false, true)) {
                 report("flag=" + enabled + " sleeping=" + maids.size()
@@ -93,9 +92,6 @@ public final class QuiltWireframe {
                 nearest = maid;
             }
             ColliderSet set = MaidColliderCapture.get(maid);
-            if (set == null) {
-                set = MaidColliderCapture.captureDirect(maid, camera, partialTick);
-            }
             // Beacon first: it is drawn from her own position, so it stays visible no matter what the
             // captured boxes contain.
             marker(consumer, matrix, maid);
@@ -170,8 +166,7 @@ public final class QuiltWireframe {
         if ((ANNOUNCED.compareAndSet(false, true) || tick % 200 == 0) && tick > 0) {
             String renderer = maids.isEmpty() ? "?" : Minecraft.getInstance().getEntityRenderDispatcher()
                     .getRenderer(maids.get(0)).getClass().getSimpleName();
-            report("停在=" + com.sleepwell.client.quilt.diag.QuiltTrace.last()
-                    + " boxes=" + boxes + " missing=" + missing
+            report("boxes=" + boxes + " missing=" + missing
                     + " mixin=" + MaidColliderCapture.mixinState()
                     + " captured=" + MaidColliderCapture.captures()
                     + " " + MaidColliderCapture.layerState()
@@ -179,7 +174,6 @@ public final class QuiltWireframe {
                     + drawDiagnostics
                     + " miss=" + MaidColliderCapture.misses()
                     + " | " + MaidColliderCapture.lastMiss());
-            LOGGER.info("[sleep_well] trace summary {}", com.sleepwell.client.quilt.diag.QuiltTrace.summary());
         }
     }
 
