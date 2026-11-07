@@ -76,9 +76,9 @@ public final class QuiltStyle {
     public static final QuiltStyle SOLID = register(new QuiltStyle("solid", "素色被",
             "solid_white", true, Tiling.WHOLE, 1.0F, 1.0F, false, 0.038F, 0.76F, 0.66F, 0.16F));
 
-    /** The original gingham cloth: the bed's dye picks its colour, so it still matches the bed it sits on. */
+    /** The original gingham cloth, with the PixelLab artwork and its own pink-and-cream colours, whatever bed it is on. */
     public static final QuiltStyle THICK_GINGHAM = register(new QuiltStyle("thick_gingham", "厚实格子被",
-            "thick_gingham", true, Tiling.TILED, 4.0F / 3.0F, 1.0F, true, 0.045F, 0.72F, 0.62F, 0.16F));
+            "thick_gingham", false, Tiling.TILED, 4.0F / 3.0F, 1.0F, true, 0.045F, 0.72F, 0.62F, 0.16F));
 
     /**
      * Spring: a thin, narrow cover in off-white with a fine green check and scattered petals - the one you
