@@ -44,6 +44,8 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
     /** Width carved out of the winter row for the gear. */
     private static final int GEAR_W = 20;
     private static final int GEAR_GAP = 2;
+    /** How far the gear and quilt icon float inside the row's right edge, so the seam reads as a gap. */
+    private static final int ICON_INSET = 4;
     /** Deep warm brown, because the sunny backdrop is far too bright for white text. */
     private static final int TITLE_COLOR = 0x4A3324;
     /** PixelLab art: a cosy sunlit bed, used as the page backdrop behind the translucent switches. */
@@ -51,8 +53,11 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
             new ResourceLocation(SleepWellMod.MOD_ID, "textures/gui/sleep_well_bg.png");
 
     private final boolean[] state = new boolean[4];
+    /** Serene Seasons is absent, so the winter switch is parked; the note is drawn under the rows. */
+    private boolean sereneMissing;
     private final List<Button> toggles = new ArrayList<>();
     private Button gear;
+    private Button quiltIcon;
     private WinterSkipPicker picker;
 
     public SleepWellSettingsScreen(SleepWellContainer container, Inventory inventory, Component title) {
@@ -70,20 +75,20 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
         Button winter = addToggle(2, this.menu.winterSkip(), "gui.sleep_well.winter_skip",
                 FIRST_ROW_Y + ROW_STEP * 2, ROW_W);
         if (!this.menu.sereneSeasons()) {
-            // Grey it out and explain on hover: replacing the label with a sentence made it overrun the row
-            // below, and the switch's own state ("开/关") is still worth reading.
+            // Grey it out and put the reason on one quiet line under the switches: both replacing the label and
+            // a hover tooltip ended up covering the row below.
             winter.active = false;
-            winter.setTooltip(net.minecraft.client.gui.components.Tooltip.create(
-                    Component.translatable("gui.sleep_well.no_serene_seasons")));
+            this.sereneMissing = true;
         }
         addToggle(3, this.menu.lieIn(), "gui.sleep_well.lie_in", FIRST_ROW_Y + ROW_STEP * 3, ROW_W);
 
         this.picker = new WinterSkipPicker(this.notHiddenTasks, SleepWellConfig.WINTER_SKIP_TASKS.get(),
                 this::closePicker, this::saveSkipTasks);
-        this.gear = this.addRenderableWidget(new GearButton(this.leftPos + ROW_X + ROW_W - GEAR_W,
+        this.gear = this.addRenderableWidget(new GearButton(this.leftPos + ROW_X + ROW_W - GEAR_W - ICON_INSET,
                 this.topPos + FIRST_ROW_Y + ROW_STEP * 2, GEAR_W, ROW_H, b -> openPicker()));
         this.gear.active = this.menu.sereneSeasons();
-        this.addRenderableWidget(new QuiltIconButton(this.leftPos + ROW_X + ROW_W - QUILT_ICON_W,
+        this.quiltIcon = this.addRenderableWidget(new QuiltIconButton(
+                this.leftPos + ROW_X + ROW_W - QUILT_ICON_W - ICON_INSET,
                 this.topPos + FIRST_ROW_Y + ROW_STEP * 3, QUILT_ICON_W, ROW_H, b -> openQuiltWall()));
     }
 
@@ -336,6 +341,15 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
      */
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        // The switches span the whole row, so their bounds cover the gear and the quilt icon. Hand the icons the
+        // click first; otherwise the switch under them wins and the buttons look dead.
+        if (this.gear != null && this.gear.visible && this.gear.mouseClicked(mouseX, mouseY, button)) {
+            return true;
+        }
+        if (this.quiltIcon != null && this.quiltIcon.visible
+                && this.quiltIcon.mouseClicked(mouseX, mouseY, button)) {
+            return true;
+        }
         if (quiltWallClick(mouseX, mouseY)) {
             return true;
         }
@@ -405,6 +419,10 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
     protected void renderLabels(GuiGraphics graphics, int mouseX, int mouseY) {
         graphics.drawString(this.font, Component.translatable("gui.sleep_well.title"),
                 ROW_X, TITLE_Y, TITLE_COLOR, false);
+        if (this.sereneMissing) {
+            graphics.drawString(this.font, Component.translatable("gui.sleep_well.no_serene_seasons"),
+                    ROW_X, FIRST_ROW_Y + ROW_STEP * 4 - 2, 0x8C6A4A, false);
+        }
     }
 
     /**
