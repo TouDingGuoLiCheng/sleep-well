@@ -317,12 +317,16 @@ public final class MaidColliderCapture {
         if (w <= 0.0F || h <= 0.0F || d <= 0.0F) {
             return;
         }
+        // TLM's bedrock loader hands cubes out already divided by 16 (a blockbench 8 px cube arrives as 0.5),
+        // so dividing again shrank every box to a centimetre and the wireframe collapsed to a dot. Packs that
+        // really are in pixels still show up with large numbers, hence the guard instead of a bare 1/16.
+        float unit = (w > 2.0F || h > 2.0F || d > 2.0F) ? 1.0F / PIXELS : 1.0F;
         QuiltBox box = new QuiltBox(name);
         for (int corner = 0; corner < 8; corner++) {
             float a = (corner & 1) != 0 ? 1.0F : 0.0F;
             float b = (corner & 2) != 0 ? 1.0F : 0.0F;
             float c = (corner & 4) != 0 ? 1.0F : 0.0F;
-            Vector3f local = new Vector3f((x + w * a) / PIXELS, (y + h * b) / PIXELS, (z + d * c) / PIXELS);
+            Vector3f local = new Vector3f((x + w * a) * unit, (y + h * b) * unit, (z + d * c) * unit);
             Vector3f world = local.mulPosition(matrix);
             box.setCorner(corner, world.x, world.y, world.z);
         }
