@@ -151,6 +151,7 @@ public final class MaidColliderCapture {
      * keep going through the layer capture exactly as before.
      */
     private static List<QuiltBox> partBoxes;
+    private static int rawCubes;
     private static java.util.Set<Object> partSeen;
     private static int partPasses;
     /** The matrix the entity renderer itself was handed: the space every part matrix should live in. */
@@ -166,6 +167,7 @@ public final class MaidColliderCapture {
         }
         if (maid.isSleeping()) {
             partBoxes = new ArrayList<>();
+            rawCubes = 0;
             partSeen = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
         } else {
             partBoxes = null;
@@ -266,6 +268,37 @@ public final class MaidColliderCapture {
                     String.format(java.util.Locale.ROOT, "%.2f", b[3] - b[0]),
                     String.format(java.util.Locale.ROOT, "%.2f", b[4] - b[1]),
                     String.format(java.util.Locale.ROOT, "%.2f", b[5] - b[2]));
+            org.joml.Quaternionf rot = Minecraft.getInstance().gameRenderer.getMainCamera().rotation();
+            net.minecraft.world.phys.Vec3 eye = Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
+            LOGGER.info("[被子] 采集明细 maid={} 相机=({},{},{}) 朝向四元数=({},{},{},{}) 她=({},{},{})",
+                    maid.getUUID(), fmt3((float) eye.x), fmt3((float) eye.y), fmt3((float) eye.z),
+                    fmt3(rot.x), fmt3(rot.y), fmt3(rot.z), fmt3(rot.w),
+                    fmt3((float) maid.getX()), fmt3((float) maid.getY()), fmt3((float) maid.getZ()));
+            int shown = 0;
+            for (QuiltBox box : boxes) {
+                if (shown++ >= 5) {
+                    break;
+                }
+                float minX = Float.MAX_VALUE, minY = Float.MAX_VALUE, minZ = Float.MAX_VALUE;
+                float maxX = -Float.MAX_VALUE, maxY = -Float.MAX_VALUE, maxZ = -Float.MAX_VALUE;
+                for (int i = 0; i < 8; i++) {
+                    minX = Math.min(minX, box.x(i));
+                    minY = Math.min(minY, box.y(i));
+                    minZ = Math.min(minZ, box.z(i));
+                    maxX = Math.max(maxX, box.x(i));
+                    maxY = Math.max(maxY, box.y(i));
+                    maxZ = Math.max(maxZ, box.z(i));
+                }
+                LOGGER.info("[被子] 盒子#{} 中心=({},{},{}) 尺寸={}x{}x{} 角0=({},{},{}) 角7=({},{},{})",
+                        shown, fmt3((minX + maxX) * 0.5F), fmt3((minY + maxY) * 0.5F), fmt3((minZ + maxZ) * 0.5F),
+                        fmt3(maxX - minX), fmt3(maxY - minY), fmt3(maxZ - minZ),
+                        fmt3(box.x(0)), fmt3(box.y(0)), fmt3(box.z(0)),
+                        fmt3(box.x(7)), fmt3(box.y(7)), fmt3(box.z(7)));
+            }
+            LOGGER.info("[被子] 采集汇总 maid={} 部件立方体={} 生成盒子={} 半宽={} 半径首盒={}",
+                    maid.getUUID(), rawCubes, boxes.size(),
+                    fmt3((boxes.get(0).shortestEdge())),
+                    fmt3(boxes.get(0).radius));
         }
     }
 
@@ -277,6 +310,10 @@ public final class MaidColliderCapture {
         float w = Reflect.floatField(cube, "width");
         float h = Reflect.floatField(cube, "height");
         float d = Reflect.floatField(cube, "depth");
+        if (rawCubes++ < 6) {
+            LOGGER.info("[被子] 立方体原始值 x={} y={} z={} w={} h={} d={} class={}", fmt3(x), fmt3(y), fmt3(z),
+                    fmt3(w), fmt3(h), fmt3(d), cube.getClass().getSimpleName());
+        }
         if (w <= 0.0F || h <= 0.0F || d <= 0.0F) {
             return;
         }
