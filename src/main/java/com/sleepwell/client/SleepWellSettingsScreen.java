@@ -65,8 +65,10 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
         toggles.clear();
         addToggle(0, this.menu.sleepFallback(), "gui.sleep_well.sleep_fallback", FIRST_ROW_Y, ROW_W);
         addToggle(1, this.menu.campfireFlee(), "gui.sleep_well.campfire_flee", FIRST_ROW_Y + ROW_STEP, ROW_W);
+        // The switches span the whole row: the gear and the quilt icon float on top of the right end instead of
+        // carving a cell out of the button, which used to leave a visible seam in the middle of the row.
         Button winter = addToggle(2, this.menu.winterSkip(), "gui.sleep_well.winter_skip",
-                FIRST_ROW_Y + ROW_STEP * 2, ROW_W - GEAR_W - GEAR_GAP);
+                FIRST_ROW_Y + ROW_STEP * 2, ROW_W);
         if (!this.menu.sereneSeasons()) {
             // Grey it out and explain on hover: replacing the label with a sentence made it overrun the row
             // below, and the switch's own state ("开/关") is still worth reading.
@@ -74,8 +76,7 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
             winter.setTooltip(net.minecraft.client.gui.components.Tooltip.create(
                     Component.translatable("gui.sleep_well.no_serene_seasons")));
         }
-        addToggle(3, this.menu.lieIn(), "gui.sleep_well.lie_in", FIRST_ROW_Y + ROW_STEP * 3,
-                ROW_W - QUILT_ICON_W - GEAR_GAP);
+        addToggle(3, this.menu.lieIn(), "gui.sleep_well.lie_in", FIRST_ROW_Y + ROW_STEP * 3, ROW_W);
 
         this.picker = new WinterSkipPicker(this.notHiddenTasks, SleepWellConfig.WINTER_SKIP_TASKS.get(),
                 this::closePicker, this::saveSkipTasks);
