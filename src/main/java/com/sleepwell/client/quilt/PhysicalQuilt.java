@@ -1158,7 +1158,7 @@ public final class PhysicalQuilt {
 
         private void draw(PoseStack pose, MultiBufferSource.BufferSource buffers, DyeColor color) {
             VertexConsumer consumer = buffers.getBuffer(
-                    RenderType.entityCutoutNoCull(style.texture(color)));
+                    RenderType.entityCutoutNoCull(style.texture()));
             PoseStack.Pose entry = pose.last();
             // Sample the light where each particle actually is. FULL_BRIGHT ignored the world entirely, which is
             // why the quilt stayed daytime-bright at night and in the rain.
@@ -1238,7 +1238,7 @@ public final class PhysicalQuilt {
                 rim(consumer, entry, rimShade, lights, 0, row, 0, row + 1, nx, ny, nz);
                 rim(consumer, entry, rimShade, lights, COLS - 1, row, COLS - 1, row + 1, nx, ny, nz);
             }
-            buffers.endBatch(RenderType.entityCutoutNoCull(style.texture(color)));
+            buffers.endBatch(RenderType.entityCutoutNoCull(style.texture()));
         }
 
         /** One border quad: particle p at the top, the same particle sunk along its normal, for two partners. */

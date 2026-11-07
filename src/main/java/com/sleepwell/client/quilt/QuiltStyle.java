@@ -1,14 +1,15 @@
 package com.sleepwell.client.quilt;
 
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.item.DyeColor;
 
 /**
  * One kind of quilt, as data rather than as constants buried in the renderer.
  * <p>
- * Everything that makes one quilt look different from another lives here: which texture it uses, how large
- * that texture is, whether the pattern tiles across the cloth or is drawn once over the whole sheet, the
- * visible thickness of the shell and how its underside and rim are shaded.
+ * Everything that makes one quilt look different from another lives here: its texture, how many times that
+ * texture repeats across the cloth, the visible thickness of the shell and how the underside and rim are shaded.
+ * <p>
+ * A quilt carries its own colours. The bed's dye no longer tints anything: a spring quilt has to look like
+ * spring on a black bed too, so each quilt owns one texture and repeats it.
  * <p>
  * Adding a quilt is therefore a matter of declaring another {@link QuiltStyle} - the renderer and the solver
  * do not know any of the numbers.
@@ -26,8 +27,12 @@ public final class QuiltStyle {
     public final String id;
     /** Name shown to players. */
     public final String displayName;
+    /** Repeat the pattern (seamless artwork) or stretch it once over the whole sheet. */
     public final Tiling tiling;
-    /** Draw the quilt one third wider than the texture was authored for (see TILE_U). */
+    /** How many times the texture repeats across the cloth, which is what keeps a pattern square. */
+    public final float repeatU;
+    public final float repeatV;
+    /** Draw the quilt one third wider than a plain one: the sheet is enlarged, not the pattern. */
     public final boolean wideAcross;
     /** Visible thickness: the underside sits this far below the solved surface. */
     public final float shell;
@@ -38,11 +43,13 @@ public final class QuiltStyle {
     /** Texture height used by the rim strips. */
     public final float rimV;
 
-    private QuiltStyle(String id, String displayName, Tiling tiling, boolean wideAcross, float shell,
-                       float underShade, float rimShade, float rimV) {
+    private QuiltStyle(String id, String displayName, Tiling tiling, float repeatU, float repeatV,
+                       boolean wideAcross, float shell, float underShade, float rimShade, float rimV) {
         this.id = id;
         this.displayName = displayName;
         this.tiling = tiling;
+        this.repeatU = repeatU;
+        this.repeatV = repeatV;
         this.wideAcross = wideAcross;
         this.shell = shell;
         this.underShade = underShade;
@@ -57,7 +64,14 @@ public final class QuiltStyle {
 
     /** The default quilt, and the one every maid wears until she picks another. */
     public static final QuiltStyle THICK_GINGHAM = register(new QuiltStyle("thick_gingham", "厚实格子被",
-            Tiling.TILED, true, 0.045F, 0.72F, 0.62F, 0.16F));
+            Tiling.TILED, 4.0F / 3.0F, 1.0F, true, 0.045F, 0.72F, 0.62F, 0.16F));
+
+    /**
+     * Spring: a thin, narrow cover in off-white with a fine green check and scattered petals - the one you
+     * pull over yourself on a night that has stopped being cold but is not yet warm.
+     */
+    public static final QuiltStyle SPRING_BLOSSOM = register(new QuiltStyle("spring_blossom", "春之被",
+            Tiling.TILED, 4.0F, 4.0F, false, 0.028F, 0.82F, 0.72F, 0.16F));
 
     private static QuiltStyle register(QuiltStyle style) {
         REGISTRY.put(style.id, style);
@@ -79,20 +93,17 @@ public final class QuiltStyle {
         return THICK_GINGHAM.id.equals(id);
     }
 
-    /** Width multiplier of the UV range: wider cloth, same check size. */
+    /** How many texture repeats span the cloth across, and along. */
     public float tileU() {
-        return tiling == Tiling.WHOLE ? 1.0F : (wideAcross ? 4.0F / 3.0F : 1.0F);
+        return repeatU;
     }
 
     public float tileV() {
-        return 1.0F;
+        return repeatV;
     }
 
-    /** Texture for one bed colour. Whole-image quilts ignore the colour and resolve by id. */
-    public ResourceLocation texture(DyeColor color) {
-        if (tiling == Tiling.WHOLE) {
-            return new ResourceLocation("sleep_well", "textures/quilt/" + id + ".png");
-        }
-        return new ResourceLocation("sleep_well", "textures/quilt/" + id + "/" + color.getSerializedName() + ".png");
+    /** Every quilt owns exactly one texture; the bed's dye is no longer involved. */
+    public ResourceLocation texture() {
+        return new ResourceLocation("sleep_well", "textures/quilt/" + id + ".png");
     }
 }
