@@ -130,8 +130,6 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
     private void renderQuiltWall(GuiGraphics graphics, int mouseX, int mouseY) {
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
-        graphics.fill(this.leftPos, this.topPos, this.leftPos + this.imageWidth, this.topPos + this.imageHeight,
-                0xD9141A2B);
         List<QuiltStyle> styles = QuiltStyle.all();
         String current = this.chosenQuilt != null ? this.chosenQuilt : this.menu.quiltStyle();
         for (int i = 0; i < styles.size(); i++) {
@@ -154,7 +152,7 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
             }
         }
         graphics.drawString(this.font, Component.translatable("gui.sleep_well.quilt_title"),
-                wallLeft(), wallTop() - 12, 0xF2EEE4, false);
+                wallLeft(), wallTop() - 12, TITLE_COLOR, false);
         RenderSystem.disableBlend();
     }
 
