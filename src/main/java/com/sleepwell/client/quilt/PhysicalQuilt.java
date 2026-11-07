@@ -111,7 +111,6 @@ public final class PhysicalQuilt {
     private static final float MAX_HALF_WIDTH = 1.40F;
     private static final float MAX_FOOT_REACH = 1.75F;
     /** Which quilt is drawn. Every appearance number lives on the style, so a new quilt is a new constant. */
-    private static final QuiltStyle STYLE = QuiltStyle.THICK_GINGHAM;
 
     private static final Map<UUID, Cloth> CLOTHS = new HashMap<>();
     private static int FRAMES;
@@ -181,8 +180,11 @@ public final class PhysicalQuilt {
         double top = bedTop(bed);
         Vec3 middle = new Vec3((head.x + foot.x) * 0.5D, top, (head.z + foot.z) * 0.5D);
 
-        String modelKey = modelKey(maid);
+        QuiltStyle shape = QuiltStyle.of(com.sleepwell.maid.MaidCapabilities.of(maid).quiltStyle());
+        // The quilt's own parameters belong in the cache key: a wide quilt solved as a plain one is wrong.
+        String modelKey = modelKey(maid) + "|" + shape.id;
         Cloth cached = CLOTHS.computeIfAbsent(maid.getUUID(), id -> new Cloth());
+        cached.style = shape;
         if (cached.initialised && modelKey.equals(cached.modelKey) && cached.hasLocalFrame()) {
             // Reuse: the sheet was solved once for this model, so it only has to be moved to whatever bed she
             // is in now. No capture, no gate, no solver - the whole point of the cache.
@@ -423,6 +425,8 @@ public final class PhysicalQuilt {
         private int waitFrames;
         private String modelKey = "";
         private BlockPos bedKey;
+        /** The quilt this sheet is wearing: textures, thickness and width all come from here. */
+        private QuiltStyle style = QuiltStyle.THICK_GINGHAM;
         private int frozenAt;
         private float fingerprint;
         private Vec3 anchor = Vec3.ZERO;
@@ -451,7 +455,8 @@ public final class PhysicalQuilt {
         private void reset() {
             // Size the sheet from what she actually occupies: a tail or a long pair of legs that sticks out
             // past the bed would otherwise sit outside the cloth and stay uncovered.
-            float halfWidth = HALF_WIDTH;
+            // A wide quilt is a third wider than a plain one, which is exactly what has to be re-solved.
+            float halfWidth = HALF_WIDTH * (style.wideAcross ? 4.0F / 3.0F : 1.0F);
             float footReach = FOOT_REACH;
             float headInset = HEAD_INSET;
             int n = boxMin.length / 3;
@@ -1153,7 +1158,7 @@ public final class PhysicalQuilt {
 
         private void draw(PoseStack pose, MultiBufferSource.BufferSource buffers, DyeColor color) {
             VertexConsumer consumer = buffers.getBuffer(
-                    RenderType.entityCutoutNoCull(STYLE.texture(color)));
+                    RenderType.entityCutoutNoCull(style.texture(color)));
             PoseStack.Pose entry = pose.last();
             // Sample the light where each particle actually is. FULL_BRIGHT ignored the world entirely, which is
             // why the quilt stayed daytime-bright at night and in the rain.
@@ -1201,10 +1206,10 @@ public final class PhysicalQuilt {
                     int b = a + 1;
                     int c = a + COLS + 1;
                     int d = a + COLS;
-                    float u0 = (float) col / (COLS - 1) * STYLE.tileU();
-                    float u1 = (float) (col + 1) / (COLS - 1) * STYLE.tileU();
-                    float v0 = (float) row / (ROWS - 1) * STYLE.tileV();
-                    float v1 = (float) (row + 1) / (ROWS - 1) * STYLE.tileV();
+                    float u0 = (float) col / (COLS - 1) * style.tileU();
+                    float u1 = (float) (col + 1) / (COLS - 1) * style.tileU();
+                    float v0 = (float) row / (ROWS - 1) * style.tileV();
+                    float v1 = (float) (row + 1) / (ROWS - 1) * style.tileV();
                     // Lit by the surface normal: folds and the head of the bed now read as shape.
                     float shade = 0.55F + 0.45F * Math.min(1.0F, Math.max(0.0F, ny[a]));
                     vertex(consumer, entry, now[a].x, now[a].y, now[a].z, u0, v0, lights[a], shade);
@@ -1212,19 +1217,19 @@ public final class PhysicalQuilt {
                     vertex(consumer, entry, now[c].x, now[c].y, now[c].z, u1, v1, lights[c], shade);
                     vertex(consumer, entry, now[d].x, now[d].y, now[d].z, u0, v1, lights[d], shade);
                     // Underside, one thickness below, wound the other way.
-                    float under = shade * STYLE.underShade;
-                    vertex(consumer, entry, now[d].x - nx[d] * STYLE.shell, now[d].y - ny[d] * STYLE.shell,
-                            now[d].z - nz[d] * STYLE.shell, u0, v1, lights[d], under);
-                    vertex(consumer, entry, now[c].x - nx[c] * STYLE.shell, now[c].y - ny[c] * STYLE.shell,
-                            now[c].z - nz[c] * STYLE.shell, u1, v1, lights[c], under);
-                    vertex(consumer, entry, now[b].x - nx[b] * STYLE.shell, now[b].y - ny[b] * STYLE.shell,
-                            now[b].z - nz[b] * STYLE.shell, u1, v0, lights[b], under);
-                    vertex(consumer, entry, now[a].x - nx[a] * STYLE.shell, now[a].y - ny[a] * STYLE.shell,
-                            now[a].z - nz[a] * STYLE.shell, u0, v0, lights[a], under);
+                    float under = shade * style.underShade;
+                    vertex(consumer, entry, now[d].x - nx[d] * style.shell, now[d].y - ny[d] * style.shell,
+                            now[d].z - nz[d] * style.shell, u0, v1, lights[d], under);
+                    vertex(consumer, entry, now[c].x - nx[c] * style.shell, now[c].y - ny[c] * style.shell,
+                            now[c].z - nz[c] * style.shell, u1, v1, lights[c], under);
+                    vertex(consumer, entry, now[b].x - nx[b] * style.shell, now[b].y - ny[b] * style.shell,
+                            now[b].z - nz[b] * style.shell, u1, v0, lights[b], under);
+                    vertex(consumer, entry, now[a].x - nx[a] * style.shell, now[a].y - ny[a] * style.shell,
+                            now[a].z - nz[a] * style.shell, u0, v0, lights[a], under);
                 }
             }
             // Rim: the four borders joined top to bottom, which is where thickness is actually visible.
-            float rimShade = STYLE.rimShade;
+            float rimShade = style.rimShade;
             for (int col = 0; col + 1 < COLS; col++) {
                 rim(consumer, entry, rimShade, lights, col, 0, col + 1, 0, nx, ny, nz);
                 rim(consumer, entry, rimShade, lights, col, ROWS - 1, col + 1, ROWS - 1, nx, ny, nz);
@@ -1233,7 +1238,7 @@ public final class PhysicalQuilt {
                 rim(consumer, entry, rimShade, lights, 0, row, 0, row + 1, nx, ny, nz);
                 rim(consumer, entry, rimShade, lights, COLS - 1, row, COLS - 1, row + 1, nx, ny, nz);
             }
-            buffers.endBatch(RenderType.entityCutoutNoCull(STYLE.texture(color)));
+            buffers.endBatch(RenderType.entityCutoutNoCull(style.texture(color)));
         }
 
         /** One border quad: particle p at the top, the same particle sunk along its normal, for two partners. */
@@ -1243,14 +1248,14 @@ public final class PhysicalQuilt {
             int light = lights[rowA * COLS + colA];
             int a = rowA * COLS + colA;
             int b = rowB * COLS + colB;
-            float u0 = (float) colA / (COLS - 1) * STYLE.tileU();
-            float u1 = (float) colB / (COLS - 1) * STYLE.tileU();
+            float u0 = (float) colA / (COLS - 1) * style.tileU();
+            float u1 = (float) colB / (COLS - 1) * style.tileU();
             vertex(consumer, entry, now[a].x, now[a].y, now[a].z, u0, 0.0F, light, shade);
             vertex(consumer, entry, now[b].x, now[b].y, now[b].z, u1, 0.0F, light, shade);
-            vertex(consumer, entry, now[b].x - nx[b] * STYLE.shell, now[b].y - ny[b] * STYLE.shell,
-                    now[b].z - nz[b] * STYLE.shell, u1, STYLE.rimV, light, shade);
-            vertex(consumer, entry, now[a].x - nx[a] * STYLE.shell, now[a].y - ny[a] * STYLE.shell,
-                    now[a].z - nz[a] * STYLE.shell, u0, STYLE.rimV, light, shade);
+            vertex(consumer, entry, now[b].x - nx[b] * style.shell, now[b].y - ny[b] * style.shell,
+                    now[b].z - nz[b] * style.shell, u1, style.rimV, light, shade);
+            vertex(consumer, entry, now[a].x - nx[a] * style.shell, now[a].y - ny[a] * style.shell,
+                    now[a].z - nz[a] * style.shell, u0, style.rimV, light, shade);
         }
 
         private static void vertex(VertexConsumer consumer, PoseStack.Pose entry, float x, float y, float z,

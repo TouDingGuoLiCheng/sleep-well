@@ -33,6 +33,11 @@ public final class SleepWellConfig {
 
     /** Master switch for "sleeps in instead of getting up at the scheduled wake-up". */
     public static final ForgeConfigSpec.BooleanValue LIE_IN_ENABLED;
+    /**
+     * Lock every non-default quilt. Off by default so the wall can be used immediately; the switch exists
+     * so the locked look can be checked before an unlock condition is designed.
+     */
+    public static final ForgeConfigSpec.BooleanValue QUILT_LOCK_ALL;
     /** Chance to stay in bed when the schedule says it is time to get up. */
     public static final ForgeConfigSpec.IntValue LIE_IN_CHANCE_PERCENT;
     /** Same chance in winter (needs Serene Seasons; without it the plain number is used). */
@@ -131,6 +136,21 @@ public final class SleepWellConfig {
                         List.of("farm", "cocoa", "melon", "sugar_cane", "grass", "snow",
                                 "feed_animal", "milk", "shears", "fishing", "torch", "honey", "berries_farm"),
                         entry -> entry instanceof String);
+        builder.pop();
+
+        builder.comment(
+                "Quilt selection: which quilt covers a maid. Unlocking is not designed yet, so the wall can",
+                "either show every quilt or lock all but the default one."
+        );
+        builder.push("quilt");
+        QUILT_LOCK_ALL = builder
+                .comment(
+                        "Lock every quilt except the default one, to preview the locked wall.",
+                        "锁上除默认以外的全部被子，用来预览\"未解锁\"的界面。",
+                        "Default false: every quilt is selectable.",
+                        "默认 false：全部可选。"
+                )
+                .define("quiltLockAll", false);
         builder.pop();
 
         builder.comment(

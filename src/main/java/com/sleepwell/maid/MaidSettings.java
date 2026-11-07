@@ -11,10 +11,13 @@ public final class MaidSettings implements INBTSerializable<CompoundTag> {
     public static final String TAG_WINTER_SKIP = "WinterSkip";
     public static final String TAG_SAVED_TASK = "SavedTask";
     public static final String TAG_LIE_IN = "LieIn";
+    public static final String TAG_QUILT_STYLE = "QuiltStyle";
+    public static final String DEFAULT_QUILT = "thick_gingham";
 
     private boolean winterSkip;
     private boolean lieIn = true;
     private String savedTaskId = "";
+    private String quiltStyle = DEFAULT_QUILT;
 
     public MaidSettings(boolean winterSkip) {
         this(winterSkip, true);
@@ -52,12 +55,22 @@ public final class MaidSettings implements INBTSerializable<CompoundTag> {
         this.savedTaskId = savedTaskId == null ? "" : savedTaskId;
     }
 
+    /** Which quilt covers her; an id from {@code QuiltStyle}. */
+    public String quiltStyle() {
+        return quiltStyle == null || quiltStyle.isEmpty() ? DEFAULT_QUILT : quiltStyle;
+    }
+
+    public void setQuiltStyle(String quiltStyle) {
+        this.quiltStyle = quiltStyle == null || quiltStyle.isEmpty() ? DEFAULT_QUILT : quiltStyle;
+    }
+
     @Override
     public CompoundTag serializeNBT() {
         CompoundTag tag = new CompoundTag();
         tag.putBoolean(TAG_WINTER_SKIP, winterSkip);
         tag.putString(TAG_SAVED_TASK, savedTaskId);
         tag.putBoolean(TAG_LIE_IN, lieIn);
+        tag.putString(TAG_QUILT_STYLE, quiltStyle());
         return tag;
     }
 
@@ -67,5 +80,6 @@ public final class MaidSettings implements INBTSerializable<CompoundTag> {
         savedTaskId = tag.getString(TAG_SAVED_TASK);
         // Missing tag = a maid from before this switch existed: she defaults to allowed.
         lieIn = !tag.contains(TAG_LIE_IN) || tag.getBoolean(TAG_LIE_IN);
+        quiltStyle = tag.contains(TAG_QUILT_STYLE) ? tag.getString(TAG_QUILT_STYLE) : DEFAULT_QUILT;
     }
 }

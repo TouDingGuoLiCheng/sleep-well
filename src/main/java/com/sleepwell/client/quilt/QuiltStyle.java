@@ -50,9 +50,32 @@ public final class QuiltStyle {
         this.rimV = rimV;
     }
 
-    /** The current quilt: a thick gingham cloth, tiled, following the bed's dye colour. */
-    public static final QuiltStyle THICK_GINGHAM = new QuiltStyle("thick_gingham", "厚实格子被",
-            Tiling.TILED, true, 0.045F, 0.72F, 0.62F, 0.16F);
+    /** The default quilt, and the one every maid wears until she picks another. */
+    public static final QuiltStyle THICK_GINGHAM = register(new QuiltStyle("thick_gingham", "厚实格子被",
+            Tiling.TILED, true, 0.045F, 0.72F, 0.62F, 0.16F));
+
+    /** Every quilt that exists, in display order. Adding a quilt means one more line here. */
+    private static final java.util.Map<String, QuiltStyle> REGISTRY = new java.util.LinkedHashMap<>();
+
+    private static QuiltStyle register(QuiltStyle style) {
+        REGISTRY.put(style.id, style);
+        return style;
+    }
+
+    /** The quilt with this id, or the default one when the id is unknown (an old save, a removed quilt). */
+    public static QuiltStyle of(String id) {
+        QuiltStyle found = id == null ? null : REGISTRY.get(id);
+        return found == null ? THICK_GINGHAM : found;
+    }
+
+    /** Every quilt, default first: the GUI wall renders this list. */
+    public static java.util.List<QuiltStyle> all() {
+        return java.util.List.copyOf(REGISTRY.values());
+    }
+
+    public boolean isDefault() {
+        return THICK_GINGHAM.id.equals(id);
+    }
 
     /** Width multiplier of the UV range: wider cloth, same check size. */
     public float tileU() {
@@ -68,6 +91,6 @@ public final class QuiltStyle {
         if (tiling == Tiling.WHOLE) {
             return new ResourceLocation("sleep_well", "textures/quilt/" + id + ".png");
         }
-        return new ResourceLocation("sleep_well", "textures/quilt/" + color.getSerializedName() + ".png");
+        return new ResourceLocation("sleep_well", "textures/quilt/" + id + "/" + color.getSerializedName() + ".png");
     }
 }
