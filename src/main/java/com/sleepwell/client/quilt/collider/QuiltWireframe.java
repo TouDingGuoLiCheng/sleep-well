@@ -114,12 +114,11 @@ public final class QuiltWireframe {
                         (float) (maid.getY() - camera.y), (float) (maid.getZ() - camera.z));
                 org.joml.Vector3f rotated = camRot.transform(new org.joml.Vector3f(rel), new org.joml.Vector3f());
                 maidList.append(String.format(java.util.Locale.ROOT,
-                        " [n=%d pos=%.1f,%.1f,%.1f min=%.1f,%.1f,%.1f rel=%.1f,%.1f,%.1f rot=%.1f,%.1f,%.1f"
-                                + " view=%s layer=%s]",
+                        " [n=%d pos=%.1f,%.1f,%.1f c=%.1f,%.1f,%.1f rel=%.1f,%.1f,%.1f rot=%.1f,%.1f,%.1f]",
                         set.boxes.size(), maid.getX(), maid.getY(), maid.getZ(),
-                        set.bounds[0], set.bounds[1], set.bounds[2],
-                        rel.x, rel.y, rel.z, rotated.x, rotated.y, rotated.z,
-                        set.viewSpace, set.fromLayer));
+                        (set.bounds[0] + set.bounds[3]) * 0.5F, (set.bounds[1] + set.bounds[4]) * 0.5F,
+                        (set.bounds[2] + set.bounds[5]) * 0.5F,
+                        rel.x, rel.y, rel.z, rotated.x, rotated.y, rotated.z));
             }
             // View-space sets carry TLM's own render matrix, so they must NOT be pushed through the level
             // matrix again; world-space fallbacks still are.
