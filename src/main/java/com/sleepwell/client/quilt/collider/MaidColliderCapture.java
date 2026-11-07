@@ -41,6 +41,8 @@ public final class MaidColliderCapture {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final float PIXELS = 16.0F;
     private static final float MAX_RADIUS = 0.10F;
+    /** Thickness given to genuinely flat panels (skirts, capes) so they still collide as a sheet. */
+    private static final float PLATE = 0.01F;
 
     /** Bone name fragments that get real cloth collision. Everything else only repels. */
     private static final String[] HARD_BITS = {
@@ -152,6 +154,7 @@ public final class MaidColliderCapture {
      */
     private static List<QuiltBox> partBoxes;
     private static int rawCubes;
+    private static int degenerateCubes;
     private static java.util.Set<Object> partSeen;
     private static int partPasses;
     /** The matrix the entity renderer itself was handed: the space every part matrix should live in. */
@@ -168,6 +171,7 @@ public final class MaidColliderCapture {
         if (maid.isSleeping()) {
             partBoxes = new ArrayList<>();
             rawCubes = 0;
+            degenerateCubes = 0;
             partSeen = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
         } else {
             partBoxes = null;
@@ -286,8 +290,8 @@ public final class MaidColliderCapture {
                         fmt3(box.x(0)), fmt3(box.y(0)), fmt3(box.z(0)),
                         fmt3(box.x(7)), fmt3(box.y(7)), fmt3(box.z(7)));
             }
-            LOGGER.info("[被子] 采集汇总 maid={} 部件立方体={} 生成盒子={} 半宽={} 半径首盒={}",
-                    maid.getUUID(), rawCubes, boxes.size(),
+            LOGGER.info("[被子] 采集汇总 maid={} 部件立方体={} 生成盒子={} 退化丢弃={} 半宽={} 半径首盒={}",
+                    maid.getUUID(), rawCubes, boxes.size(), degenerateCubes,
                     fmt3((boxes.get(0).shortestEdge())),
                     fmt3(boxes.get(0).radius));
         }
@@ -305,19 +309,29 @@ public final class MaidColliderCapture {
             LOGGER.info("[被子] 立方体原始值 x={} y={} z={} w={} h={} d={} class={}", fmt3(x), fmt3(y), fmt3(z),
                     fmt3(w), fmt3(h), fmt3(d), cube.getClass().getSimpleName());
         }
-        if (w <= 0.0F || h <= 0.0F || d <= 0.0F) {
+        if (w <= 0.0F && h <= 0.0F && d <= 0.0F) {
+            degenerateCubes++;
             return;
         }
         // TLM's bedrock loader hands cubes out already divided by 16 (a blockbench 8 px cube arrives as 0.5),
         // so dividing again shrank every box to a centimetre and the wireframe collapsed to a dot. Packs that
         // really are in pixels still show up with large numbers, hence the guard instead of a bare 1/16.
         float unit = (w > 2.0F || h > 2.0F || d > 2.0F) ? 1.0F / PIXELS : 1.0F;
+        // Skirts, coat tails and capes ship as zero-thickness panels: dropping them left whole garments out of
+        // the outline. A flat sheet still collides like cloth, it just needs a plate thin enough to act flat.
+        float thickness = PLATE * unit;
+        float bw = Math.max(w * unit, thickness);
+        float bh = Math.max(h * unit, thickness);
+        float bd = Math.max(d * unit, thickness);
+        float bx = x * unit;
+        float by = y * unit;
+        float bz = z * unit;
         QuiltBox box = new QuiltBox(name);
         for (int corner = 0; corner < 8; corner++) {
             float a = (corner & 1) != 0 ? 1.0F : 0.0F;
             float b = (corner & 2) != 0 ? 1.0F : 0.0F;
             float c = (corner & 4) != 0 ? 1.0F : 0.0F;
-            Vector3f local = new Vector3f((x + w * a) * unit, (y + h * b) * unit, (z + d * c) * unit);
+            Vector3f local = new Vector3f(bx + bw * a, by + bh * b, bz + bd * c);
             Vector3f world = local.mulPosition(matrix);
             box.setCorner(corner, world.x, world.y, world.z);
         }
