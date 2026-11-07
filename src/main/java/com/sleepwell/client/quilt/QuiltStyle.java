@@ -50,12 +50,14 @@ public final class QuiltStyle {
         this.rimV = rimV;
     }
 
+    // Declared before the quilts themselves: the constant below registers into this map while the class is
+    // still initialising, so a later field would still be null at that moment.
+    /** Every quilt that exists, in display order. Adding a quilt means one more line here. */
+    private static final java.util.Map<String, QuiltStyle> REGISTRY = new java.util.LinkedHashMap<>();
+
     /** The default quilt, and the one every maid wears until she picks another. */
     public static final QuiltStyle THICK_GINGHAM = register(new QuiltStyle("thick_gingham", "厚实格子被",
             Tiling.TILED, true, 0.045F, 0.72F, 0.62F, 0.16F));
-
-    /** Every quilt that exists, in display order. Adding a quilt means one more line here. */
-    private static final java.util.Map<String, QuiltStyle> REGISTRY = new java.util.LinkedHashMap<>();
 
     private static QuiltStyle register(QuiltStyle style) {
         REGISTRY.put(style.id, style);
