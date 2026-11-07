@@ -99,13 +99,13 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
     private static final int WALL_COLS = 2;
     private static final int WALL_CELL_W = 52;
     /** Two lines of text no longer fit: the plate shows the name only, the note moved to a hover hint. */
-    private static final int WALL_CELL_H = 34;
+    private static final int WALL_CELL_H = 26;
     private static final int WALL_GAP = 4;
     /** Edge of the quilt thumbnail inside a plate. */
-    private static final int THUMB = 20;
+    private static final int THUMB = 14;
     /** The border column, right of the divider: five plates, tighter than the quilts. */
-    private static final int BORDER_CELL_H = 26;
-    private static final int BORDER_GAP = 4;
+    private static final int BORDER_CELL_H = 22;
+    private static final int BORDER_GAP = 2;
     /** Space between the quilt grid and the divider, then the border column itself. */
     private static final int WALL_SPLIT = 8;
     /** Where the icon sits: right edge of the lie-in row, mirroring the gear on the winter row. */
@@ -140,13 +140,13 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
         }
     }
 
-    /** The wall is a full-window overlay: thumbs need more room than the row grid has. */
+    /** The wall covers the page panel only: it used to start at the window edge and buried the inventory. */
     private int wallLeft() {
-        return this.leftPos + 6;
+        return this.leftPos + PANEL_X + 4;
     }
 
     private int wallTop() {
-        return this.topPos + 14;
+        return this.topPos + 44;
     }
 
     private int wallCellX(int index) {
@@ -161,6 +161,9 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
     private void renderQuiltWall(GuiGraphics graphics, int mouseX, int mouseY) {
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
+        // Dim the page behind the plates: without it the sunny bed art shows through and everything reads as mush.
+        graphics.fill(this.leftPos + PANEL_X, this.topPos + PANEL_Y,
+                this.leftPos + PANEL_X + PANEL_W, this.topPos + PANEL_Y + PANEL_H, 0xE6141A2B);
         List<QuiltStyle> styles = QuiltStyle.all();
         String current = this.chosenQuilt != null ? this.chosenQuilt : this.menu.quiltStyle();
         String currentBorder = currentBorder();
@@ -191,7 +194,7 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
 
         // The divider is what tells a player the wall has two halves now: faces left, borders right.
         graphics.fill(borderX() - WALL_SPLIT + 2, wallTop() - 10,
-                borderX() - WALL_SPLIT + 3, wallTop() + 152, 0x66F2E27A);
+                borderX() - WALL_SPLIT + 3, wallTop() + 120, 0x66F2E27A);
         graphics.drawString(this.font, Component.translatable("gui.sleep_well.border_title"),
                 borderX(), wallTop() - 12, TITLE_COLOR, false);
 
@@ -417,9 +420,11 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
 
     @Override
     protected void renderLabels(GuiGraphics graphics, int mouseX, int mouseY) {
-        graphics.drawString(this.font, Component.translatable("gui.sleep_well.title"),
-                ROW_X, TITLE_Y, TITLE_COLOR, false);
-        if (this.sereneMissing) {
+        if (!this.quiltOpen) {
+            graphics.drawString(this.font, Component.translatable("gui.sleep_well.title"),
+                    ROW_X, TITLE_Y, TITLE_COLOR, false);
+        }
+        if (this.sereneMissing && !this.quiltOpen) {
             graphics.drawString(this.font, Component.translatable("gui.sleep_well.no_serene_seasons"),
                     ROW_X, FIRST_ROW_Y + ROW_STEP * 4 - 2, 0x8C6A4A, false);
         }
