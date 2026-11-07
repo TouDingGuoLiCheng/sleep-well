@@ -78,6 +78,12 @@ public final class PhysicalQuilt {
     /** One solve, done properly: the sheet is settled once and then frozen (R6). */
     private static final int WARMUP = 800;
     /**
+     * The settle is spread over this many frames. All 800 steps in one frame cost a visible hitch the first
+     * time a model was quilted; ten frames of 80 steps are short enough to pass unnoticed.
+     */
+    private static final int SETTLE_CHUNKS = 10;
+    private static final int SETTLE_CHUNK = WARMUP / SETTLE_CHUNKS;
+    /**
      * A capture taken while she is still lying down shows a half-seated pose whose boxes sit up to a block
      * away from her entity. Solving against that produces a quilt that covers "where she was mid-animation",
      * which is what made the quilt look like it was under her. Solve only once the capture agrees with her.
@@ -293,21 +299,27 @@ public final class PhysicalQuilt {
                 LOGGER.warn("[被子] 采集姿态始终未稳定 maid={} 帧间位移={} 盒数={} 高度范围={}..{}，仍然按当前姿态解算",
                         shortId(maid), fmt(moved), boxes, fmt(lowY), fmt(topY));
             }
-            SOLVED_THIS_FRAME = true;
-            cloth.reset();
-            LOGGER.info("[被子] 布料新建 maid={} model={} grid={}x{} anchor={} bedTop={} boxes={} {}",
-                    shortId(maid), modelKey, COLS, ROWS, fmt(cloth.anchor), fmt(cloth.bedTop), set.boxes.size(),
-                    bedInfo(maid, bed));
-            long start = System.nanoTime();
-            cloth.settle(set, viewToWorld);
+            cloth.abandoned(maid.tickCount);
+            if (!cloth.settling) {
+                SOLVED_THIS_FRAME = true;
+                cloth.reset();
+                LOGGER.info("[被子] 布料新建 maid={} model={} grid={}x{} anchor={} bedTop={} boxes={} {}",
+                        shortId(maid), modelKey, COLS, ROWS, fmt(cloth.anchor), fmt(cloth.bedTop), set.boxes.size(),
+                        bedInfo(maid, bed));
+                cloth.beginSettle(set, viewToWorld);
+            }
+            if (!cloth.settleChunk(set, viewToWorld)) {
+                // Still mid-settle: no cloth is drawn this frame, which is why the slice count matters.
+                return;
+            }
             cloth.initialised = true;
             cloth.frozenAt = maid.tickCount;
             cloth.fingerprint = fingerprint(set);
             cloth.storeToDisk(modelKey, set);
-            LOGGER.info("[被子] 布料解算完成并冻结 maid={} steps={} 耗时={}ms yRange={}..{} 沿床覆盖={} 逐行={}",
-                    shortId(maid), WARMUP, String.format(Locale.ROOT, "%.1f",
-                            (System.nanoTime() - start) / 1.0E6), fmt(cloth.minY()), fmt(cloth.maxY()),
-                    cloth.alongSpan(), cloth.rowHeights());
+            LOGGER.info("[被子] 布料解算完成并冻结 maid={} steps={} 分段={} 总耗时={}ms yRange={}..{} 沿床覆盖={} 逐行={}",
+                    shortId(maid), WARMUP, SETTLE_CHUNKS,
+                    String.format(Locale.ROOT, "%.1f", (float) cloth.settleMillis()), fmt(cloth.minY()),
+                    fmt(cloth.maxY()), cloth.alongSpan(), cloth.rowHeights());
             float clothTop = cloth.maxY();
             float bodyTop = cloth.boxMaxY();
             if (clothTop < bodyTop - 0.02F) {
@@ -537,18 +549,67 @@ public final class PhysicalQuilt {
             return moved;
         }
 
-        private void settle(ColliderSet set, Matrix4f viewToWorld) {
+        private boolean settling;
+        private int settleStepsLeft;
+        private long settleStartNanos;
+        private int settleTick;
+
+        /** First slice of the settle: set the box field up once, then let {@link #settleChunk} walk it. */
+        private void beginSettle(ColliderSet set, Matrix4f viewToWorld) {
+            settleStartNanos = System.nanoTime();
+            settleStepsLeft = WARMUP;
+            settling = true;
+            settleTick = 0;
             refreshBoxes(set, viewToWorld);
             refreshBoxes(set, viewToWorld);
             LOGGER.info("[被子] 碰撞校验 布质心={} 盒质心={} 间距={} 盒数={} 盒Y范围={}..{}",
                     fmt(centroid()), fmt(boxCentroid()), fmt(centroid().distanceTo(boxCentroid())),
                     boxMin.length / 3, fmt(boxMinY()), fmt(boxMaxY()));
-            for (int i = 0; i < WARMUP; i++) {
-                // No refresh and no grid rebuild inside the loop: the pose cannot change mid-settle.
+        }
+
+        /**
+         * One frame's worth of settling. Returns true on the frame that finishes it, so the caller can freeze
+         * and cache the sheet exactly once.
+         */
+        private boolean settleChunk(ColliderSet set, Matrix4f viewToWorld) {
+            // Her pose can drift between slices, so the box field is refreshed per chunk, not per step.
+            refreshBoxes(set, viewToWorld);
+            int steps = Math.min(SETTLE_CHUNK, settleStepsLeft);
+            for (int i = 0; i < steps; i++) {
                 step(set, viewToWorld, true);
             }
+            settleStepsLeft -= steps;
+            if (settleStepsLeft > 0) {
+                return false;
+            }
+            settling = false;
             probeContact();
             captureLocalFrame();
+            return true;
+        }
+
+        /**
+         * A settle abandoned halfway (she woke up mid-slice) must not be resumed against a later pose: the
+         * leftover steps would freeze a sheet solved for where she used to be. Restart instead.
+         */
+        private boolean abandoned(int tick) {
+            if (!settling) {
+                return false;
+            }
+            if (settleTick != 0 && tick - settleTick > 40) {
+                settling = false;
+                settleStepsLeft = 0;
+                initialised = false;
+                LOGGER.info("[被子] 解算中断 断点={}t 现在={}t，下次重新解算", settleTick, tick);
+                return true;
+            }
+            settleTick = tick;
+            return false;
+        }
+
+        /** Wall-clock milliseconds the whole (multi-frame) settle took. */
+        private long settleMillis() {
+            return (System.nanoTime() - settleStartNanos) / 1_000_000L;
         }
 
         /**
