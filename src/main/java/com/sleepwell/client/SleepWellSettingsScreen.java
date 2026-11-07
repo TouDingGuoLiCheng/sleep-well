@@ -97,12 +97,15 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
      * the lie-in row opens it, and one plate per quilt is laid out three to a row inside it.
      */
     private static final int WALL_COLS = 2;
-    private static final int WALL_CELL_W = 52;
+    /** Wide enough for a thumbnail beside the name, so the wall spans the whole 176 px panel. */
+    private static final int WALL_CELL_W = 60;
     /** Two lines of text no longer fit: the plate shows the name only, the note moved to a hover hint. */
     private static final int WALL_CELL_H = 26;
     private static final int WALL_GAP = 4;
-    /** Edge of the quilt thumbnail inside a plate. */
-    private static final int THUMB = 14;
+    /** Edge of the quilt thumbnail inside a plate; the name sits to its right. */
+    private static final int THUMB = 16;
+    /** The border column is narrower than a quilt plate: names only. */
+    private static final int BORDER_CELL_W = 44;
     /** The border column, right of the divider: five plates, tighter than the quilts. */
     private static final int BORDER_CELL_H = 22;
     private static final int BORDER_GAP = 2;
@@ -142,7 +145,7 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
 
     /** The wall covers the page panel only: it used to start at the window edge and buried the inventory. */
     private int wallLeft() {
-        return this.leftPos + PANEL_X + 4;
+        return this.leftPos + PANEL_X;
     }
 
     private int wallTop() {
@@ -181,20 +184,19 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
                     selected ? 0xFFF2E27A : (hovered ? 0xD8FFFFFF : 0x77FFFFFF));
             // The face itself as the plate's art: a player picks by look, not by reading names.
             boolean banded = !QuiltBorder.of(currentBorder).isNone();
-            blitScaled(graphics, QuiltTextures.texture(style, currentBorder),
-                    x + (WALL_CELL_W - THUMB) / 2, y + 3, THUMB,
+            blitScaled(graphics, QuiltTextures.texture(style, currentBorder), x + 4,
+                    y + (WALL_CELL_H - THUMB) / 2, THUMB,
                     banded ? 192 + QuiltBorder.BAND * 2 : 192,
                     banded ? 256 + QuiltBorder.BAND * 2 : 256);
-            graphics.drawCenteredString(this.font, (selected ? "✔" : "") + style.displayName,
-                    x + WALL_CELL_W / 2, y + WALL_CELL_H - 10,
-                    locked ? 0x8C8C8C : 0xF2EEE4);
+            graphics.drawString(this.font, (selected ? "✔" : "") + wallName(style.displayName),
+                    x + THUMB + 7, y + 9, locked ? 0x8C8C8C : 0xF2EEE4, false);
         }
         graphics.drawString(this.font, Component.translatable("gui.sleep_well.quilt_title"),
                 wallLeft(), wallTop() - 12, TITLE_COLOR, false);
 
         // The divider is what tells a player the wall has two halves now: faces left, borders right.
-        graphics.fill(borderX() - WALL_SPLIT + 2, wallTop() - 10,
-                borderX() - WALL_SPLIT + 3, wallTop() + 120, 0x66F2E27A);
+        graphics.fill(borderX() - WALL_SPLIT + 3, wallTop() - 4,
+                borderX() - WALL_SPLIT + 4, wallTop() + 118, 0x66F2E27A);
         graphics.drawString(this.font, Component.translatable("gui.sleep_well.border_title"),
                 borderX(), wallTop() - 12, TITLE_COLOR, false);
 
@@ -205,17 +207,17 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
             boolean selected = border.id.equals(currentBorder);
             int x = borderX();
             int y = borderCellY(i);
-            boolean hovered = !locked && mouseX >= x && mouseX < x + WALL_CELL_W
+            boolean hovered = !locked && mouseX >= x && mouseX < x + BORDER_CELL_W
                     && mouseY >= y && mouseY < y + BORDER_CELL_H;
-            graphics.fill(x, y, x + WALL_CELL_W, y + BORDER_CELL_H, hovered ? 0x8C33405E : 0x66141A2B);
-            graphics.fill(x, y, x + WALL_CELL_W, y + 1, 0x55FFFFFF);
-            graphics.renderOutline(x, y, WALL_CELL_W, BORDER_CELL_H,
+            graphics.fill(x, y, x + BORDER_CELL_W, y + BORDER_CELL_H, hovered ? 0x8C33405E : 0x66141A2B);
+            graphics.fill(x, y, x + BORDER_CELL_W, y + 1, 0x55FFFFFF);
+            graphics.renderOutline(x, y, BORDER_CELL_W, BORDER_CELL_H,
                     selected ? 0xFFF2E27A : (hovered ? 0xD8FFFFFF : 0x77FFFFFF));
             if (!border.isNone()) {
-                blitCrop(graphics, border.texture(), x + 4, y + 5, 0, QuiltBorder.BAND, 16);
+                blitCrop(graphics, border.texture(), x + 3, y + 3, 0, QuiltBorder.BAND, 16);
             }
-            graphics.drawString(this.font, (selected ? "✔ " : "") + border.displayName, x + 24, y + 9,
-                    locked ? 0x8C8C8C : 0xF2EEE4, false);
+            graphics.drawString(this.font, (selected ? "✔" : "") + border.displayName,
+                    x + 21, y + 7, locked ? 0x8C8C8C : 0xF2EEE4, false);
         }
         RenderSystem.disableBlend();
     }
@@ -245,6 +247,11 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
     /** The left edge of the border column, right of the quilt grid and the divider. */
     private int borderX() {
         return wallLeft() + WALL_COLS * WALL_CELL_W + WALL_GAP * (WALL_COLS - 1) + WALL_SPLIT;
+    }
+
+    /** Four characters is what fits beside a thumbnail; the full name is only one character longer. */
+    private static String wallName(String name) {
+        return name.length() <= 4 ? name : name.substring(0, 4);
     }
 
     private int borderCellY(int index) {
@@ -278,7 +285,7 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
             QuiltBorder border = borders.get(i);
             int x = borderX();
             int y = borderCellY(i);
-            if (mouseX >= x && mouseX < x + WALL_CELL_W && mouseY >= y && mouseY < y + BORDER_CELL_H) {
+            if (mouseX >= x && mouseX < x + BORDER_CELL_W && mouseY >= y && mouseY < y + BORDER_CELL_H) {
                 boolean locked = this.menu.quiltLocked() && !border.isNone();
                 if (!locked) {
                     this.chosenBorder = border.id;
