@@ -20,6 +20,6 @@
   "command.sleep_well.nap.switch_off": "%s 的「赖床与补觉」开关是关着的",
   "command.sleep_well.nap.no_bed": "附近没有空的女仆床，%s 也没设睡觉区域",
   "command.sleep_well.nap.no_maid": "附近没有女仆",
-  "command.sleep_well.nap.no_player": "这个命令要玩家来执行"
-  "gui.sleep_well.quilt_title": "被子",
+  "command.sleep_well.nap.no_player": "这个命令要玩家来执行",
+ "gui.sleep_well.quilt_title": "被子"
 }

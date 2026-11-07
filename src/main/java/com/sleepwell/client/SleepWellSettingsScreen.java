@@ -56,18 +56,9 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
         super(container, inventory, title);
     }
 
-    /** Which page this screen is showing; the tab row uses it to mark the right tab as selected. */
-    public int page() {
-        return this.menu.page();
-    }
-
     @Override
     protected void init() {
         super.init();
-        if (this.menu.page() == com.sleepwell.network.OpenSettingsPacket.PAGE_QUILT) {
-            buildQuiltWall();
-            return;
-        }
         toggles.clear();
         addToggle(0, this.menu.sleepFallback(), "gui.sleep_well.sleep_fallback", FIRST_ROW_Y, ROW_W);
         addToggle(1, this.menu.campfireFlee(), "gui.sleep_well.campfire_flee", FIRST_ROW_Y + ROW_STEP, ROW_W);
@@ -77,48 +68,120 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
             winter.active = false;
             winter.setMessage(Component.translatable("gui.sleep_well.no_serene_seasons"));
         }
-        addToggle(3, this.menu.lieIn(), "gui.sleep_well.lie_in", FIRST_ROW_Y + ROW_STEP * 3, ROW_W);
+        addToggle(3, this.menu.lieIn(), "gui.sleep_well.lie_in", FIRST_ROW_Y + ROW_STEP * 3,
+                ROW_W - QUILT_ICON_W - GEAR_GAP);
 
         this.picker = new WinterSkipPicker(this.notHiddenTasks, SleepWellConfig.WINTER_SKIP_TASKS.get(),
                 this::closePicker, this::saveSkipTasks);
         this.gear = this.addRenderableWidget(new GearButton(this.leftPos + ROW_X + ROW_W - GEAR_W,
                 this.topPos + FIRST_ROW_Y + ROW_STEP * 2, GEAR_W, ROW_H, b -> openPicker()));
         this.gear.active = this.menu.sereneSeasons();
+        this.addRenderableWidget(new QuiltIconButton(this.leftPos + ROW_X + ROW_W - QUILT_ICON_W,
+                this.topPos + FIRST_ROW_Y + ROW_STEP * 3, QUILT_ICON_W, ROW_H, b -> openQuiltWall()));
     }
 
     /**
-     * The quilt wall: one plate per quilt, three to a row. Selected carries a tick, a locked quilt is greyed
-     * out and does nothing. Placeholder art for now - the plates are the same acrylic style as the switches.
+     * The quilt wall, as an overlay on this page instead of a page of its own: the quilt icon on the right of
+     * the lie-in row opens it, and one plate per quilt is laid out three to a row inside it.
      */
-    private void buildQuiltWall() {
+    private static final int WALL_COLS = 3;
+    private static final int WALL_CELL_W = 52;
+    private static final int WALL_CELL_H = 34;
+    private static final int WALL_GAP = 4;
+    /** Where the icon sits: right edge of the lie-in row, mirroring the gear on the winter row. */
+    private static final int QUILT_ICON_W = 20;
+
+    private boolean quiltOpen;
+    private String chosenQuilt;
+
+    private void openQuiltWall() {
+        this.quiltOpen = true;
+        this.toggles.forEach(button -> button.visible = false);
+        if (this.gear != null) {
+            this.gear.visible = false;
+        }
+    }
+
+    private void closeQuiltWall() {
+        this.quiltOpen = false;
+        this.toggles.forEach(button -> button.visible = true);
+        if (this.gear != null) {
+            this.gear.visible = this.menu.sereneSeasons();
+        }
+    }
+
+    private int wallLeft() {
+        return this.leftPos + ROW_X;
+    }
+
+    private int wallTop() {
+        return this.topPos + FIRST_ROW_Y;
+    }
+
+    private int wallCellX(int index) {
+        return wallLeft() + (index % WALL_COLS) * (WALL_CELL_W + WALL_GAP);
+    }
+
+    private int wallCellY(int index) {
+        return wallTop() + (index / WALL_COLS) * (WALL_CELL_H + WALL_GAP);
+    }
+
+    /** Draws the overlay: dimmed page, then one plate per quilt with its state. */
+    private void renderQuiltWall(GuiGraphics graphics, int mouseX, int mouseY) {
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+        graphics.fill(this.leftPos, this.topPos, this.leftPos + this.imageWidth, this.topPos + this.imageHeight,
+                0xD9141A2B);
         List<QuiltStyle> styles = QuiltStyle.all();
-        int cols = 3;
-        int cellW = 52;
-        int cellH = 34;
-        int gap = 4;
+        String current = this.chosenQuilt != null ? this.chosenQuilt : this.menu.quiltStyle();
         for (int i = 0; i < styles.size(); i++) {
             QuiltStyle style = styles.get(i);
-            int col = i % cols;
-            int row = i / cols;
-            int x = this.leftPos + ROW_X + col * (cellW + gap);
-            int y = this.topPos + FIRST_ROW_Y + row * (cellH + gap);
             boolean locked = this.menu.quiltLocked() && !style.isDefault();
-            boolean selected = style.id.equals(this.menu.quiltStyle());
-            Component text = Component.literal((selected ? "✔ " : "") + style.displayName
-                    + (locked ? " 🔒" : ""));
-            Button cell = new SoftButton(x, y, cellW, cellH, text, b -> pickQuilt(style, locked));
-            cell.active = !locked;
-            this.addRenderableWidget(cell);
+            boolean selected = style.id.equals(current);
+            int x = wallCellX(i);
+            int y = wallCellY(i);
+            boolean hovered = !locked && mouseX >= x && mouseX < x + WALL_CELL_W
+                    && mouseY >= y && mouseY < y + WALL_CELL_H;
+            graphics.fill(x, y, x + WALL_CELL_W, y + WALL_CELL_H, hovered ? 0x8C33405E : 0x66141A2B);
+            graphics.fill(x, y, x + WALL_CELL_W, y + 1, 0x55FFFFFF);
+            graphics.renderOutline(x, y, WALL_CELL_W, WALL_CELL_H,
+                    selected ? 0xFFF2E27A : (hovered ? 0xD8FFFFFF : 0x77FFFFFF));
+            graphics.drawString(this.font, (selected ? "✔ " : "") + style.displayName, x + 4, y + 5,
+                    locked ? 0x8C8C8C : 0xF2EEE4, false);
+            if (locked) {
+                graphics.drawString(this.font, Component.translatable("gui.sleep_well.quilt_locked"),
+                        x + 4, y + 18, 0x8C8C8C, false);
+            }
         }
+        graphics.drawString(this.font, Component.translatable("gui.sleep_well.quilt_title"),
+                wallLeft(), wallTop() - 12, 0xF2EEE4, false);
+        RenderSystem.disableBlend();
     }
 
-    private void pickQuilt(QuiltStyle style, boolean locked) {
-        if (locked) {
-            return;
+    /** Returns true when the overlay swallowed the click. */
+    private boolean quiltWallClick(double mouseX, double mouseY) {
+        if (!this.quiltOpen) {
+            return false;
         }
-        SleepWellNetwork.CHANNEL.sendToServer(new SaveQuiltStylePacket(this.menu.entityId(), style.id));
+        List<QuiltStyle> styles = QuiltStyle.all();
+        for (int i = 0; i < styles.size(); i++) {
+            QuiltStyle style = styles.get(i);
+            int x = wallCellX(i);
+            int y = wallCellY(i);
+            if (mouseX >= x && mouseX < x + WALL_CELL_W && mouseY >= y && mouseY < y + WALL_CELL_H) {
+                boolean locked = this.menu.quiltLocked() && !style.isDefault();
+                if (!locked) {
+                    this.chosenQuilt = style.id;
+                    SleepWellNetwork.CHANNEL.sendToServer(
+                            new SaveQuiltStylePacket(this.menu.entityId(), style.id));
+                }
+                this.closeQuiltWall();
+                return true;
+            }
+        }
+        this.closeQuiltWall();
+        return true;
     }
-
     private Button addToggle(int key, boolean initial, String labelKey, int y, int width) {
         this.state[key] = initial;
         Button button = new SoftButton(this.leftPos + ROW_X, this.topPos + y, width, ROW_H,
@@ -172,6 +235,9 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
      */
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (quiltWallClick(mouseX, mouseY)) {
+            return true;
+        }
         if (pickerOpen()) {
             this.picker.mouseClicked(mouseX, mouseY, button);
             return true;
@@ -224,6 +290,9 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         super.render(graphics, mouseX, mouseY, partialTick);
+        if (this.quiltOpen) {
+            renderQuiltWall(graphics, mouseX, mouseY);
+        }
         if (pickerOpen()) {
             // Covers the whole maid window, so the page's own black margins are hidden behind it too.
             this.picker.render(graphics, this.font, this.leftPos, this.topPos,
@@ -233,10 +302,8 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
 
     @Override
     protected void renderLabels(GuiGraphics graphics, int mouseX, int mouseY) {
-        Component title = this.menu.page() == com.sleepwell.network.OpenSettingsPacket.PAGE_QUILT
-                ? Component.translatable("gui.sleep_well.quilt_title")
-                : Component.translatable("gui.sleep_well.title");
-        graphics.drawString(this.font, title, ROW_X, TITLE_Y, TITLE_COLOR, false);
+        graphics.drawString(this.font, Component.translatable("gui.sleep_well.title"),
+                ROW_X, TITLE_Y, TITLE_COLOR, false);
     }
 
     /**
@@ -262,6 +329,39 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
             graphics.renderOutline(x, y, w, h, hovered ? 0xD8FFFFFF : 0x77FFFFFF);
             graphics.drawCenteredString(Minecraft.getInstance().font, getMessage(),
                     x + w / 2, y + (h - 8) / 2, this.active ? 0xF2EEE4 : 0x8C8C8C);
+            RenderSystem.disableBlend();
+        }
+    }
+
+    /**
+     * The quilt icon on the lie-in row. Placeholder art: a 2x2 gingham patch drawn with rectangles, so the
+     * page needs no texture until real quilt art exists.
+     */
+    private static final class QuiltIconButton extends SoftButton {
+        private QuiltIconButton(int x, int y, int width, int height, OnPress onPress) {
+            super(x, y, width, height, Component.empty(), onPress);
+        }
+
+        @Override
+        public void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+            int x = getX();
+            int y = getY();
+            int w = getWidth();
+            int h = getHeight();
+            boolean hovered = this.active && isHoveredOrFocused();
+            RenderSystem.enableBlend();
+            RenderSystem.defaultBlendFunc();
+            graphics.fill(x, y, x + w, y + h, hovered ? 0x8C33405E : 0x66141A2B);
+            graphics.renderOutline(x, y, w, h, hovered ? 0xD8FFFFFF : 0x77FFFFFF);
+            int cell = 5;
+            int px = x + (w - cell * 2) / 2;
+            int py = y + (h - cell * 2) / 2;
+            for (int cx = 0; cx < 2; cx++) {
+                for (int cy = 0; cy < 2; cy++) {
+                    graphics.fill(px + cx * cell, py + cy * cell, px + cx * cell + cell,
+                            py + cy * cell + cell, (cx + cy) % 2 == 0 ? 0xFF7A5C8F : 0xFFE8DDF0);
+                }
+            }
             RenderSystem.disableBlend();
         }
     }

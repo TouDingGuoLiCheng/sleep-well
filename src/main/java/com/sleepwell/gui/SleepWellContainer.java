@@ -28,14 +28,12 @@ public class SleepWellContainer extends AbstractMaidContainer {
     private final boolean winterSkip;
     private final boolean lieIn;
     private final boolean sereneSeasons;
-    /** 0 = the switch page, 1 = the quilt wall. Both tabs share this container. */
-    private final int page;
     private final String quiltStyle;
     private final boolean quiltLocked;
 
     public SleepWellContainer(int id, Inventory inventory, int entityId,
                               boolean sleepFallback, boolean campfireFlee, boolean winterSkip,
-                              boolean lieIn, boolean sereneSeasons, int page, String quiltStyle,
+                              boolean lieIn, boolean sereneSeasons, String quiltStyle,
                               boolean quiltLocked) {
         super(TYPE.get(), id, inventory, entityId);
         this.entityId = entityId;
@@ -44,13 +42,8 @@ public class SleepWellContainer extends AbstractMaidContainer {
         this.winterSkip = winterSkip;
         this.lieIn = lieIn;
         this.sereneSeasons = sereneSeasons;
-        this.page = page;
         this.quiltStyle = quiltStyle;
         this.quiltLocked = quiltLocked;
-    }
-
-    public int page() {
-        return page;
     }
 
     public String quiltStyle() {
@@ -94,14 +87,13 @@ public class SleepWellContainer extends AbstractMaidContainer {
 
     public static void writeData(FriendlyByteBuf buf, int entityId, boolean sleepFallback,
                                  boolean campfireFlee, boolean winterSkip, boolean lieIn, boolean sereneSeasons,
-                                 int page, String quiltStyle, boolean quiltLocked) {
+                                 String quiltStyle, boolean quiltLocked) {
         buf.writeVarInt(entityId);
         buf.writeBoolean(sleepFallback);
         buf.writeBoolean(campfireFlee);
         buf.writeBoolean(winterSkip);
         buf.writeBoolean(lieIn);
         buf.writeBoolean(sereneSeasons);
-        buf.writeVarInt(page);
         buf.writeUtf(quiltStyle, 64);
         buf.writeBoolean(quiltLocked);
     }
@@ -113,16 +105,15 @@ public class SleepWellContainer extends AbstractMaidContainer {
         boolean winterSkip = buf.readBoolean();
         boolean lieIn = buf.readBoolean();
         boolean sereneSeasons = buf.readBoolean();
-        int page = buf.readVarInt();
         String quiltStyle = buf.readUtf(64);
         boolean quiltLocked = buf.readBoolean();
         return new SleepWellContainer(windowId, inventory, entityId, sleepFallback, campfireFlee, winterSkip,
-                lieIn, sereneSeasons, page, quiltStyle, quiltLocked);
+                lieIn, sereneSeasons, quiltStyle, quiltLocked);
     }
 
     public static MenuProvider create(int entityId, boolean sleepFallback, boolean campfireFlee,
                                       boolean winterSkip, boolean lieIn, boolean sereneSeasons,
-                                      int page, String quiltStyle, boolean quiltLocked) {
+                                      String quiltStyle, boolean quiltLocked) {
         return new MenuProvider() {
             @Override
             public Component getDisplayName() {
@@ -132,7 +123,7 @@ public class SleepWellContainer extends AbstractMaidContainer {
             @Override
             public SleepWellContainer createMenu(int id, Inventory inventory, Player player) {
                 return new SleepWellContainer(id, inventory, entityId, sleepFallback, campfireFlee, winterSkip,
-                        lieIn, sereneSeasons, page, quiltStyle, quiltLocked);
+                        lieIn, sereneSeasons, quiltStyle, quiltLocked);
             }
         };
     }

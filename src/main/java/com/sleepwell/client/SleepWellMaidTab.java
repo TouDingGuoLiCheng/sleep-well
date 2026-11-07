@@ -60,27 +60,20 @@ public final class SleepWellMaidTab {
             }
         }
         int x = maxX == Integer.MIN_VALUE ? event.getLeftPos() + FIRST_EXTERNAL_TAB_X : maxX + TAB_SPACING;
-        int shown = gui instanceof SleepWellSettingsScreen screen ? screen.page() : -1;
-        for (int page : new int[]{OpenSettingsPacket.PAGE_SETTINGS, OpenSettingsPacket.PAGE_QUILT}) {
-            boolean selected = shown == page;
-            int tabX = x + (page == OpenSettingsPacket.PAGE_SETTINGS ? 0 : TAB_SPACING);
-            event.addButton("sleep_well_tab_" + page, new SleepWellTabButton(tabX, topY, selected, page,
-                    button -> {
-                        if (!selected) {
-                            SleepWellNetwork.CHANNEL.sendToServer(new OpenSettingsPacket(maid.getId(), page));
-                        }
-                    }));
-        }
+        boolean selected = gui instanceof SleepWellSettingsScreen;
+        event.addButton("sleep_well_tab", new SleepWellTabButton(x, topY, selected, button -> {
+            if (!selected) {
+                SleepWellNetwork.CHANNEL.sendToServer(new OpenSettingsPacket(maid.getId()));
+            }
+        }));
     }
 
     private static final class SleepWellTabButton extends MaidTabButton {
         private final boolean selected;
-        private final int page;
 
-        private SleepWellTabButton(int x, int y, boolean selected, int page, OnPress onPress) {
+        private SleepWellTabButton(int x, int y, boolean selected, OnPress onPress) {
             super(x, y, TAB_ID, "sleep_well", onPress);
             this.selected = selected;
-            this.page = page;
             this.active = !selected;
         }
 
@@ -91,24 +84,9 @@ public final class SleepWellMaidTab {
                 graphics.blit(SIDE, this.getX(), this.getY(), SIDE_SELECTED_U, SIDE_SELECTED_V,
                         TAB_W, TAB_H, 256, 256);
             }
-            if (this.page == OpenSettingsPacket.PAGE_SETTINGS) {
-                // Same inset as TLM's own tabs: a 16x16 icon in the upper middle of the 24x26 plate.
-                graphics.blit(ICON, this.getX() + ICON_INSET_X, this.getY() + ICON_INSET_Y,
-                        ICON_DRAW, ICON_DRAW, 0, 0, ICON_SRC, ICON_SRC, ICON_SRC, ICON_SRC);
-            } else {
-                // Placeholder quilt icon: a 3x3 gingham patch, drawn with rectangles so it needs no art yet.
-                int px = this.getX() + 3;
-                int py = this.getY() + 3;
-                int cell = 6;
-                for (int cx = 0; cx < 3; cx++) {
-                    for (int cy = 0; cy < 3; cy++) {
-                        boolean dark = (cx + cy) % 2 == 0;
-                        graphics.fill(px + cx * cell, py + cy * cell, px + cx * cell + cell,
-                                py + cy * cell + cell, dark ? 0xFF7A5C8F : 0xFFE8DDF0);
-                    }
-                }
-                graphics.renderOutline(px - 1, py - 1, cell * 3 + 2, cell * 3 + 2, 0xFF3A2C46);
-            }
+            // Same inset as TLM's own tabs: a 16x16 icon in the upper middle of the 24x26 plate.
+            graphics.blit(ICON, this.getX() + ICON_INSET_X, this.getY() + ICON_INSET_Y,
+                    ICON_DRAW, ICON_DRAW, 0, 0, ICON_SRC, ICON_SRC, ICON_SRC, ICON_SRC);
         }
     }
 }

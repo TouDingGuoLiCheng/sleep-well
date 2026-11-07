@@ -14,28 +14,18 @@ import java.util.function.Supplier;
 
 /** Client asks the server to open the Sleep Well page for a maid. */
 public final class OpenSettingsPacket {
-    public static final int PAGE_SETTINGS = 0;
-    public static final int PAGE_QUILT = 1;
-
     private final int entityId;
-    private final int page;
 
     public OpenSettingsPacket(int entityId) {
-        this(entityId, PAGE_SETTINGS);
-    }
-
-    public OpenSettingsPacket(int entityId, int page) {
         this.entityId = entityId;
-        this.page = page;
     }
 
     public static void encode(OpenSettingsPacket packet, FriendlyByteBuf buf) {
         buf.writeVarInt(packet.entityId);
-        buf.writeByte(packet.page);
     }
 
     public static OpenSettingsPacket decode(FriendlyByteBuf buf) {
-        return new OpenSettingsPacket(buf.readVarInt(), buf.readByte());
+        return new OpenSettingsPacket(buf.readVarInt());
     }
 
     public static void handle(OpenSettingsPacket packet, Supplier<NetworkEvent.Context> supplier) {
@@ -57,11 +47,10 @@ public final class OpenSettingsPacket {
         boolean sereneSeasons = SeasonBridge.sereneSeasonsLoaded();
         String quiltStyle = MaidCapabilities.of(maid).quiltStyle();
         boolean quiltLocked = SleepWellConfig.QUILT_LOCK_ALL.get();
-        int page = packet.page == PAGE_QUILT ? PAGE_QUILT : PAGE_SETTINGS;
         context.enqueueWork(() -> NetworkHooks.openScreen(player,
                 SleepWellContainer.create(packet.entityId, sleepFallback, campfireFlee, winterSkip, lieIn,
-                        sereneSeasons, page, quiltStyle, quiltLocked),
+                        sereneSeasons, quiltStyle, quiltLocked),
                 buf -> SleepWellContainer.writeData(buf, packet.entityId, sleepFallback, campfireFlee, winterSkip,
-                        lieIn, sereneSeasons, page, quiltStyle, quiltLocked)));
+                        lieIn, sereneSeasons, quiltStyle, quiltLocked)));
     }
 }
