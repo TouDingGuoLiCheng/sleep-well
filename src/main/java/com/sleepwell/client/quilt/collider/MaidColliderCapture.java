@@ -208,7 +208,8 @@ public final class MaidColliderCapture {
         set.viewToWorld = null;
         set.pendingWorldMatrix = true;
         set.capsules = Capsules.fit(boxes);
-        SETS.put(maid.getUUID(), set);
+        // Publish through the guard: a model-specific outline captured earlier this frame outranks this one.
+        store(maid.getUUID(), set);
         captures++;
         if (partPasses++ % 200 == 0) {
             float[] b = set.bounds;
@@ -521,7 +522,7 @@ public final class MaidColliderCapture {
      */
     private static void store(UUID id, ColliderSet set) {
         ColliderSet existing = SETS.get(id);
-        if (existing != null && existing.fromLayer && !set.fromLayer && set.tick - existing.tick <= 3) {
+        if (existing != null && existing.layerSource && !set.layerSource && set.tick - existing.tick <= 3) {
             return;
         }
         SETS.put(id, set);
@@ -637,6 +638,7 @@ public final class MaidColliderCapture {
         // Converted at the end of this very frame; see resolveWorldMatrices.
         set.viewToWorld = null;
         set.pendingWorldMatrix = true;
+        set.layerSource = true;
         set.capsules = Capsules.fit(boxes);
         if (layerCalls % 600 == 1) {
             LOGGER.info("[被子] " + Capsules.summary(set.capsules));

@@ -17,6 +17,12 @@ public final class ColliderSet {
     public final boolean direct;
     /** True when produced inside the maid's own render pass: that is the only trustworthy source. */
     public boolean fromLayer;
+    /**
+     * True when captured from the gecko render layer, which sees the model's real bones. A bedrock-part
+     * capture is in-her-render-pass too, but it describes the plain body underneath, so it must never
+     * replace a model-specific outline that was just captured.
+     */
+    public boolean layerSource;
     /** Corner coordinates are already in the space the line batch draws in (TLM's own render matrix). */
     public boolean viewSpace;
     /** Capsule chain fitted from {@link #boxes}: the collision form the cloth actually solves against. */
