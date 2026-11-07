@@ -145,10 +145,16 @@ public final class QuiltWireframe {
                 }
             }
         }
-        // A cube at a known place in the same batch. If this one shows and the maid boxes do not, the
-        // batch is fine and the boxes are off screen; if it does not show either, nothing at this stage is
-        // reaching the screen and the whole overlay needs a different hook.
-        referenceCube(consumer);
+        // Two reference cubes in the same batch, one per candidate space. Whichever the player can see says
+        // which space this stage actually draws in:
+        //   yellow  - camera-relative, identity matrix (what the viewSpace sets assume)
+        //   magenta - world space, pushed through the level matrix (what a world-space set would need)
+        referenceCube(consumer, new Matrix4f(), 0.0F, -0.4F, -3.0F, 1.0F, 1.0F, 0.0F);
+        net.minecraft.client.Camera cam = Minecraft.getInstance().gameRenderer.getMainCamera();
+        org.joml.Vector3f eye = cam.getPosition().toVector3f();
+        org.joml.Vector3f look = cam.getLookVector();
+        referenceCube(consumer, matrix, eye.x + look.x * 3.0F, eye.y + look.y * 3.0F - 0.4F,
+                eye.z + look.z * 3.0F, 1.0F, 0.0F, 1.0F);
         buffers.endBatch(RenderType.lines());
         com.mojang.blaze3d.systems.RenderSystem.enableDepthTest();
         int tick = Minecraft.getInstance().player == null ? 0 : Minecraft.getInstance().player.tickCount;
@@ -163,7 +169,8 @@ public final class QuiltWireframe {
                     nearest.getZ(), nearSet == null ? -1 : nearSet.boxes.size(),
                     nb == null ? "-" : String.format(java.util.Locale.ROOT, "%.2f,%.2f,%.2f", nb[0], nb[1], nb[2]));
         }
-        drawDiagnostics = " ref=(0.0,-0.4,-3.0)" + " maids=" + maidList + " near=" + nearInfo
+        drawDiagnostics = " refView=yellow(0,-0.4,-3) refWorld=magenta(eye+look*3)"
+                + " maids=" + maidList + " near=" + nearInfo
                 + String.format(java.util.Locale.ROOT,
                 " cam=%.2f,%.2f,%.2f viewBox=[%.2f,%.2f,%.2f..%.2f,%.2f,%.2f] firstWorld=%s firstView=%s",
                 camera.x, camera.y, camera.z, minX, minY, minZ, maxX, maxY, maxZ,
@@ -263,11 +270,9 @@ public final class QuiltWireframe {
         consumer.vertex(matrix, p.x, p.y, p.z).color(r, g, b, 1.0F).normal(0.0F, 1.0F, 0.0F).endVertex();
     }
 
-    /** 0.2-block cube three blocks in front of the eye, drawn exactly like the maid boxes. */
-    private static void referenceCube(VertexConsumer consumer) {
-        float cx = 0.0F;
-        float cy = -0.4F;
-        float cz = -3.0F;
+    /** 0.2-block cube at a fixed spot, drawn with the given matrix and colour. */
+    private static void referenceCube(VertexConsumer consumer, Matrix4f space, float cx, float cy, float cz,
+                                      float r, float g, float b) {
         float h = 0.1F;
         float[][] corners = new float[8][];
         for (int i = 0; i < 8; i++) {
@@ -279,8 +284,8 @@ public final class QuiltWireframe {
         for (int[] edge : EDGES) {
             for (int end : edge) {
                 float[] corner = corners[end];
-                consumer.vertex(new Matrix4f(), corner[0], corner[1], corner[2])
-                        .color(1.0F, 1.0F, 0.0F, 1.0F)
+                consumer.vertex(space, corner[0], corner[1], corner[2])
+                        .color(r, g, b, 1.0F)
                         .normal(0.0F, 1.0F, 0.0F)
                         .endVertex();
             }
