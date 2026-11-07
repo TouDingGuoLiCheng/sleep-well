@@ -153,25 +153,13 @@ public final class MaidColliderCapture {
      * keep going through the layer capture exactly as before.
      */
     private static List<QuiltBox> partBoxes;
-    private static int rawCubes;
-    private static int degenerateCubes;
     private static java.util.Set<Object> partSeen;
     private static int partPasses;
-    /** The matrix the entity renderer itself was handed: the space every part matrix should live in. */
-    private static Matrix4f partHead = new Matrix4f();
-    private static EntityMaid partMaid;
-    private static final java.util.Set<UUID> MATRIX_LOGGED = new java.util.HashSet<>();
 
     /** Opens a capture pass for one maid render. */
-    public static void beginRenderPass(EntityMaid maid, Matrix4f head) {
-        partMaid = maid;
-        if (head != null) {
-            partHead = new Matrix4f(head);
-        }
+    public static void beginRenderPass(EntityMaid maid) {
         if (maid.isSleeping()) {
             partBoxes = new ArrayList<>();
-            rawCubes = 0;
-            degenerateCubes = 0;
             partSeen = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
         } else {
             partBoxes = null;
@@ -184,46 +172,12 @@ public final class MaidColliderCapture {
         return partBoxes != null;
     }
 
-    /**
-     * Diagnostic for the space question: prints the matrix the renderer was handed next to the first part's
-     * matrix. If the two share a space, the part matrix is a child of the head matrix and the boxes are
-     * already correct; if not, their difference <em>is</em> the adapter, measured rather than guessed.
-     */
-    private static void logMatrices(Matrix4f part) {
-        EntityMaid maid = partMaid;
-        if (maid == null || !MATRIX_LOGGED.add(maid.getUUID())) {
-            return;
-        }
-        Matrix4f delta = new Matrix4f(partHead).invert().mul(new Matrix4f(part));
-        org.joml.Vector3f headT = new Matrix4f(partHead).getTranslation(new org.joml.Vector3f());
-        org.joml.Vector3f partT = new Matrix4f(part).getTranslation(new org.joml.Vector3f());
-        org.joml.Vector3f deltaT = new Matrix4f(delta).getTranslation(new org.joml.Vector3f());
-        String axis = String.format(java.util.Locale.ROOT, "%.2f,%.2f,%.2f / %.2f,%.2f,%.2f / %.2f,%.2f,%.2f",
-                delta.m00(), delta.m10(), delta.m20(),
-                delta.m01(), delta.m11(), delta.m21(),
-                delta.m02(), delta.m12(), delta.m22());
-        LOGGER.info("[被子] 矩阵对照 maid={} pose={} headT=({},{},{}) partT=({},{},{}) deltaT=({},{},{}) "
-                        + "deltaAxis=[{}] det={} maidPos=({},{},{}) cam=({},{},{})",
-                maid.getUUID(), maid.getPose(), fmt3(partHead == null ? 0 : headT.x), fmt3(headT.y), fmt3(headT.z),
-                fmt3(partT.x), fmt3(partT.y), fmt3(partT.z), fmt3(deltaT.x), fmt3(deltaT.y), fmt3(deltaT.z),
-                axis, fmt3(delta.determinant()), fmt3((float) maid.getX()), fmt3((float) maid.getY()),
-                fmt3((float) maid.getZ()),
-                fmt3((float) Minecraft.getInstance().gameRenderer.getMainCamera().getPosition().x),
-                fmt3((float) Minecraft.getInstance().gameRenderer.getMainCamera().getPosition().y),
-                fmt3((float) Minecraft.getInstance().gameRenderer.getMainCamera().getPosition().z));
-    }
-
-    private static String fmt3(float value) {
-        return String.format(java.util.Locale.ROOT, "%.2f", value);
-    }
-
     /** One {@code BedrockPart} was drawn: record the cubes its matrix places. */
     public static void partRendered(Object part, Matrix4f matrix) {
         List<QuiltBox> out = partBoxes;
         if (out == null || part == null) {
             return;
         }
-        logMatrices(matrix);
         if (partSeen != null && !partSeen.add(part)) {
             return;
         }
@@ -241,7 +195,6 @@ public final class MaidColliderCapture {
         List<QuiltBox> boxes = partBoxes;
         partBoxes = null;
         partSeen = null;
-        partMaid = null;
         if (boxes == null || boxes.size() < 8) {
             return;
         }
@@ -263,37 +216,6 @@ public final class MaidColliderCapture {
                     String.format(java.util.Locale.ROOT, "%.2f", b[3] - b[0]),
                     String.format(java.util.Locale.ROOT, "%.2f", b[4] - b[1]),
                     String.format(java.util.Locale.ROOT, "%.2f", b[5] - b[2]));
-            org.joml.Quaternionf rot = Minecraft.getInstance().gameRenderer.getMainCamera().rotation();
-            net.minecraft.world.phys.Vec3 eye = Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
-            LOGGER.info("[被子] 采集明细 maid={} 相机=({},{},{}) 朝向四元数=({},{},{},{}) 她=({},{},{})",
-                    maid.getUUID(), fmt3((float) eye.x), fmt3((float) eye.y), fmt3((float) eye.z),
-                    fmt3(rot.x), fmt3(rot.y), fmt3(rot.z), fmt3(rot.w),
-                    fmt3((float) maid.getX()), fmt3((float) maid.getY()), fmt3((float) maid.getZ()));
-            int shown = 0;
-            for (QuiltBox box : boxes) {
-                if (shown++ >= 5) {
-                    break;
-                }
-                float minX = Float.MAX_VALUE, minY = Float.MAX_VALUE, minZ = Float.MAX_VALUE;
-                float maxX = -Float.MAX_VALUE, maxY = -Float.MAX_VALUE, maxZ = -Float.MAX_VALUE;
-                for (int i = 0; i < 8; i++) {
-                    minX = Math.min(minX, box.x(i));
-                    minY = Math.min(minY, box.y(i));
-                    minZ = Math.min(minZ, box.z(i));
-                    maxX = Math.max(maxX, box.x(i));
-                    maxY = Math.max(maxY, box.y(i));
-                    maxZ = Math.max(maxZ, box.z(i));
-                }
-                LOGGER.info("[被子] 盒子#{} 中心=({},{},{}) 尺寸={}x{}x{} 角0=({},{},{}) 角7=({},{},{})",
-                        shown, fmt3((minX + maxX) * 0.5F), fmt3((minY + maxY) * 0.5F), fmt3((minZ + maxZ) * 0.5F),
-                        fmt3(maxX - minX), fmt3(maxY - minY), fmt3(maxZ - minZ),
-                        fmt3(box.x(0)), fmt3(box.y(0)), fmt3(box.z(0)),
-                        fmt3(box.x(7)), fmt3(box.y(7)), fmt3(box.z(7)));
-            }
-            LOGGER.info("[被子] 采集汇总 maid={} 部件立方体={} 生成盒子={} 退化丢弃={} 半宽={} 半径首盒={}",
-                    maid.getUUID(), rawCubes, boxes.size(), degenerateCubes,
-                    fmt3((boxes.get(0).shortestEdge())),
-                    fmt3(boxes.get(0).radius));
         }
     }
 
@@ -305,12 +227,7 @@ public final class MaidColliderCapture {
         float w = Reflect.floatField(cube, "width");
         float h = Reflect.floatField(cube, "height");
         float d = Reflect.floatField(cube, "depth");
-        if (rawCubes++ < 6) {
-            LOGGER.info("[被子] 立方体原始值 x={} y={} z={} w={} h={} d={} class={}", fmt3(x), fmt3(y), fmt3(z),
-                    fmt3(w), fmt3(h), fmt3(d), cube.getClass().getSimpleName());
-        }
         if (w <= 0.0F && h <= 0.0F && d <= 0.0F) {
-            degenerateCubes++;
             return;
         }
         // TLM's bedrock loader hands cubes out already divided by 16 (a blockbench 8 px cube arrives as 0.5),

@@ -107,18 +107,8 @@ public final class QuiltWireframe {
             }
             boxes += set.boxes.size();
             if (maidList.length() < 700) {
-                // What this maid's boxes SHOULD look like in each candidate space, so the stored corners can
-                // be matched to one of them by arithmetic instead of by drawing probes.
-                org.joml.Quaternionf camRot = Minecraft.getInstance().gameRenderer.getMainCamera().rotation();
-                org.joml.Vector3f rel = new org.joml.Vector3f((float) (maid.getX() - camera.x),
-                        (float) (maid.getY() - camera.y), (float) (maid.getZ() - camera.z));
-                org.joml.Vector3f rotated = camRot.transform(new org.joml.Vector3f(rel), new org.joml.Vector3f());
-                maidList.append(String.format(java.util.Locale.ROOT,
-                        " [n=%d pos=%.1f,%.1f,%.1f c=%.1f,%.1f,%.1f rel=%.1f,%.1f,%.1f rot=%.1f,%.1f,%.1f]",
-                        set.boxes.size(), maid.getX(), maid.getY(), maid.getZ(),
-                        (set.bounds[0] + set.bounds[3]) * 0.5F, (set.bounds[1] + set.bounds[4]) * 0.5F,
-                        (set.bounds[2] + set.bounds[5]) * 0.5F,
-                        rel.x, rel.y, rel.z, rotated.x, rotated.y, rotated.z));
+                maidList.append(String.format(java.util.Locale.ROOT, " [n=%d %.1f,%.1f,%.1f]",
+                        set.boxes.size(), maid.getX(), maid.getY(), maid.getZ()));
             }
             // View-space sets carry TLM's own render matrix, so they must NOT be pushed through the level
             // matrix again; world-space fallbacks still are.
@@ -171,8 +161,7 @@ public final class QuiltWireframe {
                     nearest.getZ(), nearSet == null ? -1 : nearSet.boxes.size(),
                     nb == null ? "-" : String.format(java.util.Locale.ROOT, "%.2f,%.2f,%.2f", nb[0], nb[1], nb[2]));
         }
-        drawDiagnostics = " refView=yellow(0,-0.4,-3) refWorld=magenta(eye+look*3)"
-                + " maids=" + maidList + " near=" + nearInfo
+        drawDiagnostics = " maids=" + maidList + " near=" + nearInfo
                 + String.format(java.util.Locale.ROOT,
                 " cam=%.2f,%.2f,%.2f viewBox=[%.2f,%.2f,%.2f..%.2f,%.2f,%.2f] firstWorld=%s firstView=%s",
                 camera.x, camera.y, camera.z, minX, minY, minZ, maxX, maxY, maxZ,
@@ -270,28 +259,6 @@ public final class QuiltWireframe {
     private static void raw(VertexConsumer consumer, Matrix4f matrix, org.joml.Vector3f p,
                             float r, float g, float b) {
         consumer.vertex(matrix, p.x, p.y, p.z).color(r, g, b, 1.0F).normal(0.0F, 1.0F, 0.0F).endVertex();
-    }
-
-    /** 0.2-block cube at a fixed spot, drawn with the given matrix and colour. */
-    private static void referenceCube(VertexConsumer consumer, Matrix4f space, float cx, float cy, float cz,
-                                      float r, float g, float b) {
-        float h = 0.1F;
-        float[][] corners = new float[8][];
-        for (int i = 0; i < 8; i++) {
-            corners[i] = new float[]{
-                    cx + ((i & 1) == 0 ? -h : h),
-                    cy + ((i & 2) == 0 ? -h : h),
-                    cz + ((i & 4) == 0 ? -h : h)};
-        }
-        for (int[] edge : EDGES) {
-            for (int end : edge) {
-                float[] corner = corners[end];
-                consumer.vertex(space, corner[0], corner[1], corner[2])
-                        .color(r, g, b, 1.0F)
-                        .normal(0.0F, 1.0F, 0.0F)
-                        .endVertex();
-            }
-        }
     }
 
     private static void line(VertexConsumer consumer, Matrix4f matrix, QuiltBox box, int corner,
