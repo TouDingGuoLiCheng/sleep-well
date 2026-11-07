@@ -71,7 +71,7 @@ public final class QuiltStyle {
      * pull over yourself on a night that has stopped being cold but is not yet warm.
      */
     public static final QuiltStyle SPRING_BLOSSOM = register(new QuiltStyle("spring_blossom", "春之被",
-            Tiling.TILED, 4.0F, 4.0F, false, 0.028F, 0.82F, 0.72F, 0.16F));
+            Tiling.TILED, 2.0F, 2.0F, false, 0.028F, 0.82F, 0.72F, 0.16F));
 
     private static QuiltStyle register(QuiltStyle style) {
         REGISTRY.put(style.id, style);
