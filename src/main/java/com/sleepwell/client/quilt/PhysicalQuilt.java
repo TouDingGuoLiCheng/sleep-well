@@ -71,8 +71,10 @@ public final class PhysicalQuilt {
     /**
      * How far the cloth floats above her skin: this is the duvet's own padding. Without it the sheet lies
      * straight on a body that is only 0.23 blocks tall, which reads as a flat bed sheet rather than a quilt.
+     * The number comes from the quilt itself now - down sits high, silk lies on her - so what is left here is
+     * only the shared floor.
      */
-    private static final float DUET_PADDING = 0.022F;
+    private static final float MIN_PADDING = 0.008F;
 
     /** Below this average per-substep motion the sheet is considered settled and gets extra damping. */
     private static final float CALM_SPEED = 0.0016F;
@@ -184,7 +186,7 @@ public final class PhysicalQuilt {
         // The setting lives on the server; the client mirror is what the renderer can actually see.
         QuiltStyle shape = QuiltStyle.of(com.sleepwell.client.ClientQuiltStyles.of(maid));
         // The quilt's own parameters belong in the cache key: a wide quilt solved as a plain one is wrong.
-        String modelKey = modelKey(maid) + "|" + shape.id;
+        String modelKey = modelKey(maid) + "|" + shape.clothKey();
         Cloth cached = CLOTHS.computeIfAbsent(maid.getUUID(), id -> new Cloth());
         cached.style = shape;
         cached.border = com.sleepwell.client.ClientQuiltStyles.borderOf(maid);
@@ -441,6 +443,11 @@ public final class PhysicalQuilt {
         private float tileV() {
             return border.isEmpty() ? style.tileV() : 1.0F;
         }
+
+        /** The quilt's own padding, never below the shared floor. */
+        private float padding() {
+            return Math.max(MIN_PADDING, style.padding());
+        }
         private int frozenAt;
         private float fingerprint;
         private Vec3 anchor = Vec3.ZERO;
@@ -531,11 +538,13 @@ public final class PhysicalQuilt {
                         add(a, a + COLS + 1, 0.6F);
                         add(a + 1, a + COLS, 0.6F);
                     }
+                    // Bending is what decides the whole hand of the cloth: a cotton quilt creases,
+                    // a down or silk one collapses over every limb. Everything else stays the same.
                     if (col + 2 < COLS) {
-                        add(a, a + 2, 0.07F);
+                        add(a, a + 2, 0.07F * style.bendScale());
                     }
                     if (row + 2 < ROWS) {
-                        add(a, a + COLS * 2, 0.05F);
+                        add(a, a + COLS * 2, 0.05F * style.bendScale());
                     }
                 }
             }
@@ -810,7 +819,7 @@ public final class PhysicalQuilt {
             for (int i = 0; i < count; i++) {
                 Vector3f p = now[i];
                 float surface = surfaceAt(p.x, p.z);
-                float minY = surface + DUET_PADDING;
+                float minY = surface + padding();
                 boolean onBody = surface > Float.NEGATIVE_INFINITY;
                 // Mattress: only inside the bed footprint, so the overhang may still fall down the sides.
                 if (p.y < bedTop + THICKNESS && insideBed(p)) {
@@ -845,7 +854,7 @@ public final class PhysicalQuilt {
                     float ax = obbAxes[baseA + a * 3], ay = obbAxes[baseA + a * 3 + 1],
                             az = obbAxes[baseA + a * 3 + 2];
                     float local = cx * ax + cy * ay + cz * az;
-                    float reach = obbHalf[baseC + a] + DUET_PADDING;
+                    float reach = obbHalf[baseC + a] + padding();
                     float pen = reach - Math.abs(local);
                     if (pen < 0.0F) {
                         inside = false;
@@ -869,8 +878,8 @@ public final class PhysicalQuilt {
                     }
                     float along = (p.x - obbCentre[baseC]) * up.x + (p.y - obbCentre[baseC + 1]) * up.y
                             + (p.z - obbCentre[baseC + 2]) * up.z;
-                    if (along < obbHalf[baseC + 1] + DUET_PADDING) {
-                        float push = obbHalf[baseC + 1] + DUET_PADDING - along;
+                    if (along < obbHalf[baseC + 1] + padding()) {
+                        float push = obbHalf[baseC + 1] + padding() - along;
                         p.x += up.x * push;
                         p.y += up.y * push;
                         p.z += up.z * push;

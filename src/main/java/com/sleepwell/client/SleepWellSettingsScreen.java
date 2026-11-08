@@ -111,10 +111,20 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
     private static final int BORDER_GAP = 2;
     /** Space between the quilt grid and the divider, then the border column itself. */
     private static final int WALL_SPLIT = 8;
+    /** Four rows is what the 136 px panel holds; more quilts than that get a second page. */
+    private static final int WALL_ROWS = 4;
+    private static final int WALL_PER_PAGE = WALL_COLS * WALL_ROWS;
+    /** Where the "<" page arrow, the "1/2" counter and the ">" arrow sit in the title row. */
+    private static final int PAGE_ARROW_Y = -12;
+    private static final int PAGE_PREV_X = 92;
+    private static final int PAGE_COUNT_X = 102;
+    private static final int PAGE_NEXT_X = 124;
     /** Where the icon sits: right edge of the lie-in row, mirroring the gear on the winter row. */
     private static final int QUILT_ICON_W = 20;
 
     private boolean quiltOpen;
+    /** Which sheet of the wall is showing; 8 plates fit one page. */
+    private int quiltPage;
     private String chosenQuilt;
     private String chosenBorder;
 
@@ -129,6 +139,15 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
 
     private void openQuiltWall() {
         this.quiltOpen = true;
+        // Open on the sheet that holds her current quilt: scrolling past a page to find it is friction.
+        java.util.List<QuiltStyle> all = QuiltStyle.all();
+        String current = currentQuiltId();
+        for (int i = 0; i < all.size(); i++) {
+            if (all.get(i).id.equals(current)) {
+                this.quiltPage = i / WALL_PER_PAGE;
+                break;
+            }
+        }
         this.toggles.forEach(button -> button.visible = false);
         if (this.gear != null) {
             this.gear.visible = false;
@@ -152,12 +171,39 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
         return this.topPos + 44;
     }
 
+    /** One page holds {@link #WALL_PER_PAGE} plates; everything below works in page-local slots. */
+    private int wallPages() {
+        return Math.max(1, (QuiltStyle.all().size() + WALL_PER_PAGE - 1) / WALL_PER_PAGE);
+    }
+
+    private int wallSlot(int index) {
+        return index - this.quiltPage * WALL_PER_PAGE;
+    }
+
     private int wallCellX(int index) {
-        return wallLeft() + (index % WALL_COLS) * (WALL_CELL_W + WALL_GAP);
+        int slot = wallSlot(index);
+        return wallLeft() + (slot % WALL_COLS) * (WALL_CELL_W + WALL_GAP);
     }
 
     private int wallCellY(int index) {
-        return wallTop() + (index / WALL_COLS) * (WALL_CELL_H + WALL_GAP);
+        int slot = wallSlot(index);
+        return wallTop() + (slot / WALL_COLS) * (WALL_CELL_H + WALL_GAP);
+    }
+
+    /** The plates drawn this page: a slice of the registry, not the whole wall. */
+    private int pageStart() {
+        return this.quiltPage * WALL_PER_PAGE;
+    }
+
+    private int pageEnd(int size) {
+        return Math.min(size, pageStart() + WALL_PER_PAGE);
+    }
+
+    /** True when the mouse is over one of the page arrows in the title row. */
+    private boolean overPageArrow(double mouseX, double mouseY, int arrowX) {
+        int x = wallLeft() + arrowX;
+        int y = wallTop() + PAGE_ARROW_Y;
+        return mouseX >= x - 1 && mouseX < x + 8 && mouseY >= y - 1 && mouseY < y + 9;
     }
 
     /** Draws the overlay: dimmed page, then one plate per quilt with its state. */
@@ -170,7 +216,7 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
         List<QuiltStyle> styles = QuiltStyle.all();
         String current = this.chosenQuilt != null ? this.chosenQuilt : this.menu.quiltStyle();
         String currentBorder = currentBorder();
-        for (int i = 0; i < styles.size(); i++) {
+        for (int i = pageStart(); i < pageEnd(styles.size()); i++) {
             QuiltStyle style = styles.get(i);
             boolean locked = this.menu.quiltLocked() && !style.isDefault();
             boolean selected = style.id.equals(current);
@@ -190,7 +236,19 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
                     x + THUMB + 7, y + 9, locked ? 0x8C8C8C : 0xF2EEE4, false);
         }
         graphics.drawString(this.font, Component.translatable("gui.sleep_well.quilt_title"),
-                wallLeft(), wallTop() - 12, TITLE_COLOR, false);
+                wallLeft(), wallTop() + PAGE_ARROW_Y, TITLE_COLOR, false);
+        int pages = wallPages();
+        if (pages > 1) {
+            // Two arrows and a counter: the panel holds four rows, the wall now holds more than that.
+            boolean prevHot = this.quiltPage > 0 && overPageArrow(mouseX, mouseY, PAGE_PREV_X);
+            boolean nextHot = this.quiltPage < pages - 1 && overPageArrow(mouseX, mouseY, PAGE_NEXT_X);
+            graphics.drawString(this.font, "<", wallLeft() + PAGE_PREV_X, wallTop() + PAGE_ARROW_Y,
+                    this.quiltPage > 0 ? (prevHot ? 0xFFFFFFFF : 0xCCF2EEE4) : 0x55FFFFFF, false);
+            graphics.drawString(this.font, (this.quiltPage + 1) + "/" + pages,
+                    wallLeft() + PAGE_COUNT_X, wallTop() + PAGE_ARROW_Y, 0xCCF2EEE4, false);
+            graphics.drawString(this.font, ">", wallLeft() + PAGE_NEXT_X, wallTop() + PAGE_ARROW_Y,
+                    this.quiltPage < pages - 1 ? (nextHot ? 0xFFFFFFFF : 0xCCF2EEE4) : 0x55FFFFFF, false);
+        }
 
         // The divider is what tells a player the wall has two halves now: faces left, borders right.
         graphics.fill(borderX() - WALL_SPLIT + 3, wallTop() - 4,
@@ -266,8 +324,19 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
         if (!this.quiltOpen) {
             return false;
         }
+        int pages = wallPages();
+        if (pages > 1) {
+            if (overPageArrow(mouseX, mouseY, PAGE_PREV_X) && this.quiltPage > 0) {
+                this.quiltPage--;
+                return true;
+            }
+            if (overPageArrow(mouseX, mouseY, PAGE_NEXT_X) && this.quiltPage < pages - 1) {
+                this.quiltPage++;
+                return true;
+            }
+        }
         List<QuiltStyle> styles = QuiltStyle.all();
-        for (int i = 0; i < styles.size(); i++) {
+        for (int i = pageStart(); i < pageEnd(styles.size()); i++) {
             QuiltStyle style = styles.get(i);
             int x = wallCellX(i);
             int y = wallCellY(i);
