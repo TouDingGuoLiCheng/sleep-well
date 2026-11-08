@@ -22,6 +22,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * than glued; the artwork underneath that overlap is simply covered.
  */
 public final class QuiltTextures {
+    /** The finished sheet every composited cover is laid out on: the size the whole-sheet art uses. */
+    private static final int SHEET_W = 192;
+    private static final int SHEET_H = 256;
     private static final Map<String, ResourceLocation> CACHE = new ConcurrentHashMap<>();
     /** Pairs whose images could not be read, so a missing file does not retry every frame. */
     private static final Set<String> FAILED = ConcurrentHashMap.newKeySet();
@@ -34,9 +37,7 @@ public final class QuiltTextures {
     /** The texture this quilt should be drawn with: the face alone, or face plus band. */
     public static ResourceLocation texture(QuiltStyle style, String borderId) {
         QuiltBorder border = QuiltBorder.of(borderId);
-        // A tiling quilt draws its artwork repeatU x repeatV times, so a band baked into the texture would repeat
-        // with it and eat the pattern. Those three quilts stay borderless until the band gets its own draw pass.
-        if (border.isNone() || style.tiles()) {
+        if (border.isNone()) {
             return style.texture();
         }
         String key = style.id + "|" + border.id;
@@ -66,14 +67,14 @@ public final class QuiltTextures {
         }
         NativeImage out = null;
         try {
-            int width = face.getWidth() + QuiltBorder.BAND * 2;
-            int height = face.getHeight() + QuiltBorder.BAND * 2;
+            // Everything is laid out on one canonical sheet first. A gingham that tiles 2x2 is flattened here, so
+            // the band frames a finished cloth instead of repeating with the pattern.
+            int width = SHEET_W + QuiltBorder.REACH * 2;
+            int height = SHEET_H + QuiltBorder.REACH * 2;
             out = new NativeImage(width, height, true);
-            int originX = QuiltBorder.REACH;
-            int originY = QuiltBorder.REACH;
-            for (int y = 0; y < face.getHeight(); y++) {
-                for (int x = 0; x < face.getWidth(); x++) {
-                    out.setPixelRGBA(x + originX, y + originY, face.getPixelRGBA(x, y));
+            for (int y = 0; y < SHEET_H; y++) {
+                for (int x = 0; x < SHEET_W; x++) {
+                    out.setPixelRGBA(x + QuiltBorder.REACH, y + QuiltBorder.REACH, sampleTiled(face, style, x, y));
                 }
             }
             // The band is drawn last and only where it is opaque: its middle is punched out. It is sampled with a
@@ -116,12 +117,23 @@ public final class QuiltTextures {
         NativeImage image = read(style.texture());
         int[] size = image == null ? new int[]{192, 256} : new int[]{image.getWidth(), image.getHeight()};
         close(image);
-        if (!border.isNone() && !style.tiles()) {
-            // The composite adds the band's reach on every side.
-            size = new int[]{size[0] + QuiltBorder.BAND * 2, size[1] + QuiltBorder.BAND * 2};
+        if (!border.isNone()) {
+            // A composited cover is always one canonical sheet plus the band's outward reach on each side.
+            size = new int[]{SHEET_W + QuiltBorder.REACH * 2, SHEET_H + QuiltBorder.REACH * 2};
         }
         SIZES.put(key, size);
         return size;
+    }
+
+    /** One pixel of the flattened sheet: the face sampled where the quilt's own repeat count would land. */
+    private static int sampleTiled(com.mojang.blaze3d.platform.NativeImage face, QuiltStyle style, int x, int y) {
+        double u = (double) x / SHEET_W * style.repeatU;
+        double v = (double) y / SHEET_H * style.repeatV;
+        u -= Math.floor(u);
+        v -= Math.floor(v);
+        int sx = Math.min((int) (u * face.getWidth()), face.getWidth() - 1);
+        int sy = Math.min((int) (v * face.getHeight()), face.getHeight() - 1);
+        return face.getPixelRGBA(sx, sy);
     }
 
     private static NativeImage read(ResourceLocation location) {

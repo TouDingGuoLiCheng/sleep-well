@@ -432,6 +432,15 @@ public final class PhysicalQuilt {
         private QuiltStyle style = QuiltStyle.THICK_GINGHAM;
         /** The border sewn around her quilt; empty means the artwork covers the whole sheet. */
         private String border = "";
+
+        /** A banded cover is composited into one finished sheet, so the cloth samples it exactly once. */
+        private float tileU() {
+            return border.isEmpty() ? style.tileU() : 1.0F;
+        }
+
+        private float tileV() {
+            return border.isEmpty() ? style.tileV() : 1.0F;
+        }
         private int frozenAt;
         private float fingerprint;
         private Vec3 anchor = Vec3.ZERO;
@@ -1222,10 +1231,10 @@ public final class PhysicalQuilt {
                     int b = a + 1;
                     int c = a + COLS + 1;
                     int d = a + COLS;
-                    float u0 = (float) col / (COLS - 1) * style.tileU();
-                    float u1 = (float) (col + 1) / (COLS - 1) * style.tileU();
-                    float v0 = (float) row / (ROWS - 1) * style.tileV();
-                    float v1 = (float) (row + 1) / (ROWS - 1) * style.tileV();
+                    float u0 = (float) col / (COLS - 1) * tileU();
+                    float u1 = (float) (col + 1) / (COLS - 1) * tileU();
+                    float v0 = (float) row / (ROWS - 1) * tileV();
+                    float v1 = (float) (row + 1) / (ROWS - 1) * tileV();
                     // Lit by the surface normal: folds and the head of the bed now read as shape.
                     float shade = 0.55F + 0.45F * Math.min(1.0F, Math.max(0.0F, ny[a]));
                     vertex(consumer, entry, now[a].x, now[a].y, now[a].z, u0, v0, lights[a], shade);
@@ -1264,8 +1273,8 @@ public final class PhysicalQuilt {
             int light = lights[rowA * COLS + colA];
             int a = rowA * COLS + colA;
             int b = rowB * COLS + colB;
-            float u0 = (float) colA / (COLS - 1) * style.tileU();
-            float u1 = (float) colB / (COLS - 1) * style.tileU();
+            float u0 = (float) colA / (COLS - 1) * tileU();
+            float u1 = (float) colB / (COLS - 1) * tileU();
             vertex(consumer, entry, now[a].x, now[a].y, now[a].z, u0, 0.0F, light, shade);
             vertex(consumer, entry, now[b].x, now[b].y, now[b].z, u1, 0.0F, light, shade);
             vertex(consumer, entry, now[b].x - nx[b] * style.shell, now[b].y - ny[b] * style.shell,
