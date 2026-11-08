@@ -121,8 +121,10 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
     private static final int PAGE_NEXT_X = 124;
     /** Where the icon sits: right edge of the lie-in row, mirroring the gear on the winter row. */
     private static final int QUILT_ICON_W = 20;
-    /** Source size of the folded-quilt icon, drawn 1:1 so the pixels stay square. */
+    /** Size the folded-quilt icon occupies on the row. */
     private static final int ICON_SIZE = 16;
+    /** Native edge of the icon texture: the 512 px original ships untouched, no downsampled copy. */
+    private static final int ICON_SOURCE = 512;
     private static final ResourceLocation QUILT_ICON =
             new ResourceLocation(SleepWellMod.MOD_ID, "textures/gui/quilt_icon.png");
 
@@ -541,8 +543,8 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
     }
 
     /**
-     * The quilt icon on the lie-in row. Placeholder art: a 2x2 gingham patch drawn with rectangles, so the
-     * page needs no texture until real quilt art exists.
+     * The quilt icon on the lie-in row: the 512 px folded-quilt art, sampled whole and scaled down to the slot
+     * by the pose rather than by a pre-baked 16 px copy.
      */
     private static final class QuiltIconButton extends SoftButton {
         private QuiltIconButton(int x, int y, int width, int height, OnPress onPress) {
@@ -562,9 +564,16 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
             if (hovered) {
                 graphics.fill(x, y + 2, x + w, y + h - 2, 0x55FFFFFF);
             }
-            // The folded quilt itself, not a checkerboard standing in for one.
+            // The folded quilt itself, straight from the original sheet: the pose shrinks all 512 px into the
+            // slot, so the resource pack carries the full-resolution art instead of a downsampled 16 px copy.
             int size = ICON_SIZE;
-            graphics.blit(QUILT_ICON, x + (w - size) / 2, y + (h - size) / 2, 0, 0, size, size, size, size);
+            float scale = size / (float) ICON_SOURCE;
+            com.mojang.blaze3d.vertex.PoseStack pose = graphics.pose();
+            pose.pushPose();
+            pose.translate(x + (w - size) / 2, y + (h - size) / 2, 0.0F);
+            pose.scale(scale, scale, 1.0F);
+            graphics.blit(QUILT_ICON, 0, 0, 0, 0, ICON_SOURCE, ICON_SOURCE, ICON_SOURCE, ICON_SOURCE);
+            pose.popPose();
             RenderSystem.disableBlend();
         }
     }
