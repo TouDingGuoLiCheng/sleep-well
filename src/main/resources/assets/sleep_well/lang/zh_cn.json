@@ -22,5 +22,7 @@
   "command.sleep_well.nap.no_maid": "附近没有女仆",
   "command.sleep_well.nap.no_player": "这个命令要玩家来执行",
  "gui.sleep_well.quilt_title": "被子",
- "gui.sleep_well.border_title": "裹边"
+ "gui.sleep_well.border_title": "裹边",
+ "effect.sleep_well.vigor": "干劲",
+ "effect.sleep_well.drowsy": "困倦"
 }

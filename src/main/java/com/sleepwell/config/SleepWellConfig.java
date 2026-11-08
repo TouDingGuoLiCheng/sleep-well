@@ -56,6 +56,14 @@ public final class SleepWellConfig {
     public static final ForgeConfigSpec.IntValue NAP_MIN_HOURS;
     public static final ForgeConfigSpec.IntValue NAP_MAX_HOURS;
 
+    /** Sleeping actually pays out: 干劲 after a proper sleep in her own window, 困倦 when she skipped it. */
+    public static final ForgeConfigSpec.BooleanValue VIGOR_ENABLED;
+    public static final ForgeConfigSpec.IntValue VIGOR_SECONDS;
+    public static final ForgeConfigSpec.BooleanValue DROWSY_ENABLED;
+    public static final ForgeConfigSpec.IntValue DROWSY_SECONDS;
+    /** Heal while asleep. */
+    public static final ForgeConfigSpec.BooleanValue SLEEP_REGEN_ENABLED;
+
     static {
         ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
 
@@ -210,6 +218,35 @@ public final class SleepWellConfig {
         NAP_MAX_HOURS = builder
                 .comment("Longest nap, in in-game hours.", "最长补觉时长（游戏内小时）。")
                 .defineInRange("napMaxHours", 3, 1, 12);
+        builder.pop();
+
+        builder.comment(
+                "What a night's sleep is worth: +30% movement speed after a real sleep,",
+                "-15% when she skipped her own sleep window.",
+                "睡觉的收益：正常睡够 +30% 移速，没在自己睡觉时段睡 -15%。",
+                "判定按每只女仆自己的作息走，白班夜班各自算。"
+        );
+        builder.push("effects");
+        VIGOR_ENABLED = builder
+                .comment("Grant 干劲 (+30% speed) after a sleep in her own rest window.",
+                        "睡够后给「干劲」（+30% 移速）。")
+                .define("vigorEnabled", true);
+        VIGOR_SECONDS = builder
+                .comment("How long 干劲 lasts, in seconds.",
+                        "「干劲」持续多少秒。")
+                .defineInRange("vigorSeconds", 180, 10, 3600);
+        DROWSY_ENABLED = builder
+                .comment("Grant 困倦 (-15% speed) when her rest window ends without enough sleep.",
+                        "她自己的睡觉时段结束时没睡够，就给「困倦」（-15% 移速）。")
+                .define("drowsyEnabled", true);
+        DROWSY_SECONDS = builder
+                .comment("How long 困倦 lasts, in seconds.",
+                        "「困倦」持续多少秒。")
+                .defineInRange("drowsySeconds", 600, 10, 7200);
+        SLEEP_REGEN_ENABLED = builder
+                .comment("Heal 1 HP every 3 s while she is asleep.",
+                        "睡着时每 3 秒回 1 点血。")
+                .define("sleepRegenEnabled", true);
         builder.pop();
 
         SPEC = builder.build();

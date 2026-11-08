@@ -19,6 +19,7 @@ public final class SleepWellMod {
     public SleepWellMod() {
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, SleepWellConfig.SPEC);
         SleepWellContainer.MENUS.register(FMLJavaModLoadingContext.get().getModEventBus());
+        com.sleepwell.effect.SleepWellEffects.EFFECTS.register(FMLJavaModLoadingContext.get().getModEventBus());
         SleepWellNetwork.init();
     }
 }

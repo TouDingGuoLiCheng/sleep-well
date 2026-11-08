@@ -16,5 +16,7 @@
   "gui.sleep_well.no_tasks": "No work tasks to pick from",
   "gui.sleep_well.skip_count": "%s of %s selected",
  "gui.sleep_well.quilt_title": "Quilts",
- "gui.sleep_well.border_title": "Borders"
+ "gui.sleep_well.border_title": "Borders",
+ "effect.sleep_well.vigor": "Vigor",
+ "effect.sleep_well.drowsy": "Drowsy"
 }
