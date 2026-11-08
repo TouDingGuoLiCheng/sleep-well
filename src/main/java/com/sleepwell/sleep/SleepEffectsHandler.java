@@ -64,6 +64,11 @@ public final class SleepEffectsHandler {
         private int regenTimer;
         /** True when the window closed while she was still asleep: that is a lie-in, judged when she wakes. */
         private boolean closedWhileAsleep;
+        /**
+         * A window pays out once. Without this, waking up inside the last grace ticks granted 干劲, then the
+         * window closed on an awake maid with the counters already cleared and handed out 困倦 as well.
+         */
+        private boolean judged;
     }
 
     @SubscribeEvent
@@ -84,6 +89,7 @@ public final class SleepEffectsHandler {
                 track.windowSleepTicks = 0;
                 track.sleptInWindow = false;
                 track.closedWhileAsleep = false;
+                track.judged = false;
             }
         } else if (track.inWindow && ++track.outOfWindow >= WINDOW_CLOSE_GRACE) {
             track.inWindow = false;
@@ -128,9 +134,11 @@ public final class SleepEffectsHandler {
                 && slept >= MIN_SLEEP_TICKS;
         boolean lieIn = !track.inWindow;
         if (enough && SleepWellConfig.VIGOR_ENABLED.get()) {
+            track.judged = true;
             applyVigor(maid, lieIn);
         } else if (!enough && track.closedWhileAsleep && SleepWellConfig.DROWSY_ENABLED.get()) {
             // Slept through most of the window but still too little: same verdict as never lying down.
+            track.judged = true;
             applyDrowsy(maid, track);
         }
         log(maid, "起床", track, slept, enough, lieIn);
@@ -152,9 +160,10 @@ public final class SleepEffectsHandler {
     }
 
     private static void judgeDrowsy(EntityMaid maid, Track track) {
-        if (!SleepWellConfig.DROWSY_ENABLED.get()) {
+        if (track.judged || !SleepWellConfig.DROWSY_ENABLED.get()) {
             return;
         }
+        track.judged = true;
         if (!track.sleptInWindow || track.windowSleepTicks < MIN_WINDOW_SLEEP_TICKS) {
             applyDrowsy(maid, track);
         }
