@@ -121,8 +121,8 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
     private static final int PAGE_NEXT_X = 124;
     /** Where the icon sits: right edge of the lie-in row, mirroring the gear on the winter row. */
     private static final int QUILT_ICON_W = 20;
-    /** Size the folded-quilt icon occupies on the row. */
-    private static final int ICON_SIZE = 16;
+    /** Size the folded-quilt icon occupies on the row: 18 px inside the 20 px row, so the plate's hairlines stay whole. */
+    private static final int ICON_SIZE = 18;
     /** Native edge of the icon texture: the 512 px original ships untouched, no downsampled copy. */
     private static final int ICON_SOURCE = 512;
     private static final ResourceLocation QUILT_ICON =
