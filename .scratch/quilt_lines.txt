@@ -1,0 +1,154 @@
+[15:45:35] [Render thread/INFO]: [sleep_well] quilt stage running, camera=(8.5, 65.0, 8.5)
+[15:45:35] [Render thread/INFO]: [sleep_well] sleeping maids near camera=0
+[15:45:35] [Render thread/INFO]: [System] [CHAT] [被子] 线框 flag=false sleeping=0 hook=0
+[15:46:14] [Render thread/INFO]: [sleep_well] quilt stage running, camera=(10.5, -61.5718183855693, 8.5)
+[15:46:14] [Render thread/INFO]: [sleep_well] sleeping maids near camera=0
+[15:46:19] [Render thread/INFO]: [sleep_well] quilt stage running, camera=(10.5, -58.38284778594971, 8.5)
+[15:46:19] [Render thread/INFO]: [sleep_well] sleeping maids near camera=0
+[15:48:06] [Render thread/INFO]: [sleep_well] collider miss render:model: animatable=GeckoMaidEntity renderer=EntityMaidRenderer
+[15:48:06] [Render thread/INFO]: [sleep_well] silhouette maid=686eff2d-7969-4e69-af85-a05f851fd1b3 model=BedrockModel parts=71 height=1.50 radius=0.41 0.35 0.37 0.32 0.27 0.25 0.25 0.21 0.18 0.15 0.13 0.15 0.18 0.21 0.25 0.29 0.35 0.41 0.48 0.56 0.66 0.78 0.92 0.78 
+[15:48:06] [Render thread/INFO]: [被子] 已挂载 gecko 采集层 -> GeckoEntityMaidRenderer
+[15:48:06] [Render thread/WARN]: [被子] 碰撞盒偏少 maid=686eff2d boxes=14（采集可能漏骨骼，被子会穿透）
+[15:48:06] [Render thread/WARN]: [被子] 碰撞盒偏少 maid=686eff2d boxes=14（采集可能漏骨骼，被子会穿透）
+[15:48:06] [Render thread/WARN]: [被子] 碰撞盒偏少 maid=686eff2d boxes=14（采集可能漏骨骼，被子会穿透）
+[15:48:06] [Render thread/WARN]: [被子] 碰撞盒偏少 maid=686eff2d boxes=14（采集可能漏骨骼，被子会穿透）
+[15:48:06] [Render thread/INFO]: [被子] 覆盖范围 半宽=1.04 枕端=0.35 脚端=1.20（盒数=14）
+[15:48:06] [Render thread/INFO]: [被子] 布料新建 maid=686eff2d model=touhou_little_maid:kaenbyou_rin|solid-0.350-0.500 grid=23x31 anchor=6.00,-59.44,5.50 bedTop=-59.44 boxes=14 她=5.50,-59.44,5.50 所在格=BlockPos{x=5, y=-60, z=5} 床头=BlockPos{x=5, y=-60, z=5} 床尾=BlockPos{x=6, y=-60, z=5} 到床中心=0.50
+[15:48:06] [Render thread/INFO]: [被子] 碰撞校验 布质心=6.43,-58.93,5.50 盒质心=5.89,-59.49,5.49 间距=0.77 盒数=14 盒Y范围=-60.07..-59.05
+[15:48:06] [Render thread/WARN]: [被子] 碰撞盒偏少 maid=686eff2d boxes=14（采集可能漏骨骼，被子会穿透）
+[15:48:07] [Render thread/INFO]: [被子] 贴面校验 她XZ=5.89,5.48 高度场=-59.28 她盒顶=-59.07 最近质点=103 质点Y=-59.26 水平距=0.04 被子最高=-59.23
+[15:48:07] [Render thread/INFO]: [被子] 布料解算完成并冻结 maid=686eff2d steps=800 分段=10 总耗时=653.0ms yRange=-60.00..-59.23 沿床覆盖=-0.33..1.19 逐行=-59.23 -59.26 -59.26 -59.29 -59.30 -59.34 -59.43 -59.47
+[15:48:07] [Render thread/WARN]: [被子] 校验失败 maid=686eff2d 被子最高=-59.23 低于身体顶面=-59.07，她会穿出被子（高度图或采样偏低）
+[15:48:59] [Render thread/INFO]: [sleep_well] silhouette maid=d8383d81-7ff1-4438-ba36-95530ecfb5c5 model=BedrockModel parts=10 height=0.94 radius=0.03 0.03 0.04 0.04 0.05 0.06 0.07 0.08 0.09 0.11 0.13 0.15 0.18 0.21 0.25 0.21 0.18 0.15 0.13 0.11 0.09 0.09 0.10 0.12 
+[15:48:59] [Render thread/INFO]: [被子] 覆盖范围 半宽=0.96 枕端=0.35 脚端=1.20（盒数=13）
+[15:48:59] [Render thread/INFO]: [被子] 布料新建 maid=d8383d81 model=little_maid_mob:engage_octaver_3c|solid-0.350-0.500 grid=23x31 anchor=8.50,-59.44,5.00 bedTop=-59.44 boxes=13 她=8.50,-59.36,4.50 所在格=BlockPos{x=8, y=-60, z=4} 床头=BlockPos{x=8, y=-60, z=4} 床尾=BlockPos{x=8, y=-60, z=5} 到床中心=0.50
+[15:48:59] [Render thread/INFO]: [被子] 碰撞校验 布质心=8.50,-58.83,5.43 盒质心=8.50,-59.39,4.69 间距=0.92 盒数=13 盒Y范围=-59.79..-58.95
+[15:48:59] [Render thread/INFO]: [被子] 贴面校验 她XZ=8.50,4.69 高度场=-59.07 她盒顶=-59.07 最近质点=11 质点Y=-59.06 水平距=0.10 被子最高=-59.06
+[15:48:59] [Render thread/INFO]: [被子] 布料解算完成并冻结 maid=d8383d81 steps=800 分段=10 总耗时=595.0ms yRange=-59.88..-59.06 沿床覆盖=-0.41..1.16 逐行=-59.06 -59.25 -59.29 -59.29 -59.29 -59.29 -59.39 -59.44
+[15:49:29] [Render thread/INFO]: [sleep_well] render capture boxes=276 model=AnimatedGeoModel
+[15:49:29] [Render thread/INFO]: [被子] capsules=60 hard=36 soft=24 rAvg=0.126 rMax=0.240 lenAvg=0.137
+[15:49:29] [Render thread/INFO]: [被子] model size=1.50x2.61x2.02 min=-0.70,-0.03,-0.65 yaw=-45.0 bedDir=south posedSize=1.06x1.56x1.57
+[15:49:29] [Render thread/INFO]: [被子] layer boxes=276 size=1.06x1.56x1.57 min=-1.98,-0.77,-2.62 maid=7.50,-59.31,1.50 pose=SLEEPING bed=south
+[15:49:29] [Render thread/INFO]: [sleep_well] silhouette maid=c735f968-fac4-4df2-b5ac-8cd74e5de1c0 model=BedrockModel parts=32 height=1.50 radius=0.44 0.37 0.31 0.27 0.27 0.32 0.37 0.32 0.27 0.23 0.19 0.17 0.14 0.13 0.16 0.19 0.18 0.21 0.25 0.29 0.34 0.41 0.48 0.56 
+[15:49:29] [Render thread/INFO]: [被子] 覆盖范围 半宽=0.96 枕端=0.35 脚端=1.20（盒数=276）
+[15:49:29] [Render thread/INFO]: [被子] 布料新建 maid=c735f968 model=geckolib:winefox_salesperson_84961723c2751ef4c6b9a0f8596f95cc|solid-0.350-0.500 grid=23x31 anchor=7.50,-59.44,1.00 bedTop=-59.44 boxes=276 她=7.50,-59.44,1.50 所在格=BlockPos{x=7, y=-60, z=1} 床头=BlockPos{x=7, y=-60, z=1} 床尾=BlockPos{x=7, y=-60, z=0} 到床中心=0.50
+[15:49:29] [Render thread/INFO]: [被子] 碰撞校验 布质心=7.50,-58.76,0.57 盒质心=7.33,-59.32,1.44 间距=1.04 盒数=276 盒Y范围=-59.63..-58.88
+[15:49:30] [Render thread/INFO]: [被子] 贴面校验 她XZ=7.33,1.44 高度场=-58.93 她盒顶=-58.88 最近质点=9 质点Y=-58.86 水平距=0.20 被子最高=-58.83
+[15:49:30] [Render thread/INFO]: [被子] 布料解算完成并冻结 maid=c735f968 steps=800 分段=10 总耗时=642.0ms yRange=-59.88..-58.83 沿床覆盖=-0.43..1.15 逐行=-58.90 -58.91 -58.92 -58.97 -59.08 -59.13 -59.28 -59.41
+[15:49:37] [Render thread/INFO]: [被子] capsules=60 hard=36 soft=24 rAvg=0.126 rMax=0.240 lenAvg=0.137
+[15:49:37] [Render thread/INFO]: [被子] model size=1.62x2.74x1.19 min=-0.91,-0.09,-0.85 yaw=-45.0 bedDir=south posedSize=1.45x1.01x1.24
+[15:49:37] [Render thread/INFO]: [被子] layer boxes=276 size=1.45x1.01x1.24 min=0.17,-0.36,-2.61 maid=7.50,-59.44,1.50 pose=SLEEPING bed=south
+[15:49:44] [Render thread/INFO]: [被子] 复用上次解算 maid=c735f968 model=geckolib:winefox_salesperson_84961723c2751ef4c6b9a0f8596f95cc|solid-0.350-0.500 床=BlockPos{x=9, y=-60, z=-2}（跳过解算）
+[15:50:00] [Render thread/INFO]: [被子] capsules=60 hard=36 soft=24 rAvg=0.125 rMax=0.240 lenAvg=0.136
+[15:50:00] [Render thread/INFO]: [被子] model size=1.62x2.78x1.19 min=-0.91,-0.09,-0.85 yaw=-164.53125 bedDir=north posedSize=1.82x0.96x0.95
+[15:50:00] [Render thread/INFO]: [被子] layer boxes=276 size=1.82x0.96x0.95 min=-5.02,0.63,-3.83 maid=9.50,-59.44,-1.50 pose=SLEEPING bed=north
+[15:50:08] [Render thread/INFO]: [被子] capsules=60 hard=36 soft=24 rAvg=0.126 rMax=0.240 lenAvg=0.137
+[15:50:08] [Render thread/INFO]: [被子] model size=1.62x2.78x1.19 min=-0.91,-0.09,-0.85 yaw=-164.53125 bedDir=north posedSize=1.72x0.92x1.04
+[15:50:08] [Render thread/INFO]: [被子] layer boxes=276 size=1.72x0.92x1.04 min=-4.08,0.76,-4.77 maid=9.50,-59.44,-1.50 pose=SLEEPING bed=north
+[15:50:20] [Render thread/INFO]: [被子] capsules=60 hard=36 soft=24 rAvg=0.124 rMax=0.240 lenAvg=0.137
+[15:50:20] [Render thread/INFO]: [被子] model size=1.62x2.78x1.19 min=-0.91,-0.09,-0.85 yaw=-164.53125 bedDir=north posedSize=1.81x0.84x1.04
+[15:50:20] [Render thread/INFO]: [被子] layer boxes=276 size=1.81x0.84x1.04 min=-4.17,-0.55,-4.69 maid=9.50,-59.44,-1.50 pose=SLEEPING bed=north
+[15:50:27] [Render thread/INFO]: [被子] capsules=60 hard=36 soft=24 rAvg=0.124 rMax=0.240 lenAvg=0.137
+[15:50:27] [Render thread/INFO]: [被子] model size=1.62x2.78x1.19 min=-0.91,-0.09,-0.85 yaw=-164.53125 bedDir=north posedSize=1.81x0.84x1.04
+[15:50:27] [Render thread/INFO]: [被子] layer boxes=276 size=1.81x0.84x1.04 min=-4.17,-0.55,-4.69 maid=9.50,-59.44,-1.50 pose=SLEEPING bed=north
+[15:50:34] [Render thread/INFO]: [被子] capsules=60 hard=36 soft=24 rAvg=0.124 rMax=0.240 lenAvg=0.137
+[15:50:34] [Render thread/INFO]: [被子] model size=1.62x2.78x1.19 min=-0.91,-0.09,-0.85 yaw=-164.53125 bedDir=north posedSize=1.81x0.84x1.04
+[15:50:34] [Render thread/INFO]: [被子] layer boxes=276 size=1.81x0.84x1.04 min=-4.17,-0.55,-4.69 maid=9.50,-59.44,-1.50 pose=SLEEPING bed=north
+[15:50:42] [Render thread/INFO]: [被子] capsules=60 hard=36 soft=24 rAvg=0.124 rMax=0.240 lenAvg=0.137
+[15:50:42] [Render thread/INFO]: [被子] model size=1.62x2.78x1.19 min=-0.91,-0.09,-0.85 yaw=-164.53125 bedDir=north posedSize=1.81x0.84x1.04
+[15:50:42] [Render thread/INFO]: [被子] layer boxes=276 size=1.81x0.84x1.04 min=-4.17,-0.55,-4.69 maid=9.50,-59.44,-1.50 pose=SLEEPING bed=north
+[15:50:47] [Render thread/INFO]: [System] [CHAT] [被子] 线框已打开
+[15:50:47] [Render thread/INFO]: [System] [CHAT] [被子] 线框 boxes=303 missing=0 mixin=34986 captured=34986 layer=4676/7589 size=1.81x0.84x1.04 renderer=EntityMaidRenderer maids= [n=14 5.5,-59.4,5.5] [n=13 8.5,-59.4,4.5] [n=276 9.5,-59.4,-1.5] near=3.60@5.50,-59.44,5.50 n=14 min=2.50,-1.62,-1.42 cam=5.46,-58.38,2.06 viewBox=[-6.70,55.29,11.40..-1.82,56.76,20.01] firstWorld=( 3.695E+0 -7.317E-1  1.845E-1) firstView=(-1.863E+0  5.639E+1  1.211E+1) miss=[render:model] | render:model:animatable=GeckoMaidEntity renderer=EntityMaidRenderer
+[15:50:55] [Render thread/INFO]: [System] [CHAT] [被子] 线框 boxes=303 missing=0 mixin=36963 captured=36963 layer=4719/7632 size=1.81x0.90x0.97 renderer=EntityMaidRenderer maids= [n=14 5.5,-59.4,5.5] [n=13 8.5,-59.4,4.5] [n=276 9.5,-59.4,-1.5] near=1.43@5.50,-59.44,5.50 n=14 min=-0.56,-1.19,-2.47 cam=5.67,-58.17,4.86 viewBox=[-0.27,15.29,54.22..4.49,20.14,57.75] firstWorld=( 9.614E-1 -5.694E-2 -9.836E-1) firstView=( 3.561E-1  2.014E+1  5.502E+1) miss=[render:model] | render:model:animatable=GeckoMaidEntity renderer=EntityMaidRenderer
+[15:50:55] [Render thread/INFO]: [System] [CHAT] [被子] 线框 boxes=303 missing=0 mixin=36965 captured=36965 layer=4719/7632 size=1.81x0.90x0.97 renderer=EntityMaidRenderer maids= [n=14 5.5,-59.4,5.5] [n=13 8.5,-59.4,4.5] [n=276 9.5,-59.4,-1.5] near=1.44@5.50,-59.44,5.50 n=14 min=-0.49,-1.23,-2.48 cam=5.67,-58.17,4.85 viewBox=[-0.92,16.70,53.62..3.59,21.71,57.36] firstWorld=( 9.933E-1 -1.458E-1 -9.478E-1) firstView=(-1.695E-1  2.171E+1  5.432E+1) miss=[render:model] | render:model:animatable=GeckoMaidEntity renderer=EntityMaidRenderer
+[15:50:55] [Render thread/INFO]: [System] [CHAT] [被子] 线框 boxes=303 missing=0 mixin=36967 captured=36967 layer=4719/7632 size=1.81x0.90x0.97 renderer=EntityMaidRenderer maids= [n=14 5.5,-59.4,5.5] [n=13 8.5,-59.4,4.5] [n=276 9.5,-59.4,-1.5] near=1.44@5.50,-59.44,5.50 n=14 min=-0.41,-1.28,-2.48 cam=5.68,-58.17,4.85 viewBox=[-1.62,18.29,52.91..2.57,23.43,56.87] firstWorld=( 1.020E+0 -2.438E-1 -9.019E-1) firstView=(-7.367E-1  2.343E+1  5.349E+1) miss=[render:model] | render:model:animatable=GeckoMaidEntity renderer=EntityMaidRenderer
+[15:50:55] [Render thread/INFO]: [System] [CHAT] [被子] 线框 boxes=303 missing=0 mixin=36969 captured=36969 layer=4719/7632 size=1.81x0.90x0.97 renderer=EntityMaidRenderer maids= [n=14 5.5,-59.4,5.5] [n=13 8.5,-59.4,4.5] [n=276 9.5,-59.4,-1.5] near=1.44@5.50,-59.44,5.50 n=14 min=-0.37,-1.33,-2.47 cam=5.68,-58.17,4.85 viewBox=[-2.37,20.22,51.99..1.40,25.43,56.22] firstWorld=( 1.043E+0 -3.544E-1 -8.419E-1) firstView=(-1.353E+0  2.543E+1  5.242E+1) miss=[render:model] | render:model:animatable=GeckoMaidEntity renderer=EntityMaidRenderer
+[15:50:55] [Render thread/INFO]: [System] [CHAT] [被子] 线框 boxes=303 missing=0 mixin=36971 captured=36971 layer=4719/7632 size=1.81x0.90x0.97 renderer=EntityMaidRenderer maids= [n=14 5.5,-59.4,5.5] [n=13 8.5,-59.4,4.5] [n=276 9.5,-59.4,-1.5] near=1.44@5.50,-59.44,5.50 n=14 min=-0.36,-1.37,-2.45 cam=5.68,-58.17,4.85 viewBox=[-3.10,22.36,50.90..0.21,27.57,55.41] firstWorld=( 1.057E+0 -4.645E-1 -7.727E-1) firstView=(-1.937E+0  2.757E+1  5.117E+1) miss=[render:model] | render:model:animatable=GeckoMaidEntity renderer=EntityMaidRenderer
+[15:50:55] [Render thread/INFO]: [System] [CHAT] [被子] 线框 boxes=303 missing=0 mixin=36973 captured=36973 layer=4719/7632 size=1.81x0.90x0.97 renderer=EntityMaidRenderer maids= [n=14 5.5,-59.4,5.5] [n=13 8.5,-59.4,4.5] [n=276 9.5,-59.4,-1.5] near=1.44@5.50,-59.44,5.50 n=14 min=-0.36,-1.37,-2.45 cam=5.69,-58.17,4.84 viewBox=[-3.10,22.36,50.89..0.21,27.57,55.41] firstWorld=( 1.060E+0 -4.654E-1 -7.720E-1) firstView=(-1.935E+0  2.757E+1  5.117E+1) miss=[render:model] | render:model:animatable=GeckoMaidEntity renderer=EntityMaidRenderer
+[15:50:55] [Render thread/INFO]: [System] [CHAT] [被子] 线框 boxes=303 missing=0 mixin=36975 captured=36975 layer=4719/7632 size=1.81x0.90x0.97 renderer=EntityMaidRenderer maids= [n=14 5.5,-59.4,5.5] [n=13 8.5,-59.4,4.5] [n=276 9.5,-59.4,-1.5] near=1.44@5.50,-59.44,5.50 n=14 min=-0.35,-1.41,-2.41 cam=5.69,-58.17,4.84 viewBox=[-3.81,24.55,49.59..-0.88,29.68,54.45] firstWorld=( 1.067E+0 -5.675E-1 -6.979E-1) firstView=(-2.450E+0  2.968E+1  4.983E+1) miss=[render:model] | render:model:animatable=GeckoMaidEntity renderer=EntityMaidRenderer
+[15:50:57] [Render thread/INFO]: [被子] capsules=60 hard=36 soft=24 rAvg=0.124 rMax=0.240 lenAvg=0.137
+[15:50:57] [Render thread/INFO]: [被子] model size=1.62x2.78x1.19 min=-0.91,-0.09,-0.85 yaw=-164.53125 bedDir=north posedSize=1.05x1.54x1.47
+[15:50:57] [Render thread/INFO]: [被子] layer boxes=276 size=1.05x1.54x1.47 min=1.09,2.27,-5.68 maid=9.50,-59.44,-1.50 pose=SLEEPING bed=north
+[15:51:05] [Render thread/INFO]: [System] [CHAT] [被子] 线框 boxes=303 missing=0 mixin=39267 captured=39267 layer=5036/7949 size=1.15x1.31x1.40 renderer=EntityMaidRenderer maids= [n=14 5.5,-59.4,5.5] [n=13 8.5,-59.4,4.5] [n=276 9.5,-59.4,-1.5] near=4.23@8.50,-59.44,4.50 n=13 min=-4.34,-0.25,-3.18 cam=6.01,-58.38,1.24 viewBox=[3.55,47.06,31.91..11.16,49.22,35.72] firstWorld=(-1.110E+0  1.961E+0 -4.065E+0) firstView=( 8.700E+0  4.871E+1  3.565E+1) miss=[render:model] | render:model:animatable=GeckoMaidEntity renderer=EntityMaidRenderer
+[15:51:05] [Render thread/INFO]: [System] [CHAT] [被子] 线框 boxes=303 missing=0 mixin=39269 captured=39269 layer=5036/7949 size=1.15x1.31x1.40 renderer=EntityMaidRenderer maids= [n=14 5.5,-59.4,5.5] [n=13 8.5,-59.4,4.5] [n=276 9.5,-59.4,-1.5] near=4.26@8.50,-59.44,4.50 n=13 min=-4.30,-0.21,-3.28 cam=5.96,-58.38,1.25 viewBox=[3.52,47.13,31.97..11.11,49.16,35.79] firstWorld=(-9.932E-1  1.943E+0 -4.081E+0) firstView=( 8.480E+0  4.866E+1  3.572E+1) miss=[render:model] | render:model:animatable=GeckoMaidEntity renderer=EntityMaidRenderer
+[15:51:05] [Render thread/INFO]: [System] [CHAT] [被子] 线框 boxes=303 missing=0 mixin=39271 captured=39271 layer=5036/7949 size=1.15x1.31x1.40 renderer=EntityMaidRenderer maids= [n=14 5.5,-59.4,5.5] [n=13 8.5,-59.4,4.5] [n=276 9.5,-59.4,-1.5] near=4.28@8.50,-59.44,4.50 n=13 min=-4.25,-0.16,-3.37 cam=5.91,-58.38,1.26 viewBox=[3.48,47.13,31.98..11.03,49.03,35.96] firstWorld=(-8.793E-1  1.937E+0 -4.093E+0) firstView=( 8.259E+0  4.854E+1  3.589E+1) miss=[render:model] | render:model:animatable=GeckoMaidEntity renderer=EntityMaidRenderer
+[15:51:05] [Render thread/INFO]: [System] [CHAT] [被子] 线框 boxes=303 missing=0 mixin=39273 captured=39273 layer=5036/7949 size=1.15x1.31x1.40 renderer=EntityMaidRenderer maids= [n=14 5.5,-59.4,5.5] [n=13 8.5,-59.4,4.5] [n=276 9.5,-59.4,-1.5] near=4.30@8.50,-59.44,4.50 n=13 min=-4.20,-0.11,-3.46 cam=5.88,-58.38,1.26 viewBox=[3.45,47.22,31.85..10.94,48.99,35.99] firstWorld=(-7.560E-1  1.922E+0 -4.112E+0) firstView=( 8.028E+0  4.852E+1  3.593E+1) miss=[render:model] | render:model:animatable=GeckoMaidEntity renderer=EntityMaidRenderer
+[15:51:05] [Render thread/INFO]: [System] [CHAT] [被子] 线框 boxes=303 missing=0 mixin=39275 captured=39275 layer=5036/7949 size=1.15x1.31x1.40 renderer=EntityMaidRenderer maids= [n=14 5.5,-59.4,5.5] [n=13 8.5,-59.4,4.5] [n=276 9.5,-59.4,-1.5] near=4.32@8.50,-59.44,4.50 n=13 min=-4.15,-0.08,-3.54 cam=5.84,-58.38,1.27 viewBox=[3.40,47.23,31.83..10.83,48.89,36.14] firstWorld=(-6.615E-1  1.912E+0 -4.119E+0) firstView=( 7.817E+0  4.845E+1  3.603E+1) miss=[render:model] | render:model:animatable=GeckoMaidEntity renderer=EntityMaidRenderer
+[15:51:05] [Render thread/INFO]: [System] [CHAT] [被子] 线框 boxes=303 missing=0 mixin=39277 captured=39277 layer=5036/7949 size=1.15x1.31x1.40 renderer=EntityMaidRenderer maids= [n=14 5.5,-59.4,5.5] [n=13 8.5,-59.4,4.5] [n=276 9.5,-59.4,-1.5] near=4.34@8.50,-59.44,4.50 n=13 min=-4.12,-0.04,-3.61 cam=5.80,-58.38,1.28 viewBox=[3.35,47.25,31.80..10.72,48.82,36.26] firstWorld=(-5.843E-1  1.899E+0 -4.120E+0) firstView=( 7.616E+0  4.840E+1  3.610E+1) miss=[render:model] | render:model:animatable=GeckoMaidEntity renderer=EntityMaidRenderer
+[15:51:10] [Render thread/INFO]: [被子] capsules=60 hard=36 soft=24 rAvg=0.126 rMax=0.240 lenAvg=0.137
+[15:51:10] [Render thread/INFO]: [被子] model size=1.62x2.78x1.19 min=-0.91,-0.09,-0.85 yaw=-164.53125 bedDir=north posedSize=1.76x0.93x1.01
+[15:51:10] [Render thread/INFO]: [被子] layer boxes=276 size=1.76x0.93x1.01 min=-2.79,1.38,-5.79 maid=9.50,-59.44,-1.50 pose=SLEEPING bed=north
+[15:51:11] [Render thread/INFO]: [System] [CHAT] [被子] 线框已关闭
+[15:51:11] [Render thread/INFO]: [System] [CHAT] [被子] 线框 flag=false sleeping=3 hook=0
+[15:51:18] [Render thread/INFO]: [被子] capsules=60 hard=36 soft=24 rAvg=0.122 rMax=0.240 lenAvg=0.136
+[15:51:18] [Render thread/INFO]: [被子] model size=1.62x2.78x1.19 min=-0.91,-0.09,-0.85 yaw=-164.53125 bedDir=north posedSize=1.83x0.93x0.98
+[15:51:18] [Render thread/INFO]: [被子] layer boxes=276 size=1.83x0.93x0.98 min=-4.87,0.85,-5.95 maid=9.50,-59.44,-1.50 pose=SLEEPING bed=north
+[15:51:25] [Render thread/INFO]: [被子] capsules=60 hard=36 soft=24 rAvg=0.122 rMax=0.240 lenAvg=0.136
+[15:51:25] [Render thread/INFO]: [被子] model size=1.62x2.78x1.19 min=-0.91,-0.09,-0.85 yaw=-164.53125 bedDir=north posedSize=1.83x0.93x0.98
+[15:51:25] [Render thread/INFO]: [被子] layer boxes=276 size=1.83x0.93x0.98 min=-4.87,0.85,-5.95 maid=9.50,-59.44,-1.50 pose=SLEEPING bed=north
+[15:51:32] [Render thread/INFO]: [被子] capsules=60 hard=36 soft=24 rAvg=0.122 rMax=0.240 lenAvg=0.136
+[15:51:32] [Render thread/INFO]: [被子] model size=1.62x2.78x1.19 min=-0.91,-0.09,-0.85 yaw=-164.53125 bedDir=north posedSize=1.83x0.93x0.98
+[15:51:32] [Render thread/INFO]: [被子] layer boxes=276 size=1.83x0.93x0.98 min=-4.87,0.85,-5.95 maid=9.50,-59.44,-1.50 pose=SLEEPING bed=north
+[15:51:40] [Render thread/INFO]: [被子] capsules=60 hard=36 soft=24 rAvg=0.122 rMax=0.240 lenAvg=0.136
+[15:51:40] [Render thread/INFO]: [被子] model size=1.62x2.78x1.19 min=-0.91,-0.09,-0.85 yaw=-164.53125 bedDir=north posedSize=1.83x0.93x0.98
+[15:51:40] [Render thread/INFO]: [被子] layer boxes=276 size=1.83x0.93x0.98 min=-4.87,0.85,-5.95 maid=9.50,-59.44,-1.50 pose=SLEEPING bed=north
+[15:51:47] [Render thread/INFO]: [被子] capsules=60 hard=36 soft=24 rAvg=0.122 rMax=0.240 lenAvg=0.136
+[15:51:47] [Render thread/INFO]: [被子] model size=1.62x2.78x1.19 min=-0.91,-0.09,-0.85 yaw=-164.53125 bedDir=north posedSize=1.83x0.93x0.98
+[15:51:47] [Render thread/INFO]: [被子] layer boxes=276 size=1.83x0.93x0.98 min=-4.87,0.85,-5.95 maid=9.50,-59.44,-1.50 pose=SLEEPING bed=north
+[15:51:55] [Render thread/INFO]: [被子] capsules=60 hard=36 soft=24 rAvg=0.122 rMax=0.240 lenAvg=0.136
+[15:51:55] [Render thread/INFO]: [被子] model size=1.62x2.78x1.19 min=-0.91,-0.09,-0.85 yaw=-164.53125 bedDir=north posedSize=1.83x0.93x0.98
+[15:51:55] [Render thread/INFO]: [被子] layer boxes=276 size=1.83x0.93x0.98 min=-4.87,0.85,-5.95 maid=9.50,-59.44,-1.50 pose=SLEEPING bed=north
+[15:52:03] [Render thread/INFO]: [被子] capsules=60 hard=36 soft=24 rAvg=0.122 rMax=0.240 lenAvg=0.136
+[15:52:03] [Render thread/INFO]: [被子] model size=1.62x2.78x1.19 min=-0.91,-0.09,-0.85 yaw=-164.53125 bedDir=north posedSize=1.83x0.93x0.98
+[15:52:03] [Render thread/INFO]: [被子] layer boxes=276 size=1.83x0.93x0.98 min=-4.87,0.85,-5.95 maid=9.50,-59.44,-1.50 pose=SLEEPING bed=north
+[15:52:10] [Render thread/INFO]: [被子] capsules=60 hard=36 soft=24 rAvg=0.122 rMax=0.240 lenAvg=0.136
+[15:52:10] [Render thread/INFO]: [被子] model size=1.62x2.78x1.19 min=-0.91,-0.09,-0.85 yaw=-164.53125 bedDir=north posedSize=1.83x0.93x0.98
+[15:52:10] [Render thread/INFO]: [被子] layer boxes=276 size=1.83x0.93x0.98 min=-4.87,0.85,-5.95 maid=9.50,-59.44,-1.50 pose=SLEEPING bed=north
+[15:52:18] [Render thread/INFO]: [被子] capsules=60 hard=36 soft=24 rAvg=0.122 rMax=0.240 lenAvg=0.136
+[15:52:18] [Render thread/INFO]: [被子] model size=1.62x2.78x1.19 min=-0.91,-0.09,-0.85 yaw=-164.53125 bedDir=north posedSize=1.83x0.93x0.98
+[15:52:18] [Render thread/INFO]: [被子] layer boxes=276 size=1.83x0.93x0.98 min=-4.87,0.85,-5.95 maid=9.50,-59.44,-1.50 pose=SLEEPING bed=north
+[15:52:25] [Render thread/INFO]: [被子] capsules=60 hard=36 soft=24 rAvg=0.122 rMax=0.240 lenAvg=0.136
+[15:52:25] [Render thread/INFO]: [被子] model size=1.62x2.78x1.19 min=-0.91,-0.09,-0.85 yaw=-164.53125 bedDir=north posedSize=1.83x0.93x0.98
+[15:52:25] [Render thread/INFO]: [被子] layer boxes=276 size=1.83x0.93x0.98 min=-4.87,0.85,-5.95 maid=9.50,-59.44,-1.50 pose=SLEEPING bed=north
+[15:52:33] [Render thread/INFO]: [被子] capsules=60 hard=36 soft=24 rAvg=0.122 rMax=0.240 lenAvg=0.136
+[15:52:33] [Render thread/INFO]: [被子] model size=1.62x2.78x1.19 min=-0.91,-0.09,-0.85 yaw=-164.53125 bedDir=north posedSize=1.83x0.93x0.98
+[15:52:33] [Render thread/INFO]: [被子] layer boxes=276 size=1.83x0.93x0.98 min=-4.87,0.85,-5.95 maid=9.50,-59.44,-1.50 pose=SLEEPING bed=north
+[15:52:41] [Render thread/INFO]: [被子] capsules=60 hard=36 soft=24 rAvg=0.122 rMax=0.240 lenAvg=0.136
+[15:52:41] [Render thread/INFO]: [被子] model size=1.62x2.78x1.19 min=-0.91,-0.09,-0.85 yaw=-164.53125 bedDir=north posedSize=1.83x0.93x0.98
+[15:52:41] [Render thread/INFO]: [被子] layer boxes=276 size=1.83x0.93x0.98 min=-4.87,0.85,-5.95 maid=9.50,-59.44,-1.50 pose=SLEEPING bed=north
+[15:52:48] [Render thread/INFO]: [被子] capsules=60 hard=36 soft=24 rAvg=0.122 rMax=0.240 lenAvg=0.136
+[15:52:48] [Render thread/INFO]: [被子] model size=1.62x2.78x1.19 min=-0.91,-0.09,-0.85 yaw=-164.53125 bedDir=north posedSize=1.83x0.93x0.98
+[15:52:48] [Render thread/INFO]: [被子] layer boxes=276 size=1.83x0.93x0.98 min=-4.86,0.81,-5.85 maid=9.50,-59.44,-1.50 pose=SLEEPING bed=north
+[15:52:57] [Render thread/INFO]: [被子] capsules=60 hard=36 soft=24 rAvg=0.122 rMax=0.240 lenAvg=0.136
+[15:52:57] [Render thread/INFO]: [被子] model size=1.62x2.78x1.19 min=-0.91,-0.09,-0.85 yaw=-164.53125 bedDir=north posedSize=1.83x0.93x0.98
+[15:52:57] [Render thread/INFO]: [被子] layer boxes=276 size=1.83x0.93x0.98 min=-4.86,0.81,-5.85 maid=9.50,-59.44,-1.50 pose=SLEEPING bed=north
+[15:53:06] [Render thread/INFO]: [被子] capsules=60 hard=36 soft=24 rAvg=0.126 rMax=0.240 lenAvg=0.136
+[15:53:06] [Render thread/INFO]: [被子] model size=1.62x2.78x1.19 min=-0.91,-0.09,-0.85 yaw=-164.53125 bedDir=north posedSize=1.69x0.96x1.02
+[15:53:06] [Render thread/INFO]: [被子] layer boxes=276 size=1.69x0.96x1.02 min=-2.04,2.77,-6.46 maid=9.50,-59.44,-1.50 pose=SLEEPING bed=north
+[15:53:18] [Render thread/INFO]: [被子] capsules=60 hard=36 soft=24 rAvg=0.126 rMax=0.240 lenAvg=0.137
+[15:53:18] [Render thread/INFO]: [被子] model size=1.62x2.78x1.19 min=-0.91,-0.09,-0.85 yaw=-164.53125 bedDir=north posedSize=1.05x1.43x1.48
+[15:53:18] [Render thread/INFO]: [被子] layer boxes=276 size=1.05x1.43x1.48 min=-1.99,1.66,-5.25 maid=9.50,-59.44,-1.50 pose=SLEEPING bed=north
+[15:53:31] [Render thread/INFO]: [被子] capsules=60 hard=36 soft=24 rAvg=0.126 rMax=0.240 lenAvg=0.137
+[15:53:31] [Render thread/INFO]: [被子] model size=1.62x2.78x1.19 min=-0.91,-0.09,-0.85 yaw=-164.53125 bedDir=north posedSize=1.05x1.31x1.61
+[15:53:31] [Render thread/INFO]: [被子] layer boxes=276 size=1.05x1.31x1.61 min=-1.17,2.11,-7.00 maid=9.50,-59.44,-1.50 pose=SLEEPING bed=north
+[15:53:41] [Render thread/INFO]: [被子] capsules=60 hard=36 soft=24 rAvg=0.122 rMax=0.240 lenAvg=0.137
+[15:53:41] [Render thread/INFO]: [被子] model size=1.62x2.78x1.19 min=-0.91,-0.09,-0.85 yaw=-164.53125 bedDir=north posedSize=1.80x0.75x1.03
+[15:53:41] [Render thread/INFO]: [被子] layer boxes=276 size=1.80x0.75x1.03 min=0.92,-0.38,-3.87 maid=9.50,-59.44,-1.50 pose=SLEEPING bed=north
+[15:53:52] [Render thread/INFO]: [被子] capsules=60 hard=36 soft=24 rAvg=0.124 rMax=0.240 lenAvg=0.137
+[15:53:52] [Render thread/INFO]: [被子] model size=1.62x2.78x1.19 min=-0.91,-0.09,-0.85 yaw=-164.53125 bedDir=north posedSize=1.81x0.75x1.03
+[15:53:52] [Render thread/INFO]: [被子] layer boxes=276 size=1.81x0.75x1.03 min=2.63,-0.57,-3.70 maid=9.50,-59.44,-1.50 pose=SLEEPING bed=north
+[15:54:01] [Render thread/INFO]: [被子] capsules=60 hard=36 soft=24 rAvg=0.124 rMax=0.240 lenAvg=0.137
+[15:54:01] [Render thread/INFO]: [被子] model size=1.62x2.78x1.19 min=-0.91,-0.09,-0.85 yaw=-164.53125 bedDir=north posedSize=1.81x0.75x1.03
+[15:54:01] [Render thread/INFO]: [被子] layer boxes=276 size=1.81x0.75x1.03 min=2.63,-0.57,-3.70 maid=9.50,-59.44,-1.50 pose=SLEEPING bed=north
+[15:54:11] [Render thread/INFO]: [被子] capsules=60 hard=36 soft=24 rAvg=0.124 rMax=0.240 lenAvg=0.137
+[15:54:11] [Render thread/INFO]: [被子] model size=1.62x2.78x1.19 min=-0.91,-0.09,-0.85 yaw=-164.53125 bedDir=north posedSize=1.81x0.75x1.03
+[15:54:11] [Render thread/INFO]: [被子] layer boxes=276 size=1.81x0.75x1.03 min=2.63,-0.57,-3.70 maid=9.50,-59.44,-1.50 pose=SLEEPING bed=north
+[15:54:20] [Render thread/INFO]: [被子] capsules=60 hard=36 soft=24 rAvg=0.124 rMax=0.240 lenAvg=0.137
+[15:54:20] [Render thread/INFO]: [被子] model size=1.62x2.78x1.19 min=-0.91,-0.09,-0.85 yaw=-164.53125 bedDir=north posedSize=1.81x0.75x1.03
+[15:54:20] [Render thread/INFO]: [被子] layer boxes=276 size=1.81x0.75x1.03 min=2.63,-0.57,-3.70 maid=9.50,-59.44,-1.50 pose=SLEEPING bed=north
+[15:54:30] [Render thread/INFO]: [被子] capsules=60 hard=36 soft=24 rAvg=0.124 rMax=0.240 lenAvg=0.137
+[15:54:30] [Render thread/INFO]: [被子] model size=1.62x2.78x1.19 min=-0.91,-0.09,-0.85 yaw=-164.53125 bedDir=north posedSize=1.81x0.75x1.03
+[15:54:30] [Render thread/INFO]: [被子] layer boxes=276 size=1.81x0.75x1.03 min=2.63,-0.57,-3.70 maid=9.50,-59.44,-1.50 pose=SLEEPING bed=north
+[15:54:42] [Render thread/INFO]: [被子] capsules=60 hard=36 soft=24 rAvg=0.124 rMax=0.240 lenAvg=0.137
+[15:54:42] [Render thread/INFO]: [被子] model size=1.62x2.78x1.19 min=-0.91,-0.09,-0.85 yaw=-164.53125 bedDir=north posedSize=1.81x0.75x1.03
+[15:54:42] [Render thread/INFO]: [被子] layer boxes=276 size=1.81x0.75x1.03 min=2.55,-0.56,-3.77 maid=9.50,-59.44,-1.50 pose=SLEEPING bed=north

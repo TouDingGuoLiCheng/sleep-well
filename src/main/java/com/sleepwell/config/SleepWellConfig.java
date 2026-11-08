@@ -59,6 +59,8 @@ public final class SleepWellConfig {
     /** Sleeping actually pays out: 干劲 after a proper sleep in her own window, 困倦 when she skipped it. */
     public static final ForgeConfigSpec.BooleanValue VIGOR_ENABLED;
     public static final ForgeConfigSpec.IntValue VIGOR_SECONDS;
+    /** Extra seconds for a lie-in wake-up. */
+    public static final ForgeConfigSpec.IntValue VIGOR_LIE_IN_EXTRA_SECONDS;
     public static final ForgeConfigSpec.BooleanValue DROWSY_ENABLED;
     public static final ForgeConfigSpec.IntValue DROWSY_SECONDS;
     /** Heal while asleep. */
@@ -235,6 +237,10 @@ public final class SleepWellConfig {
                 .comment("How long 干劲 lasts, in seconds.",
                         "「干劲」持续多少秒。")
                 .defineInRange("vigorSeconds", 180, 10, 3600);
+        VIGOR_LIE_IN_EXTRA_SECONDS = builder
+                .comment("Extra seconds of 干劲 when she was still asleep after her window ended (a lie-in).",
+                        "赖床（窗口结束还没起）时「干劲」多给多少秒。")
+                .defineInRange("vigorLieInExtraSeconds", 120, 0, 3600);
         DROWSY_ENABLED = builder
                 .comment("Grant 困倦 (-15% speed) when her rest window ends without enough sleep.",
                         "她自己的睡觉时段结束时没睡够，就给「困倦」（-15% 移速）。")

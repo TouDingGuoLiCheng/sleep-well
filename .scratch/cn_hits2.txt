@@ -1,0 +1,30 @@
+[15:45:35] [Render thread/INFO]: [System] [CHAT] [被子] 线框 flag=false sleeping=0 hook=0
+[15:48:06] [Render thread/INFO]: [被子] 已挂载 gecko 采集层 -> GeckoEntityMaidRenderer
+[15:48:06] [Render thread/WARN]: [被子] 碰撞盒偏少 maid=686eff2d boxes=14（采集可能漏骨骼，被子会穿透）
+[15:48:06] [Render thread/WARN]: [被子] 碰撞盒偏少 maid=686eff2d boxes=14（采集可能漏骨骼，被子会穿透）
+[15:48:06] [Render thread/WARN]: [被子] 碰撞盒偏少 maid=686eff2d boxes=14（采集可能漏骨骼，被子会穿透）
+[15:48:06] [Render thread/WARN]: [被子] 碰撞盒偏少 maid=686eff2d boxes=14（采集可能漏骨骼，被子会穿透）
+[15:48:06] [Render thread/INFO]: [被子] 覆盖范围 半宽=1.04 枕端=0.35 脚端=1.20（盒数=14）
+[15:48:06] [Render thread/INFO]: [被子] 布料新建 maid=686eff2d model=touhou_little_maid:kaenbyou_rin|solid-0.350-0.500 grid=23x31 anchor=6.00,-59.44,5.50 bedTop=-59.44 boxes=14 她=5.50,-59.44,5.50 所在格=BlockPos{x=5, y=-60, z=5} 床头=BlockPos{x=5, y=-60, z=5} 床尾=BlockPos{x=6, y=-60, z=5} 到床中心=0.50
+[15:48:06] [Render thread/INFO]: [被子] 碰撞校验 布质心=6.43,-58.93,5.50 盒质心=5.89,-59.49,5.49 间距=0.77 盒数=14 盒Y范围=-60.07..-59.05
+[15:48:06] [Render thread/WARN]: [被子] 碰撞盒偏少 maid=686eff2d boxes=14（采集可能漏骨骼，被子会穿透）
+[15:48:07] [Render thread/INFO]: [被子] 贴面校验 她XZ=5.89,5.48 高度场=-59.28 她盒顶=-59.07 最近质点=103 质点Y=-59.26 水平距=0.04 被子最高=-59.23
+[15:48:07] [Render thread/INFO]: [被子] 布料解算完成并冻结 maid=686eff2d steps=800 分段=10 总耗时=653.0ms yRange=-60.00..-59.23 沿床覆盖=-0.33..1.19 逐行=-59.23 -59.26 -59.26 -59.29 -59.30 -59.34 -59.43 -59.47
+[15:48:07] [Render thread/WARN]: [被子] 校验失败 maid=686eff2d 被子最高=-59.23 低于身体顶面=-59.07，她会穿出被子（高度图或采样偏低）
+[15:48:59] [Render thread/INFO]: [被子] 覆盖范围 半宽=0.96 枕端=0.35 脚端=1.20（盒数=13）
+[15:48:59] [Render thread/INFO]: [被子] 布料新建 maid=d8383d81 model=little_maid_mob:engage_octaver_3c|solid-0.350-0.500 grid=23x31 anchor=8.50,-59.44,5.00 bedTop=-59.44 boxes=13 她=8.50,-59.36,4.50 所在格=BlockPos{x=8, y=-60, z=4} 床头=BlockPos{x=8, y=-60, z=4} 床尾=BlockPos{x=8, y=-60, z=5} 到床中心=0.50
+[15:48:59] [Render thread/INFO]: [被子] 碰撞校验 布质心=8.50,-58.83,5.43 盒质心=8.50,-59.39,4.69 间距=0.92 盒数=13 盒Y范围=-59.79..-58.95
+[15:48:59] [Render thread/INFO]: [被子] 贴面校验 她XZ=8.50,4.69 高度场=-59.07 她盒顶=-59.07 最近质点=11 质点Y=-59.06 水平距=0.10 被子最高=-59.06
+[15:48:59] [Render thread/INFO]: [被子] 布料解算完成并冻结 maid=d8383d81 steps=800 分段=10 总耗时=595.0ms yRange=-59.88..-59.06 沿床覆盖=-0.41..1.16 逐行=-59.06 -59.25 -59.29 -59.29 -59.29 -59.29 -59.39 -59.44
+[15:49:29] [Render thread/INFO]: [被子] capsules=60 hard=36 soft=24 rAvg=0.126 rMax=0.240 lenAvg=0.137
+[15:49:29] [Render thread/INFO]: [被子] model size=1.50x2.61x2.02 min=-0.70,-0.03,-0.65 yaw=-45.0 bedDir=south posedSize=1.06x1.56x1.57
+[15:49:29] [Render thread/INFO]: [被子] layer boxes=276 size=1.06x1.56x1.57 min=-1.98,-0.77,-2.62 maid=7.50,-59.31,1.50 pose=SLEEPING bed=south
+[15:49:29] [Render thread/INFO]: [被子] 覆盖范围 半宽=0.96 枕端=0.35 脚端=1.20（盒数=276）
+[15:49:29] [Render thread/INFO]: [被子] 布料新建 maid=c735f968 model=geckolib:winefox_salesperson_84961723c2751ef4c6b9a0f8596f95cc|solid-0.350-0.500 grid=23x31 anchor=7.50,-59.44,1.00 bedTop=-59.44 boxes=276 她=7.50,-59.44,1.50 所在格=BlockPos{x=7, y=-60, z=1} 床头=BlockPos{x=7, y=-60, z=1} 床尾=BlockPos{x=7, y=-60, z=0} 到床中心=0.50
+[15:49:29] [Render thread/INFO]: [被子] 碰撞校验 布质心=7.50,-58.76,0.57 盒质心=7.33,-59.32,1.44 间距=1.04 盒数=276 盒Y范围=-59.63..-58.88
+[15:49:30] [Render thread/INFO]: [被子] 贴面校验 她XZ=7.33,1.44 高度场=-58.93 她盒顶=-58.88 最近质点=9 质点Y=-58.86 水平距=0.20 被子最高=-58.83
+[15:49:30] [Render thread/INFO]: [被子] 布料解算完成并冻结 maid=c735f968 steps=800 分段=10 总耗时=642.0ms yRange=-59.88..-58.83 沿床覆盖=-0.43..1.15 逐行=-58.90 -58.91 -58.92 -58.97 -59.08 -59.13 -59.28 -59.41
+[15:49:37] [Render thread/INFO]: [被子] capsules=60 hard=36 soft=24 rAvg=0.126 rMax=0.240 lenAvg=0.137
+[15:49:37] [Render thread/INFO]: [被子] model size=1.62x2.74x1.19 min=-0.91,-0.09,-0.85 yaw=-45.0 bedDir=south posedSize=1.45x1.01x1.24
+[15:49:37] [Render thread/INFO]: [被子] layer boxes=276 size=1.45x1.01x1.24 min=0.17,-0.36,-2.61 maid=7.50,-59.44,1.50 pose=SLEEPING bed=south
+[15:49:44] [Render thread/INFO]: [被子] 复用上次解算 maid=c735f968 model=geckolib:winefox_salesperson_84961723c2751ef4c6b9a0f8596f95cc|solid-0.350-0.500 床=BlockPos{x=9, y=-60, z=-2}（跳过解算）
