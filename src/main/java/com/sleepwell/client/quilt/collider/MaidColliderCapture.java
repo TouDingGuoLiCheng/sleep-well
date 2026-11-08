@@ -202,9 +202,11 @@ public final class MaidColliderCapture {
         // Publish through the guard: a model-specific outline captured earlier this frame outranks this one.
         store(maid.getUUID(), set);
         captures++;
+        // DEBUG on purpose: the capture runs every frame per sleeping maid, and at INFO this one line was
+        // most of the log file. Turn it up when the quilt's footprint looks wrong.
         if (partPasses++ % 200 == 0) {
             float[] b = set.bounds;
-            LOGGER.info("[被子] 模型采集 maid={} boxes={} size={}x{}x{}", maid.getUUID(), boxes.size(),
+            LOGGER.debug("[被子] 模型采集 maid={} boxes={} size={}x{}x{}", maid.getUUID(), boxes.size(),
                     String.format(java.util.Locale.ROOT, "%.2f", b[3] - b[0]),
                     String.format(java.util.Locale.ROOT, "%.2f", b[4] - b[1]),
                     String.format(java.util.Locale.ROOT, "%.2f", b[5] - b[2]));
