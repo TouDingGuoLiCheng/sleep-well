@@ -116,6 +116,11 @@ public final class QuiltStyle {
     public static final QuiltStyle WINTER = register(new QuiltStyle("winter", "冬之被",
             "winter", false, Tiling.WHOLE, 1.0F, 1.0F, false, 0.038F, 0.76F, 0.66F, 0.16F));
 
+    /** True when the artwork repeats across the cloth instead of covering it once. */
+    public boolean tiles() {
+        return repeatU != 1.0F || repeatV != 1.0F;
+    }
+
     private static QuiltStyle register(QuiltStyle style) {
         REGISTRY.put(style.id, style);
         return style;

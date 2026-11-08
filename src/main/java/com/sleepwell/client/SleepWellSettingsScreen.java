@@ -183,11 +183,9 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
             graphics.renderOutline(x, y, WALL_CELL_W, WALL_CELL_H,
                     selected ? 0xFFF2E27A : (hovered ? 0xD8FFFFFF : 0x77FFFFFF));
             // The face itself as the plate's art: a player picks by look, not by reading names.
-            boolean banded = !QuiltBorder.of(currentBorder).isNone();
+            int[] size = QuiltTextures.dimensions(style, currentBorder);
             blitScaled(graphics, QuiltTextures.texture(style, currentBorder), x + 4,
-                    y + (WALL_CELL_H - THUMB) / 2, THUMB,
-                    banded ? 192 + QuiltBorder.BAND * 2 : 192,
-                    banded ? 256 + QuiltBorder.BAND * 2 : 256);
+                    y + (WALL_CELL_H - THUMB) / 2, THUMB, size[0], size[1]);
             graphics.drawString(this.font, (selected ? "✔" : "") + wallName(style.displayName),
                     x + THUMB + 7, y + 9, locked ? 0x8C8C8C : 0xF2EEE4, false);
         }
@@ -201,9 +199,11 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
                 borderX(), wallTop() - 12, TITLE_COLOR, false);
 
         List<QuiltBorder> borders = QuiltBorder.all();
+        boolean tiled = QuiltStyle.of(current).tiles();
         for (int i = 0; i < borders.size(); i++) {
             QuiltBorder border = borders.get(i);
-            boolean locked = this.menu.quiltLocked() && !border.isNone();
+            // Tiled quilts cannot wear a band yet, so the wall greys the column instead of pretending.
+            boolean locked = (this.menu.quiltLocked() && !border.isNone()) || (tiled && !border.isNone());
             boolean selected = border.id.equals(currentBorder);
             int x = borderX();
             int y = borderCellY(i);
@@ -242,6 +242,11 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
     private static void blitCrop(GuiGraphics graphics, ResourceLocation texture, int x, int y,
                                  int u, int v, int size) {
         graphics.blit(texture, x, y, u, v, size, size, 220, 284);
+    }
+
+    /** The quilt the wall is showing: the one just clicked, else the one the server reports. */
+    private String currentQuiltId() {
+        return this.chosenQuilt != null ? this.chosenQuilt : this.menu.quiltStyle();
     }
 
     /** The left edge of the border column, right of the quilt grid and the divider. */
@@ -286,7 +291,8 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
             int x = borderX();
             int y = borderCellY(i);
             if (mouseX >= x && mouseX < x + BORDER_CELL_W && mouseY >= y && mouseY < y + BORDER_CELL_H) {
-                boolean locked = this.menu.quiltLocked() && !border.isNone();
+                boolean locked = (this.menu.quiltLocked() && !border.isNone())
+                        || (QuiltStyle.of(currentQuiltId()).tiles() && !border.isNone());
                 if (!locked) {
                     this.chosenBorder = border.id;
                     SleepWellNetwork.CHANNEL.sendToServer(

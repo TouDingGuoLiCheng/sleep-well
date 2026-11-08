@@ -25,6 +25,8 @@ public final class QuiltTextures {
     private static final Map<String, ResourceLocation> CACHE = new ConcurrentHashMap<>();
     /** Pairs whose images could not be read, so a missing file does not retry every frame. */
     private static final Set<String> FAILED = ConcurrentHashMap.newKeySet();
+    /** Source pixel sizes, so the GUI can draw a 32x32 gingham and a 192x256 scene at their own shapes. */
+    private static final Map<String, int[]> SIZES = new ConcurrentHashMap<>();
 
     private QuiltTextures() {
     }
@@ -32,7 +34,9 @@ public final class QuiltTextures {
     /** The texture this quilt should be drawn with: the face alone, or face plus band. */
     public static ResourceLocation texture(QuiltStyle style, String borderId) {
         QuiltBorder border = QuiltBorder.of(borderId);
-        if (border.isNone()) {
+        // A tiling quilt draws its artwork repeatU x repeatV times, so a band baked into the texture would repeat
+        // with it and eat the pattern. Those three quilts stay borderless until the band gets its own draw pass.
+        if (border.isNone() || style.tiles()) {
             return style.texture();
         }
         String key = style.id + "|" + border.id;
@@ -72,10 +76,14 @@ public final class QuiltTextures {
                     out.setPixelRGBA(x + originX, y + originY, face.getPixelRGBA(x, y));
                 }
             }
-            // The band is drawn last and only where it is opaque: its middle is punched out.
-            for (int y = 0; y < height && y < band.getHeight(); y++) {
-                for (int x = 0; x < width && x < band.getWidth(); x++) {
-                    int pixel = band.getPixelRGBA(x, y);
+            // The band is drawn last and only where it is opaque: its middle is punched out. It is sampled with a
+            // nearest-neighbour ratio because the art is authored at 220x284 while a solid quilt's face is 32x32:
+            // copying pixel for pixel left a sliver of band in one corner and the cover looked missing.
+            for (int y = 0; y < height; y++) {
+                int bandY = Math.min((int) ((long) y * band.getHeight() / height), band.getHeight() - 1);
+                for (int x = 0; x < width; x++) {
+                    int bandX = Math.min((int) ((long) x * band.getWidth() / width), band.getWidth() - 1);
+                    int pixel = band.getPixelRGBA(bandX, bandY);
                     if (((pixel >>> 24) & 0xFF) != 0) {
                         out.setPixelRGBA(x, y, pixel);
                     }
@@ -95,6 +103,25 @@ public final class QuiltTextures {
             close(band);
             close(out);
         }
+    }
+
+    /** Pixel size of the texture {@link #texture} would hand back, for drawing it at the right shape. */
+    public static int[] dimensions(QuiltStyle style, String borderId) {
+        QuiltBorder border = QuiltBorder.of(borderId);
+        String key = style.id + "|" + border.id;
+        int[] known = SIZES.get(key);
+        if (known != null) {
+            return known;
+        }
+        NativeImage image = read(style.texture());
+        int[] size = image == null ? new int[]{192, 256} : new int[]{image.getWidth(), image.getHeight()};
+        close(image);
+        if (!border.isNone() && !style.tiles()) {
+            // The composite adds the band's reach on every side.
+            size = new int[]{size[0] + QuiltBorder.BAND * 2, size[1] + QuiltBorder.BAND * 2};
+        }
+        SIZES.put(key, size);
+        return size;
     }
 
     private static NativeImage read(ResourceLocation location) {
