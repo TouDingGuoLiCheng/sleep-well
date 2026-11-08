@@ -121,6 +121,10 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
     private static final int PAGE_NEXT_X = 124;
     /** Where the icon sits: right edge of the lie-in row, mirroring the gear on the winter row. */
     private static final int QUILT_ICON_W = 20;
+    /** Source size of the folded-quilt icon, drawn 1:1 so the pixels stay square. */
+    private static final int ICON_SIZE = 16;
+    private static final ResourceLocation QUILT_ICON =
+            new ResourceLocation(SleepWellMod.MOD_ID, "textures/gui/quilt_icon.png");
 
     private boolean quiltOpen;
     /** Which sheet of the wall is showing; 8 plates fit one page. */
@@ -558,15 +562,9 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
             if (hovered) {
                 graphics.fill(x, y + 2, x + w, y + h - 2, 0x55FFFFFF);
             }
-            int cell = 5;
-            int px = x + (w - cell * 2) / 2;
-            int py = y + (h - cell * 2) / 2;
-            for (int cx = 0; cx < 2; cx++) {
-                for (int cy = 0; cy < 2; cy++) {
-                    graphics.fill(px + cx * cell, py + cy * cell, px + cx * cell + cell,
-                            py + cy * cell + cell, (cx + cy) % 2 == 0 ? 0xFF7A5C8F : 0xFFE8DDF0);
-                }
-            }
+            // The folded quilt itself, not a checkerboard standing in for one.
+            int size = ICON_SIZE;
+            graphics.blit(QUILT_ICON, x + (w - size) / 2, y + (h - size) / 2, 0, 0, size, size, size, size);
             RenderSystem.disableBlend();
         }
     }
