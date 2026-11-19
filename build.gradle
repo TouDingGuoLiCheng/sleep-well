@@ -1,0 +1,196 @@
+buildscript {
+    repositories {
+        maven { url = 'https://repo.spongepowered.org/repository/maven-public/' }
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'org.spongepowered:mixingradle:0.7.38'
+    }
+}
+
+plugins {
+    id 'eclipse'
+    id 'idea'
+    id 'maven-publish'
+    id 'net.minecraftforge.gradle' version '[6.0,6.2)'
+}
+
+apply plugin: 'org.spongepowered.mixin'
+
+version = mod_version
+group = mod_group_id
+
+base {
+    archivesName = mod_id
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+
+mixin {
+    add sourceSets.main, "${mod_id}.refmap.json"
+    config "${mod_id}.mixins.json"
+}
+
+println "Java: ${System.getProperty 'java.version'}, JVM: ${System.getProperty 'java.vm.version'} (${System.getProperty 'java.vendor'}), Arch: ${System.getProperty 'os.arch'}"
+
+minecraft {
+    mappings channel: mapping_channel, version: mapping_version
+    copyIdeResources = true
+
+    runs {
+        configureEach {
+            workingDirectory project.file('run')
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+            mods {
+                "${mod_id}" {
+                    source sourceSets.main
+                }
+            }
+        }
+
+        client {
+            property 'forge.enabledGameTestNamespaces', mod_id
+        }
+
+        server {
+            property 'forge.enabledGameTestNamespaces', mod_id
+            args '--nogui'
+        }
+    }
+}
+
+sourceSets {
+    unitTest
+}
+
+sourceSets.main.resources { srcDir 'src/generated/resources' }
+
+repositories {
+    maven {
+        name = 'Modrinth'
+        url = 'https://api.modrinth.com/maven'
+        content {
+            includeGroup 'maven.modrinth'
+        }
+    }
+    // Offline fallback: drop touhoulittlemaid-1.5.3.jar into libs/
+    flatDir {
+        dir 'libs'
+    }
+}
+
+dependencies {
+    minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
+
+    // Touhou Little Maid 1.5.3+ (hard dependency, not bundled)
+    implementation fg.deobf("maven.modrinth:touhou-little-maid:${tlm_version}")
+
+    // Serene Seasons: compile-only soft dependency (never shipped, never bundled)
+    compileOnly files("libs/SereneSeasons-forge-1.20.1-9.1.0.3.jar")
+
+    // Mixin, for the one SchedulePos hook (winter work-point suppression)
+    compileOnly 'org.spongepowered:mixin:0.8.5'
+    annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
+
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    unitTestImplementation sourceSets.main.output
+    unitTestImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    unitTestRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+// ForgeGradle puts the whole MC/Forge graph on the test classpath and Gradle hands it over via
+// @argfile. On Windows JDK argfiles cannot resolve project output paths containing non-ASCII
+// characters (this project folder is 睡个好觉), so stage the classes in a plain temp dir first.
+def jvmTestStagingDir = file("${System.getProperty('java.io.tmpdir')}/${mod_id}-jvm-test-staging")
+
+tasks.register('prepareJvmTestStaging', Sync) {
+    dependsOn unitTestClasses
+    from sourceSets.unitTest.output.classesDirs
+    from sourceSets.main.output.classesDirs
+    into jvmTestStagingDir
+}
+
+tasks.register('unitTest', Test) {
+    description = 'Pure JVM unit tests without Forge bootstrap (Windows-safe classpath)'
+    group = 'verification'
+    useJUnitPlatform()
+    dependsOn prepareJvmTestStaging
+    testClassesDirs = sourceSets.unitTest.output.classesDirs
+    classpath = files(jvmTestStagingDir) + configurations.unitTestRuntimeClasspath
+}
+
+tasks.named('test', Test).configure {
+    useJUnitPlatform()
+}
+
+tasks.named('check').configure {
+    dependsOn unitTest
+}
+
+tasks.named('processResources', ProcessResources).configure {
+    var replaceProperties = [
+            minecraft_version: minecraft_version, minecraft_version_range: minecraft_version_range,
+            forge_version: forge_version, forge_version_range: forge_version_range,
+            loader_version_range: loader_version_range,
+            mod_id: mod_id, mod_name: mod_name, mod_license: mod_license, mod_version: mod_version,
+            mod_authors: mod_authors, mod_description: mod_description,
+    ]
+    inputs.properties replaceProperties
+
+    filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) {
+        expand replaceProperties + [project: project]
+    }
+}
+
+tasks.named('jar', Jar).configure {
+    manifest {
+        attributes([
+                'Specification-Title'     : mod_id,
+                'Specification-Vendor'    : mod_authors,
+                'Specification-Version'   : '1',
+                'Implementation-Title'    : project.name,
+                'Implementation-Version'  : project.jar.archiveVersion,
+                'Implementation-Vendor'   : mod_authors,
+                'Implementation-Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ"),
+                'MixinConfigs'            : "${mod_id}.mixins.json"
+        ])
+    }
+
+    finalizedBy 'reobfJar'
+}
+
+// Keep every built version under releases/ — `clean` wipes build/libs but not this folder.
+tasks.register('copyJarToReleases', Copy) {
+    group = 'build'
+    description = 'Copy the built mod jar into releases/ (preserves older versions)'
+    dependsOn reobfJar
+    from(tasks.named('jar', Jar).map { it.archiveFile })
+    into(layout.projectDirectory.dir('releases'))
+    doLast {
+        logger.lifecycle("Archived jar -> releases/${tasks.named('jar', Jar).get().archiveFileName.get()}")
+    }
+}
+
+tasks.named('build').configure {
+    finalizedBy copyJarToReleases
+}
+
+publishing {
+    publications {
+        register('mavenJava', MavenPublication) {
+            artifact jar
+        }
+    }
+    repositories {
+        maven {
+            url "file://${project.projectDir}/mcmodsrepo"
+        }
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}

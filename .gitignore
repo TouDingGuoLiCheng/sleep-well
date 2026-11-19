@@ -1,0 +1,43 @@
+# Gradle
+.gradle/
+build/
+out/
+run/
+run-data/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+bin/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Mod artifacts kept on purpose
+!releases/
+
+# Local fallback jars (see libs/README.md) — too large to track
+libs/*.jar
+hs_err_pid*.log
+replay_pid*.log
+# Build artifacts that land next to the project
+/sleep_well-*.jar
+/build_compile.log
+
+# Public export extras
+.scratch/
+.cursor/
+.superpowers/
+.worktrees/
+下一步的计划-*.md
+待办事项.md
+待修复.md
+*.log
+build-error.txt
+build_compile*.txt
+releases/*.jar

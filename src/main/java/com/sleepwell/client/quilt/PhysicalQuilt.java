@@ -1,0 +1,1310 @@
+package com.sleepwell.client.quilt;
+
+import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
+import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.mojang.logging.LogUtils;
+import com.sleepwell.client.quilt.collider.ColliderSet;
+import com.sleepwell.client.quilt.collider.MaidColliderCapture;
+import com.sleepwell.client.quilt.collider.QuiltBox;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.RenderType;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.item.DyeColor;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BedPart;
+import net.minecraft.world.level.block.HorizontalDirectionalBlock;
+import net.minecraft.core.Direction;
+import net.minecraft.world.phys.Vec3;
+import org.joml.Matrix4f;
+import org.joml.Vector3f;
+import org.slf4j.Logger;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.UUID;
+
+/**
+ * The quilt as an actual cloth: a particle grid solved with position based dynamics, colliding against the
+ * exact per-cube OBBs captured from her sleeping pose and against the bed it lies on.
+ * <p>
+ * Gravity, distance constraints and collision are all solved every frame, so indentations under her body and
+ * the sag over the bed edge are consequences of the simulation rather than hand-authored curves.
+ */
+public final class PhysicalQuilt {
+    private static final Logger LOGGER = LogUtils.getLogger();
+
+    /** Grid resolution: across the bed first, then along it. */
+    /**
+     * Grid resolution. This is the real limit on how closely the sheet can follow her: the particle spacing
+     * must be finer than her limbs (~0.1 blocks) or the cloth simply bridges over every gap and looks hollow.
+     */
+    private static final int COLS = 23;
+    private static final int ROWS = 31;
+    private static final float DT = 1.0F / 60.0F;
+    private static final int SUBSTEPS = 4;
+    private static final int ITERATIONS = 6;
+    /** Fewer sweeps while settling: the sheet only has to look right, not converge to machine precision. */
+    private static final int WARMUP_ITERATIONS = 3;
+    private static final float GRAVITY = -9.8F;
+    private static final float DAMPING = 0.985F;
+    private static final float DAMPING_CALM = 0.86F;
+    /** Set per frame from the measured average speed; not thread state, just a cheap settle detector. */
+    private static boolean CALM;
+    private static final float THICKNESS = 0.012F;
+    /** Upper bound on how far one particle may move per substep, in blocks. */
+    private static final float MAX_STEP = 0.05F;
+    /** Broadphase cell. Her cubes are small, so a particle only needs to look at its own cell. */
+    private static final float CELL = 0.5F;
+    /**
+     * Height field cell. Coarser than her limbs on purpose: the quilt should read as a soft mound over her,
+     * not as a body scan with every limb etched into the cloth.
+     */
+    private static final float HF_CELL = 0.08F;
+    /** Fraction of tangential speed kept when the cloth rubs against something; 0 = glued. */
+    private static final float FRICTION = 0.18F;
+    /**
+     * How far the cloth floats above her skin: this is the duvet's own padding. Without it the sheet lies
+     * straight on a body that is only 0.23 blocks tall, which reads as a flat bed sheet rather than a quilt.
+     * The number comes from the quilt itself now - down sits high, silk lies on her - so what is left here is
+     * only the shared floor.
+     */
+    private static final float MIN_PADDING = 0.008F;
+
+    /** Below this average per-substep motion the sheet is considered settled and gets extra damping. */
+    private static final float CALM_SPEED = 0.0016F;
+    /** One solve, done properly: the sheet is settled once and then frozen (R6). */
+    private static final int WARMUP = 800;
+    /**
+     * The settle is spread over this many frames. All 800 steps in one frame cost a visible hitch the first
+     * time a model was quilted; ten frames of 80 steps are short enough to pass unnoticed.
+     */
+    private static final int SETTLE_CHUNKS = 10;
+    private static final int SETTLE_CHUNK = WARMUP / SETTLE_CHUNKS;
+    /**
+     * A capture taken while she is still lying down shows a half-seated pose whose boxes sit up to a block
+     * away from her entity. Solving against that produces a quilt that covers "where she was mid-animation",
+     * which is what made the quilt look like it was under her. Solve only once the capture agrees with her.
+     */
+    private static final int STABLE_FRAMES = 2;
+    /** Frame-to-frame motion below this means she has stopped moving. Compared with itself, never with her
+     *  entity position: an asymmetric model (a big costume, a tail) has its box centroid permanently offset,
+     *  and requiring agreement with the entity made the gate impossible to pass for exactly those models. */
+    private static final float STABLE_MOVE = 0.03F;
+    private static final int STABLE_BOXES = 2;
+    private static final float STABLE_RANGE = 0.02F;
+    /** Never wait forever: a model that never settles still deserves a quilt (and a warning). */
+    private static final int STABLE_GIVE_UP = 60;
+    /** How often the frozen quilt is re-checked against her current pose. */
+    private static final int RECHECK_TICKS = 100;
+    // No pinned rows: the head edge used to be welded to the initial layout height, which held it in the
+    // air and made the quilt look like a tent. Gravity, the height field and friction alone decide the shape.
+    /** Half a bed's width, plus the overhang that hangs down the sides. */
+    private static final float HALF_WIDTH = 0.96F;
+    /** How far short of the pillow end the quilt starts, in blocks (measured from the bed centre). */
+    private static final float HEAD_INSET = 0.35F;
+    /** How far past the bed centre it reaches toward the foot. */
+    private static final float FOOT_REACH = 1.08F;
+    /** Hard caps for the footprint-driven sizing, so one long tail cannot turn the quilt into a tent. */
+    private static final float MAX_HALF_WIDTH = 1.40F;
+    private static final float MAX_FOOT_REACH = 1.75F;
+    /** Which quilt is drawn. Every appearance number lives on the style, so a new quilt is a new constant. */
+
+    private static final Map<UUID, Cloth> CLOTHS = new HashMap<>();
+    private static int FRAMES;
+    private static int TICK_LOGS = 300;
+    /** Bounded: the skip path can fire every frame and would flood the log. */
+    private static int SKIP_LOGS = 5;
+    /** At most one new quilt is solved per frame, which keeps the one-time cost off the frame budget. */
+    private static boolean SOLVED_THIS_FRAME;
+    /**
+     * Dynamic re-solve. Off in normal play; switched on to measure whether the solver still walks the quilt
+     * around. Each pass reports how far the sheet moved, so jitter becomes a number instead of a feeling.
+     */
+    private static final boolean DYNAMIC =
+            "true".equalsIgnoreCase(System.getProperty("sleepwell.quiltDynamic"));
+    /** Geometry change that is worth a re-solve; anything smaller is jitter, not a new pose. */
+    private static final float FINGERPRINT_EPS = 0.02F;
+    /** Relaxation steps used when re-solving from the current state instead of from scratch. */
+    private static final int RELAX_STEPS = 60;
+
+    /** Anything that changes her rendered geometry must invalidate the cache. */
+    private static String modelKey(EntityMaid maid) {
+        Object id = com.sleepwell.client.quilt.collider.Reflect.call(maid, "getModelId");
+        return id == null ? "unknown" : id.toString();
+    }
+
+    /** Called once per frame by the level stage: the one-solve-per-frame budget starts over here. */
+    public static void beginFrame() {
+        SOLVED_THIS_FRAME = false;
+    }
+
+    /** Cheap signature of the current collision geometry: total extent, enough to spot a different pose. */
+    private static float fingerprint(ColliderSet set) {
+        float[] bounds = set.bounds;
+        return (bounds[3] - bounds[0]) + (bounds[4] - bounds[1]) + (bounds[5] - bounds[2]);
+    }
+
+    private static String shortId(EntityMaid maid) {
+        String id = maid.getUUID().toString();
+        return id.substring(0, 8);
+    }
+
+    private static String fmt(double value) {
+        return String.format(Locale.ROOT, "%.2f", value);
+    }
+
+    private static String fmt(Vec3 value) {
+        return String.format(Locale.ROOT, "%.2f,%.2f,%.2f", value.x, value.y, value.z);
+    }
+
+    private static String fmt(float value) {
+        return String.format(Locale.ROOT, "%.2f", value);
+    }
+
+    private PhysicalQuilt() {
+    }
+
+    public static void clear() {
+        CLOTHS.clear();
+    }
+
+    public static void render(PoseStack pose, MultiBufferSource.BufferSource buffers, QuiltRenderer.Bed bed,
+                              EntityMaid maid) {
+        Vec3 head = Vec3.atLowerCornerOf(bed.head()).add(0.5D, 0.0D, 0.5D);
+        Vec3 foot = Vec3.atLowerCornerOf(bed.foot()).add(0.5D, 0.0D, 0.5D);
+        Vec3 along = new Vec3(foot.x - head.x, 0.0D, foot.z - head.z).normalize();
+        Vec3 across = new Vec3(-along.z, 0.0D, along.x);
+        double top = bedTop(bed);
+        Vec3 middle = new Vec3((head.x + foot.x) * 0.5D, top, (head.z + foot.z) * 0.5D);
+
+        // The setting lives on the server; the client mirror is what the renderer can actually see.
+        QuiltStyle shape = QuiltStyle.of(com.sleepwell.client.ClientQuiltStyles.of(maid));
+        // The quilt's own parameters belong in the cache key: a wide quilt solved as a plain one is wrong.
+        String modelKey = modelKey(maid) + "|" + shape.clothKey();
+        Cloth cached = CLOTHS.computeIfAbsent(maid.getUUID(), id -> new Cloth());
+        cached.style = shape;
+        cached.border = com.sleepwell.client.ClientQuiltStyles.borderOf(maid);
+        if (cached.initialised && modelKey.equals(cached.modelKey) && cached.hasLocalFrame()) {
+            // Reuse: the sheet was solved once for this model, so it only has to be moved to whatever bed she
+            // is in now. No capture, no gate, no solver - the whole point of the cache.
+            boolean moved = cached.bedKey == null || !cached.bedKey.equals(bed.head());
+            cached.anchor = middle;
+            cached.along = along;
+            cached.across = across;
+            cached.bedTop = top;
+            cached.bedHead = new Vec3(head.x, top, head.z);
+            cached.bedFoot = new Vec3(foot.x, top, foot.z);
+            if (moved) {
+                cached.retarget(middle, along, across, top);
+                cached.bedKey = bed.head();
+                LOGGER.info("[被子] 复用上次解算 maid={} model={} 床={}（跳过解算）", shortId(maid), modelKey,
+                        bed.head());
+            }
+            cached.draw(pose, buffers, bed.color());
+            return;
+        }
+
+        ColliderSet set = MaidColliderCapture.get(maid);
+        if (set == null || set.boxes.isEmpty()) {
+            // Silence here is what made "the quilt vanished" take a log hunt to explain.
+            if (SKIP_LOGS-- > 0) {
+                LOGGER.warn("[被子] 布料跳过 maid={} set={} boxes={}", shortId(maid),
+                        set == null ? "null" : "ok", set == null ? -1 : set.boxes.size());
+            }
+            return;
+        }
+        // Entities are drawn before AFTER_ENTITIES, so a set captured this frame carries the counter of the
+        // previous one. Anything older than that is genuinely stale.
+        if (MaidColliderCapture.frameCounter() - set.captureFrame > 1) {
+            // The set comes from an earlier frame, so its view-space corners no longer match the camera;
+            // transforming them now is what put the collision boxes 1.5 blocks above the bed. Keep the
+            // frozen sheet as it is and wait for a set captured this very frame.
+            Cloth existing = CLOTHS.get(maid.getUUID());
+            if (existing != null && existing.initialised) {
+                existing.draw(pose, buffers, bed.color());
+            } else if (SKIP_LOGS-- > 0) {
+                LOGGER.info("[被子] 碰撞集不是本帧的 maid={} setFrame={} now={}（等本帧采集）", shortId(maid),
+                        set.captureFrame, MaidColliderCapture.frameCounter());
+            }
+            return;
+        }
+        if (set.boxes.size() < 100 && SKIP_LOGS-- > 0) {
+            LOGGER.warn("[被子] 碰撞盒偏少 maid={} boxes={}（采集可能漏骨骼，被子会穿透）", shortId(maid),
+                    set.boxes.size());
+        }
+        // The captured corners live in the line batch's space. The level PoseStack maps world into exactly
+        // that space, so its inverse is the only correct way back to world coordinates.
+        // The matrix that came with the capture. Recomputing it from the current pose was the bug: a capture
+        // taken one frame earlier was converted with a camera that had already moved, which slid the whole
+        // body sideways under a frozen quilt.
+        Matrix4f viewToWorld = set.viewToWorld != null
+                ? new Matrix4f(set.viewToWorld)
+                : new Matrix4f(pose.last().pose()).invert();
+        // Reached only when the cache could not serve her: a different model, or a first sleep.
+        Cloth cloth = cached;
+        if (cloth.initialised && !modelKey.equals(cloth.modelKey)) {
+            // Different model (or skin/model pack) means different geometry: the cached sheet no longer fits.
+            LOGGER.info("[被子] 布料失效重算 maid={} 原因=模型变化 {} -> {} {}", shortId(maid), cloth.modelKey,
+                    modelKey, bedInfo(maid, bed));
+            cloth.initialised = false;
+        }
+        if (cloth.initialised && cloth.bedKey != null && !cloth.bedKey.equals(bed.head())) {
+            LOGGER.info("[被子] 布料失效重算 maid={} 原因=床位置变化 旧床={} {}", shortId(maid),
+                    cloth.bedKey, bedInfo(maid, bed));
+            cloth.initialised = false;
+        }
+        cloth.modelKey = modelKey;
+        cloth.bedKey = bed.head();
+        cloth.anchor = middle;
+        cloth.along = along;
+        cloth.across = across;
+        cloth.bedTop = top;
+        cloth.bedHead = new Vec3(head.x, top, head.z);
+        cloth.bedFoot = new Vec3(foot.x, top, foot.z);
+        if (!cloth.initialised) {
+            // A solved shape for this model may already exist from an earlier session.
+            if (cloth.adopt(QuiltCache.load(modelKey, set, COLS, ROWS))) {
+                cloth.fingerprint = fingerprint(set);
+                cloth.frozenAt = maid.tickCount;
+                LOGGER.info("[被子] 磁盘缓存命中 maid={} model={}（跳过解算）{}", shortId(maid), modelKey,
+                        bedInfo(maid, bed));
+            }
+        }
+        if (!cloth.initialised && SOLVED_THIS_FRAME) {
+            // Several maids coming into view at once used to stack ~400 ms of solving into one frame.
+            return;
+        }
+        if (!cloth.initialised) {
+            cloth.refreshBoxes(set, viewToWorld);
+            Vec3 centre = cloth.boxCentroid();
+            int boxes = set.boxes.size();
+            float topY = cloth.boxMaxY();
+            float lowY = cloth.boxMinY();
+            float moved = cloth.haveLast ? (float) centre.distanceTo(cloth.lastCentre) : Float.MAX_VALUE;
+            boolean still = cloth.haveLast
+                    && moved < STABLE_MOVE
+                    && Math.abs(boxes - cloth.lastBoxes) <= STABLE_BOXES
+                    && Math.abs(topY - cloth.lastMaxY) < STABLE_RANGE
+                    && Math.abs(lowY - cloth.lastMinY) < STABLE_RANGE;
+            cloth.haveLast = true;
+            cloth.lastCentre = centre;
+            cloth.lastBoxes = boxes;
+            cloth.lastMaxY = topY;
+            cloth.lastMinY = lowY;
+            cloth.stableFrames = still ? cloth.stableFrames + 1 : 0;
+            if (cloth.stableFrames < STABLE_FRAMES && ++cloth.waitFrames < STABLE_GIVE_UP) {
+                // She is still lying down. The capture is exactly as mid-motion as she is, so wait.
+                return;
+            }
+            if (cloth.stableFrames < STABLE_FRAMES) {
+                LOGGER.warn("[被子] 采集姿态始终未稳定 maid={} 帧间位移={} 盒数={} 高度范围={}..{}，仍然按当前姿态解算",
+                        shortId(maid), fmt(moved), boxes, fmt(lowY), fmt(topY));
+            }
+            cloth.abandoned(maid.tickCount);
+            if (!cloth.settling) {
+                SOLVED_THIS_FRAME = true;
+                cloth.reset();
+                LOGGER.info("[被子] 布料新建 maid={} model={} grid={}x{} anchor={} bedTop={} boxes={} {}",
+                        shortId(maid), modelKey, COLS, ROWS, fmt(cloth.anchor), fmt(cloth.bedTop), set.boxes.size(),
+                        bedInfo(maid, bed));
+                cloth.beginSettle(set, viewToWorld);
+            }
+            if (!cloth.settleChunk(set, viewToWorld)) {
+                // Still mid-settle: no cloth is drawn this frame, which is why the slice count matters.
+                return;
+            }
+            cloth.initialised = true;
+            cloth.frozenAt = maid.tickCount;
+            cloth.fingerprint = fingerprint(set);
+            cloth.storeToDisk(modelKey, set);
+            LOGGER.info("[被子] 布料解算完成并冻结 maid={} steps={} 分段={} 总耗时={}ms yRange={}..{} 沿床覆盖={} 逐行={}",
+                    shortId(maid), WARMUP, SETTLE_CHUNKS,
+                    String.format(Locale.ROOT, "%.1f", (float) cloth.settleMillis()), fmt(cloth.minY()),
+                    fmt(cloth.maxY()), cloth.alongSpan(), cloth.rowHeights());
+            float clothTop = cloth.maxY();
+            float bodyTop = cloth.boxMaxY();
+            if (clothTop < bodyTop - 0.02F) {
+                LOGGER.warn("[被子] 校验失败 maid={} 被子最高={} 低于身体顶面={}，她会穿出被子（高度图或采样偏低）",
+                        shortId(maid), fmt(clothTop), fmt(bodyTop));
+            }
+        } else if (DYNAMIC && maid.tickCount - cloth.frozenAt >= RECHECK_TICKS) {
+            cloth.frozenAt = maid.tickCount;
+            float current = fingerprint(set);
+            if (Math.abs(current - cloth.fingerprint) > FINGERPRINT_EPS) {
+                float moved = cloth.relax(set, viewToWorld, RELAX_STEPS);
+                LOGGER.info("[被子] 动态重算 maid={} 位移={}格 指纹={} -> {}", shortId(maid), fmt(moved),
+                        fmt(cloth.fingerprint), fmt(current));
+                cloth.fingerprint = current;
+            }
+        }
+        // No full rebuild: a periodic 300-step rebuild was the stutter, and it also re-laid the sheet.
+        // The path above only relaxes from where the cloth already is.
+        // nudged the geometry, which is exactly the stutter that got the cloth rolled back. The cache now
+        // only dies on a real change (different model, different bed).
+        cloth.draw(pose, buffers, bed.color());
+        if (--TICK_LOGS <= 0) {
+            TICK_LOGS = 300;
+            float minY = cloth.minY();
+            float maxY = cloth.maxY();
+            float drift = (float) Math.abs(cloth.centroid().y - (cloth.bedTop + 0.15D));
+            LOGGER.info("[被子] 布料 frame={} p={} boxes={} yRange={}..{} 床面={} 质心高度差={} 悬浮={} 沿床覆盖={} 静止={}",
+                    FRAMES, cloth.count, set.boxes.size(), fmt(minY), fmt(maxY), fmt(cloth.bedTop),
+                    fmt(drift), drift > 1.5F ? "是" : "否", cloth.alongSpan(), CALM ? "是" : "否");
+            if (drift > 1.5F) {
+                LOGGER.warn("[被子] 布料整体离床 {} 格（床面 {}，质心 {}）：坐标换算或碰撞盒方向有问题",
+                        fmt(drift), fmt(cloth.bedTop), fmt(cloth.centroid().y));
+            }
+            if (Float.isNaN(minY) || Float.isNaN(maxY)) {
+                LOGGER.error("[被子] 布料出现 NaN，重置 maid={}", shortId(maid));
+                cloth.initialised = false;
+            }
+        }
+    }
+
+    /**
+     * World height of the mattress surface. The block's shape only reports its local top (0..1), so the
+     * bed's own Y has to be added: using the local value alone pinned the whole sheet near world zero,
+     * which is how the quilt "disappeared" while sitting at y = 0.57.
+     */
+    /**
+     * Where she actually is versus which bed the quilt was laid on. Repeated "床位置变化" rebuilds for one
+     * maid mean her block position keeps crossing boundaries, and the quilt follows whichever bed the lookup
+     * happens to return - which reads as "the quilt is under her" when the two disagree by a whole bed.
+     */
+    private static String bedInfo(EntityMaid maid, QuiltRenderer.Bed bed) {
+        BlockPos head = bed.head();
+        BlockPos foot = bed.foot();
+        double cx = (head.getX() + foot.getX()) * 0.5D + 0.5D;
+        double cz = (head.getZ() + foot.getZ()) * 0.5D + 0.5D;
+        double dx = maid.getX() - cx;
+        double dz = maid.getZ() - cz;
+        return String.format(Locale.ROOT,
+                "她=%.2f,%.2f,%.2f 所在格=%s 床头=%s 床尾=%s 到床中心=%.2f",
+                maid.getX(), maid.getY(), maid.getZ(), maid.blockPosition(), head, foot,
+                Math.sqrt(dx * dx + dz * dz));
+    }
+
+    private static double bedTop(QuiltRenderer.Bed bed) {
+        net.minecraft.client.multiplayer.ClientLevel level = Minecraft.getInstance().level;
+        if (level == null) {
+            return bed.head().getY() + 0.5125D;
+        }
+        BlockState headState = level.getBlockState(bed.head());
+        BlockState footState = level.getBlockState(bed.foot());
+        double a = headState.getShape(level, bed.head()).max(Direction.Axis.Y);
+        double b = footState.getShape(level, bed.foot()).max(Direction.Axis.Y);
+        double local = Math.min(a, b);
+        if (local <= 0.0D || local > 0.60D) {
+            local = 0.5125D;
+        }
+        return bed.head().getY() + local;
+    }
+
+    /** One sheet: positions, previous positions and the constraint list. */
+    private static final class Cloth {
+        private final Vector3f[] now = new Vector3f[COLS * ROWS];
+        private final Vector3f[] prev = new Vector3f[COLS * ROWS];
+        private final List<int[]> constraints = new ArrayList<>();
+        private final List<float[]> rests = new ArrayList<>();
+        private final int count = COLS * ROWS;
+
+        private boolean initialised;
+        /** Consecutive frames in which the capture did not move, so she has stopped reshaping. */
+        private int stableFrames;
+        private boolean haveLast;
+        /** Solved shape in bed-local coordinates; see captureLocalFrame. */
+        private float[] localAlong;
+        private float[] localAcross;
+        private float[] localHeight;
+        private Vec3 lastCentre;
+        private int lastBoxes;
+        private float lastMinY;
+        private float lastMaxY;
+        /** Frames spent waiting for that agreement, so the gate cannot starve the quilt. */
+        private int waitFrames;
+        private String modelKey = "";
+        private BlockPos bedKey;
+        /** The quilt this sheet is wearing: textures, thickness and width all come from here. */
+        private QuiltStyle style = QuiltStyle.THICK_GINGHAM;
+        /** The border sewn around her quilt; empty means the artwork covers the whole sheet. */
+        private String border = "";
+
+        /** A banded cover is composited into one finished sheet, so the cloth samples it exactly once. */
+        private float tileU() {
+            return border.isEmpty() ? style.tileU() : 1.0F;
+        }
+
+        private float tileV() {
+            return border.isEmpty() ? style.tileV() : 1.0F;
+        }
+
+        /** The quilt's own padding, never below the shared floor. */
+        private float padding() {
+            return Math.max(MIN_PADDING, style.padding());
+        }
+        private int frozenAt;
+        private float fingerprint;
+        private Vec3 anchor = Vec3.ZERO;
+        private Vec3 along = Vec3.ZERO;
+        private Vec3 across = Vec3.ZERO;
+        private double bedTop;
+        private Vec3 bedHead = Vec3.ZERO;
+        private Vec3 bedFoot = Vec3.ZERO;
+        /** World-space AABBs of the captured cubes, rebuilt every frame from the latest pose. */
+        private float[] boxMin = new float[0];
+        private float[] boxMax = new float[0];
+        /** Highest point of her body over the bed plane, sampled on a grid: the only surface the cloth sees. */
+        private float[] height;
+        private int hfNx;
+        private int hfNz;
+        private float hfX0;
+        private float hfZ0;
+
+        /** Oriented box form: centre, three unit axes and half extents, all in world space. */
+        private float[] obbCentre = new float[0];
+        private float[] obbAxes = new float[0];
+        private float[] obbHalf = new float[0];
+        /** Box indices bucketed by cell, rebuilt once per settle. Turns 408 tests per particle into a few. */
+        private final java.util.HashMap<Long, int[]> grid = new java.util.HashMap<>();
+
+        private void reset() {
+            // Size the sheet from what she actually occupies: a tail or a long pair of legs that sticks out
+            // past the bed would otherwise sit outside the cloth and stay uncovered.
+            // A wide quilt is a third wider than a plain one, which is exactly what has to be re-solved.
+            float halfWidth = HALF_WIDTH * (style.wideAcross ? 4.0F / 3.0F : 1.0F);
+            float footReach = FOOT_REACH;
+            float headInset = HEAD_INSET;
+            int n = boxMin.length / 3;
+            if (n > 0) {
+                float maxAcross = 0.0F;
+                float minAlong = -HEAD_INSET;
+                float maxAlong = FOOT_REACH;
+                for (int i = 0; i < n; i++) {
+                    int base = i * 3;
+                    for (int corner = 0; corner < 8; corner++) {
+                        float x = (corner & 1) == 0 ? boxMin[base] : boxMax[base];
+                        float z = (corner & 2) == 0 ? boxMin[base + 2] : boxMax[base + 2];
+                        double alongOffset = (x - anchor.x) * along.x + (z - anchor.z) * along.z;
+                        double acrossOffset = (x - anchor.x) * across.x + (z - anchor.z) * across.z;
+                        maxAcross = (float) Math.max(maxAcross, Math.abs(acrossOffset));
+                        minAlong = (float) Math.min(minAlong, alongOffset);
+                        maxAlong = (float) Math.max(maxAlong, alongOffset);
+                    }
+                }
+                halfWidth = Math.min(MAX_HALF_WIDTH, Math.max(halfWidth, maxAcross + 0.10F));
+                footReach = Math.min(MAX_FOOT_REACH, Math.max(footReach, maxAlong + 0.12F));
+                // Never let the head end creep onto the pillow: an inset of zero is the limit.
+                headInset = Math.max(0.0F, Math.min(headInset, -minAlong + 0.10F));
+            }
+            LOGGER.info("[被子] 覆盖范围 半宽={} 枕端={} 脚端={}（盒数={}）", fmt(halfWidth), fmt(headInset),
+                    fmt(footReach), n);
+            // Drop it from above her tallest point: starting level with the mattress put the sheet inside her
+            // body and inside any tail, and the collision then pushed those particles downwards.
+            double startY = Math.max(bedTop + 0.14D, boxMaxY() + 0.12D);
+            for (int row = 0; row < ROWS; row++) {
+                for (int col = 0; col < COLS; col++) {
+                    float u = COLS == 1 ? 0.0F : (float) col / (COLS - 1);
+                    float v = ROWS == 1 ? 0.0F : (float) row / (ROWS - 1);
+                    double offsetAcross = (u - 0.5) * 2.0 * halfWidth;
+                    // Along: asymmetric on purpose. A quilt starts below the pillow, so the head end is
+                    // inset while the foot end still drapes past the mattress.
+                    double offsetAlong = -headInset + (footReach + headInset) * v;
+                    Vec3 p = new Vec3(anchor.x + across.x * offsetAcross + along.x * offsetAlong, startY,
+                            anchor.z + across.z * offsetAcross + along.z * offsetAlong);
+                    int index = row * COLS + col;
+                    now[index] = new Vector3f((float) p.x, (float) p.y, (float) p.z);
+                    prev[index] = new Vector3f((float) p.x, (float) p.y, (float) p.z);
+
+                }
+            }
+            constraints.clear();
+            rests.clear();
+            for (int row = 0; row < ROWS; row++) {
+                for (int col = 0; col < COLS; col++) {
+                    int a = row * COLS + col;
+                    if (col + 1 < COLS) {
+                        add(a, a + 1, 1.0F);
+                    }
+                    if (row + 1 < ROWS) {
+                        add(a, a + COLS, 1.0F);
+                    }
+                    if (col + 1 < COLS && row + 1 < ROWS) {
+                        add(a, a + COLS + 1, 0.6F);
+                        add(a + 1, a + COLS, 0.6F);
+                    }
+                    // Bending is what decides the whole hand of the cloth: a cotton quilt creases,
+                    // a down or silk one collapses over every limb. Everything else stays the same.
+                    if (col + 2 < COLS) {
+                        add(a, a + 2, 0.07F * style.bendScale());
+                    }
+                    if (row + 2 < ROWS) {
+                        add(a, a + COLS * 2, 0.05F * style.bendScale());
+                    }
+                }
+            }
+        }
+
+        private void add(int a, int b, float stiffness) {
+            float rest = now[a].distance(now[b]);
+            constraints.add(new int[]{a, b});
+            rests.add(new float[]{rest, stiffness});
+        }
+
+        /** Continues solving from the current positions; returns the largest distance any particle moved. */
+        private float relax(ColliderSet set, Matrix4f viewToWorld, int steps) {
+            float[] before = new float[count * 3];
+            for (int i = 0; i < count; i++) {
+                before[i * 3] = now[i].x;
+                before[i * 3 + 1] = now[i].y;
+                before[i * 3 + 2] = now[i].z;
+            }
+            for (int i = 0; i < steps; i++) {
+                step(set, viewToWorld, false);
+            }
+            float moved = 0.0F;
+            for (int i = 0; i < count; i++) {
+                float dx = now[i].x - before[i * 3];
+                float dy = now[i].y - before[i * 3 + 1];
+                float dz = now[i].z - before[i * 3 + 2];
+                moved = Math.max(moved, (float) Math.sqrt(dx * dx + dy * dy + dz * dz));
+            }
+            return moved;
+        }
+
+        private boolean settling;
+        private int settleStepsLeft;
+        private long settleStartNanos;
+        private int settleTick;
+
+        /** First slice of the settle: set the box field up once, then let {@link #settleChunk} walk it. */
+        private void beginSettle(ColliderSet set, Matrix4f viewToWorld) {
+            settleStartNanos = System.nanoTime();
+            settleStepsLeft = WARMUP;
+            settling = true;
+            settleTick = 0;
+            refreshBoxes(set, viewToWorld);
+            refreshBoxes(set, viewToWorld);
+            LOGGER.info("[被子] 碰撞校验 布质心={} 盒质心={} 间距={} 盒数={} 盒Y范围={}..{}",
+                    fmt(centroid()), fmt(boxCentroid()), fmt(centroid().distanceTo(boxCentroid())),
+                    boxMin.length / 3, fmt(boxMinY()), fmt(boxMaxY()));
+        }
+
+        /**
+         * One frame's worth of settling. Returns true on the frame that finishes it, so the caller can freeze
+         * and cache the sheet exactly once.
+         */
+        private boolean settleChunk(ColliderSet set, Matrix4f viewToWorld) {
+            // The box field is built once in beginSettle and kept for the whole solve: refreshing it mid-way
+            // would let a drifting pose pull the sheet around while it is still falling.
+            int steps = Math.min(SETTLE_CHUNK, settleStepsLeft);
+            for (int i = 0; i < steps; i++) {
+                step(set, viewToWorld, true);
+            }
+            settleStepsLeft -= steps;
+            if (settleStepsLeft > 0) {
+                return false;
+            }
+            settling = false;
+            probeContact();
+            captureLocalFrame();
+            return true;
+        }
+
+        /**
+         * A settle abandoned halfway (she woke up mid-slice) must not be resumed against a later pose: the
+         * leftover steps would freeze a sheet solved for where she used to be. Restart instead.
+         */
+        private boolean abandoned(int tick) {
+            if (!settling) {
+                return false;
+            }
+            if (settleTick != 0 && tick - settleTick > 40) {
+                settling = false;
+                settleStepsLeft = 0;
+                initialised = false;
+                LOGGER.info("[被子] 解算中断 断点={}t 现在={}t，下次重新解算", settleTick, tick);
+                return true;
+            }
+            settleTick = tick;
+            return false;
+        }
+
+        /** Wall-clock milliseconds the whole (multi-frame) settle took. */
+        private long settleMillis() {
+            return (System.nanoTime() - settleStartNanos) / 1_000_000L;
+        }
+
+        /**
+         * Separates three explanations that look identical on screen: the height field is missing under her,
+         * the field is right but the cloth is not pushed up, or both are right and her visible model is
+         * simply taller than her boxes. Prints the field value above her, her box top there, and the height
+         * of the nearest cloth particle.
+         */
+        private void probeContact() {
+            Vec3 c = boxCentroid();
+            float surface = surfaceAt((float) c.x, (float) c.z);
+            int best = 0;
+            float bestDist = Float.MAX_VALUE;
+            for (int i = 0; i < count; i++) {
+                float dx = now[i].x - (float) c.x;
+                float dz = now[i].z - (float) c.z;
+                float d = dx * dx + dz * dz;
+                if (d < bestDist) {
+                    bestDist = d;
+                    best = i;
+                }
+            }
+            LOGGER.info("[被子] 贴面校验 她XZ={},{} 高度场={} 她盒顶={} 最近质点={} 质点Y={} 水平距={} 被子最高={}",
+                    fmt(c.x), fmt(c.z),
+                    surface == Float.NEGATIVE_INFINITY ? "无表面" : fmt(surface),
+                    fmt(boxMaxY()), best, fmt(now[best].y),
+                    fmt(Math.sqrt(bestDist)), fmt(maxY()));
+        }
+
+        /** The solved shape expressed in the bed's own frame, so it can be re-placed without re-solving. */
+        private void captureLocalFrame() {
+            if (localAlong == null) {
+                localAlong = new float[count];
+                localAcross = new float[count];
+                localHeight = new float[count];
+            }
+            for (int i = 0; i < count; i++) {
+                double dx = now[i].x - anchor.x;
+                double dz = now[i].z - anchor.z;
+                localAlong[i] = (float) (dx * along.x + dz * along.z);
+                localAcross[i] = (float) (dx * across.x + dz * across.z);
+                localHeight[i] = (float) (now[i].y - bedTop);
+            }
+        }
+
+        private boolean hasLocalFrame() {
+            return localAlong != null;
+        }
+
+        /** Takes a previously solved shape from disk and lays it out in the current bed. */
+        /** Allocates the particle vectors. A fresh Cloth has empty slots until something fills them in. */
+        private void ensureVectors() {
+            for (int i = 0; i < count; i++) {
+                if (now[i] == null) {
+                    now[i] = new Vector3f();
+                    prev[i] = new Vector3f();
+                }
+            }
+        }
+
+        private boolean adopt(QuiltCache.Frame frame) {
+            if (frame == null || frame.along.length != count) {
+                return false;
+            }
+            // A cloth that has never been solved this session has no particle vectors yet; without this the
+            // first cache hit after a restart crashed while re-placing the sheet.
+            ensureVectors();
+            localAlong = frame.along;
+            localAcross = frame.across;
+            localHeight = frame.height;
+            retarget(anchor, along, across, bedTop);
+            initialised = true;
+            return true;
+        }
+
+        /** Keeps the solved shape for the next launch. Called once, right after a solve. */
+        private void storeToDisk(String key, ColliderSet set) {
+            if (localAlong != null) {
+                QuiltCache.save(key, set, COLS, ROWS, localAlong, localAcross, localHeight);
+            }
+        }
+
+        /** Lays the cached shape into another bed: a rigid move, which is all a different bed needs. */
+        private void retarget(Vec3 newAnchor, Vec3 newAlong, Vec3 newAcross, double newBedTop) {
+            if (localAlong == null) {
+                return;
+            }
+            for (int i = 0; i < count; i++) {
+                float a = localAlong[i];
+                float c = localAcross[i];
+                float x = (float) (newAnchor.x + newAlong.x * a + newAcross.x * c);
+                float z = (float) (newAnchor.z + newAlong.z * a + newAcross.z * c);
+                float y = (float) (newBedTop + localHeight[i]);
+                now[i].set(x, y, z);
+                prev[i].set(x, y, z);
+            }
+        }
+
+        private void step(ColliderSet set, Matrix4f viewToWorld) {
+            step(set, viewToWorld, false);
+        }
+
+        private void step(ColliderSet set, Matrix4f viewToWorld, boolean warmup) {
+            if (!warmup) {
+                refreshBoxes(set, viewToWorld);
+            }
+            float sub = DT / SUBSTEPS;
+            // While settling the sheet still has to fall, so the calm-down damping must not apply yet.
+            float damping = (!warmup && CALM) ? DAMPING_CALM : DAMPING;
+            for (int s = 0; s < SUBSTEPS; s++) {
+                for (int i = 0; i < count; i++) {
+                    Vector3f p = now[i];
+                    Vector3f o = prev[i];
+                    float vx = (p.x - o.x) * damping;
+                    float vy = (p.y - o.y) * damping;
+                    float vz = (p.z - o.z) * damping;
+                    o.set(p);
+                    p.x += vx;
+                    p.y += vy + GRAVITY * sub * sub;
+                    p.z += vz;
+                    // Cap the per-substep displacement: without this a single deep overlap can inject
+                    // enough energy to fling the sheet around.
+                    float mx = p.x - o.x, my = p.y - o.y, mz = p.z - o.z;
+                    float dist = (float) Math.sqrt(mx * mx + my * my + mz * mz);
+                    if (dist > MAX_STEP) {
+                        float k = MAX_STEP / dist;
+                        p.set(o.x + mx * k, o.y + my * k, o.z + mz * k);
+                    }
+                    if (Math.abs(p.y - (float) bedTop) > 4.0F || p.distanceSquared(o) > 4.0F) {
+                        // Runaway particle: put it back on the bed instead of letting one bad push fling
+                        // the whole sheet out of the world.
+                        p.set((float) anchor.x, (float) (bedTop + 0.4D), (float) anchor.z);
+                        o.set(p);
+                    }
+                }
+                int iterations = warmup ? WARMUP_ITERATIONS : ITERATIONS;
+                for (int iter = 0; iter < iterations; iter++) {
+                    for (int c = 0; c < constraints.size(); c++) {
+                        int[] pair = constraints.get(c);
+                        float[] rest = rests.get(c);
+                        project(pair[0], pair[1], rest[0], rest[1]);
+                    }
+                    collide();
+                }
+            }
+            if (!warmup) {
+                FRAMES++;
+                float speed = 0.0F;
+                for (int i = 0; i < count; i++) {
+                    speed += now[i].distance(prev[i]);
+                }
+                CALM = speed / count / SUBSTEPS < CALM_SPEED;
+            }
+        }
+
+        private void project(int ia, int ib, float rest, float stiffness) {
+            Vector3f a = now[ia];
+            Vector3f b = now[ib];
+            float dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z;
+            float d = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
+            if (d < 1.0E-5F) {
+                return;
+            }
+            float diff = (d - rest) / d * 0.5F * stiffness;
+            a.x += dx * diff;
+            a.y += dy * diff;
+            a.z += dz * diff;
+            b.x -= dx * diff;
+            b.y -= dy * diff;
+            b.z -= dz * diff;
+        }
+
+        /**
+         * One monotone test per particle. There is no lateral push at all, so no amount of iteration can
+         * ping-pong the cloth between two overlapping cubes — that oscillation was what made two identical
+         * maids end up with different quilts.
+         */
+        private void collide() {
+            for (int i = 0; i < count; i++) {
+                Vector3f p = now[i];
+                float surface = surfaceAt(p.x, p.z);
+                float minY = surface + padding();
+                boolean onBody = surface > Float.NEGATIVE_INFINITY;
+                // Mattress: only inside the bed footprint, so the overhang may still fall down the sides.
+                if (p.y < bedTop + THICKNESS && insideBed(p)) {
+                    p.y = (float) (bedTop + THICKNESS);
+                }
+                if (onBody && p.y < minY) {
+                    p.y = minY;
+                }
+                if (onBody || (p.y <= bedTop + THICKNESS && insideBed(p))) {
+                    // Rub: a real quilt stays put because cloth grips what it lies on.
+                    Vector3f previous = prev[i];
+                    previous.x = p.x + (previous.x - p.x) * FRICTION;
+                    previous.z = p.z + (previous.z - p.z) * FRICTION;
+                }
+            }
+        }
+
+        private void collideWith(Vector3f p, int[] candidates, Vector3f cameFrom) {
+            for (int box : candidates) {
+                int baseC = box * 3;
+                int baseA = box * 9;
+                float cx = p.x - obbCentre[baseC];
+                float cy = p.y - obbCentre[baseC + 1];
+                float cz = p.z - obbCentre[baseC + 2];
+                // Minimal translation vector in the box's own frame: a rotated cube is no bigger than itself,
+                // which is what removes the air gap the axis-aligned test left around every limb.
+                float bestPen = Float.MAX_VALUE;
+                int bestAxis = -1;
+                float bestSign = 1.0F;
+                boolean inside = true;
+                for (int a = 0; a < 3; a++) {
+                    float ax = obbAxes[baseA + a * 3], ay = obbAxes[baseA + a * 3 + 1],
+                            az = obbAxes[baseA + a * 3 + 2];
+                    float local = cx * ax + cy * ay + cz * az;
+                    float reach = obbHalf[baseC + a] + padding();
+                    float pen = reach - Math.abs(local);
+                    if (pen < 0.0F) {
+                        inside = false;
+                        break;
+                    }
+                    if (pen < bestPen) {
+                        bestPen = pen;
+                        bestAxis = a;
+                        bestSign = local >= 0.0F ? 1.0F : -1.0F;
+                    }
+                }
+                if (!inside || bestAxis < 0) {
+                    continue;
+                }
+                // Leaving through the top is right when the particle came from above; the minimal push is
+                // right otherwise (sides, underneath her).
+                if (cameFrom.y > obbCentre[baseC + 1] + obbHalf[baseC + 1]) {
+                    Vector3f up = new Vector3f(obbAxes[baseA], obbAxes[baseA + 1], obbAxes[baseA + 2]);
+                    if (up.y < 0.0F) {
+                        up.negate();
+                    }
+                    float along = (p.x - obbCentre[baseC]) * up.x + (p.y - obbCentre[baseC + 1]) * up.y
+                            + (p.z - obbCentre[baseC + 2]) * up.z;
+                    if (along < obbHalf[baseC + 1] + padding()) {
+                        float push = obbHalf[baseC + 1] + padding() - along;
+                        p.x += up.x * push;
+                        p.y += up.y * push;
+                        p.z += up.z * push;
+                    }
+                    continue;
+                }
+                float ax = obbAxes[baseA + bestAxis * 3], ay = obbAxes[baseA + bestAxis * 3 + 1],
+                        az = obbAxes[baseA + bestAxis * 3 + 2];
+                p.x += ax * bestSign * bestPen;
+                p.y += ay * bestSign * bestPen;
+                p.z += az * bestSign * bestPen;
+            }
+        }
+
+        /** True inside the bed's own footprint: only there may the mattress hold the cloth up. */
+        private boolean insideBed(Vector3f p) {
+            double alongOffset = (p.x - anchor.x) * along.x + (p.z - anchor.z) * along.z;
+            double acrossOffset = (p.x - anchor.x) * across.x + (p.z - anchor.z) * across.z;
+            return Math.abs(alongOffset) <= 1.05D && Math.abs(acrossOffset) <= 0.52D;
+        }
+
+        private void refreshBoxes(ColliderSet set, Matrix4f viewToWorld) {
+            int n = set.boxes.size();
+            if (boxMin.length != n * 3) {
+                boxMin = new float[n * 3];
+                boxMax = new float[n * 3];
+                obbCentre = new float[n * 3];
+                obbAxes = new float[n * 9];
+                obbHalf = new float[n * 3];
+            }
+            Matrix4f toWorld = viewToWorld;
+            for (int i = 0; i < n; i++) {
+                QuiltBox box = set.boxes.get(i);
+                float minX = Float.MAX_VALUE, minY = Float.MAX_VALUE, minZ = Float.MAX_VALUE;
+                float maxX = -Float.MAX_VALUE, maxY = -Float.MAX_VALUE, maxZ = -Float.MAX_VALUE;
+                for (int corner = 0; corner < 8; corner++) {
+                    Vector3f v = toWorld.transformPosition(
+                            new Vector3f(box.x(corner), box.y(corner), box.z(corner)));
+                    minX = Math.min(minX, v.x);
+                    minY = Math.min(minY, v.y);
+                    minZ = Math.min(minZ, v.z);
+                    maxX = Math.max(maxX, v.x);
+                    maxY = Math.max(maxY, v.y);
+                    maxZ = Math.max(maxZ, v.z);
+                }
+                int base = i * 3;
+                boxMin[base] = minX;
+                boxMin[base + 1] = minY;
+                boxMin[base + 2] = minZ;
+                boxMax[base] = maxX;
+                boxMax[base + 1] = maxY;
+                boxMax[base + 2] = maxZ;
+                buildObb(i, box, toWorld);
+            }
+            buildHeightField(n);
+        }
+
+        /**
+         * Projects her body onto a height map. Collision then becomes a single "push up if below the
+         * surface" test, which cannot oscillate: it is monotone. The old per-box push ping-ponged between
+         * overlapping cubes, injecting velocity and dragging the whole sheet out of place.
+         */
+        private void buildHeightField(int n) {
+            if (n == 0) {
+                height = null;
+                return;
+            }
+            float minX = Float.MAX_VALUE, maxX = -Float.MAX_VALUE;
+            float minZ = Float.MAX_VALUE, maxZ = -Float.MAX_VALUE;
+            for (int i = 0; i < n; i++) {
+                int base = i * 3;
+                minX = Math.min(minX, boxMin[base]);
+                maxX = Math.max(maxX, boxMax[base]);
+                minZ = Math.min(minZ, boxMin[base + 2]);
+                maxZ = Math.max(maxZ, boxMax[base + 2]);
+            }
+            final float margin = 0.30F;
+            hfX0 = minX - margin;
+            hfZ0 = minZ - margin;
+            hfNx = Math.max(2, (int) Math.ceil((maxX - minX + 2.0F * margin) / HF_CELL) + 1);
+            hfNz = Math.max(2, (int) Math.ceil((maxZ - minZ + 2.0F * margin) / HF_CELL) + 1);
+            height = new float[hfNx * hfNz];
+            java.util.Arrays.fill(height, Float.NEGATIVE_INFINITY);
+            for (int i = 0; i < n; i++) {
+                int base = i * 3;
+                float top = boxMax[base + 1];
+                int x0 = cellIndex(boxMin[base] - hfX0, hfNx);
+                int x1 = cellIndex(boxMax[base] - hfX0, hfNx);
+                int z0 = cellIndex(boxMin[base + 2] - hfZ0, hfNz);
+                int z1 = cellIndex(boxMax[base + 2] - hfZ0, hfNz);
+                for (int z = z0; z <= z1; z++) {
+                    for (int x = x0; x <= x1; x++) {
+                        int index = z * hfNx + x;
+                        if (top > height[index]) {
+                            height[index] = top;
+                        }
+                    }
+                }
+            }
+            // One smoothing pass: a raw max-field makes the quilt look like it was pulled over furniture.
+            float floor = Float.MAX_VALUE;
+            for (float value : height) {
+                if (value != Float.NEGATIVE_INFINITY) {
+                    floor = Math.min(floor, value);
+                }
+            }
+            if (floor == Float.MAX_VALUE) {
+                height = null;
+                return;
+            }
+            for (int i = 0; i < height.length; i++) {
+                if (height[i] == Float.NEGATIVE_INFINITY) {
+                    height[i] = floor - 1.0F;
+                }
+            }
+            // Deliberately NOT smoothed: averaging a 3x3 window over 0.08 cells lowered every narrow peak
+            // by ~0.24 blocks of neighbourhood, so the cloth came to rest *inside* her shoulders and knees.
+            // Roundness now comes from the cloth's own bending, which cannot push the surface downwards.
+        }
+
+        private static int cellIndex(float offset, int size) {
+            int cell = (int) Math.floor(offset / HF_CELL);
+            return Math.max(0, Math.min(size - 1, cell));
+        }
+
+        /** Bilinear surface height, so the cloth follows a soft mound rather than a staircase. */
+        private float surfaceAt(float x, float z) {
+            if (height == null) {
+                return Float.NEGATIVE_INFINITY;
+            }
+            float fx = (x - hfX0) / HF_CELL;
+            float fz = (z - hfZ0) / HF_CELL;
+            int ix = (int) Math.floor(fx);
+            int iz = (int) Math.floor(fz);
+            if (ix < 0 || iz < 0 || ix >= hfNx - 1 || iz >= hfNz - 1) {
+                return Float.NEGATIVE_INFINITY;
+            }
+            // Maximum, not interpolation: interpolating between a high cell and an empty neighbour pulls the
+            // surface below her body and lets her poke through the quilt.
+            float best = height[iz * hfNx + ix];
+            best = Math.max(best, height[iz * hfNx + ix + 1]);
+            best = Math.max(best, height[(iz + 1) * hfNx + ix]);
+            best = Math.max(best, height[(iz + 1) * hfNx + ix + 1]);
+            return best;
+        }
+
+        /** Derives the box's own frame from its eight corners; a rotated cube is not axis aligned. */
+        private void buildObb(int index, QuiltBox box, Matrix4f toWorld) {
+            Vector3f[] corner = new Vector3f[8];
+            Vector3f centre = new Vector3f();
+            for (int i = 0; i < 8; i++) {
+                corner[i] = toWorld.transformPosition(new Vector3f(box.x(i), box.y(i), box.z(i)));
+                centre.add(corner[i]);
+            }
+            centre.mul(1.0F / 8.0F);
+            // A cube's corner order is the usual bit layout, so these three edges are the box axes.
+            Vector3f[] axes = {
+                    new Vector3f(corner[1]).sub(corner[0]),
+                    new Vector3f(corner[2]).sub(corner[0]),
+                    new Vector3f(corner[4]).sub(corner[0])
+            };
+            int baseC = index * 3;
+            obbCentre[baseC] = centre.x;
+            obbCentre[baseC + 1] = centre.y;
+            obbCentre[baseC + 2] = centre.z;
+            int baseA = index * 9;
+            for (int a = 0; a < 3; a++) {
+                if (axes[a].lengthSquared() < 1.0E-9F) {
+                    axes[a].set(a == 0 ? 1 : 0, a == 1 ? 1 : 0, a == 2 ? 1 : 0);
+                }
+                axes[a].normalize();
+                obbAxes[baseA + a * 3] = axes[a].x;
+                obbAxes[baseA + a * 3 + 1] = axes[a].y;
+                obbAxes[baseA + a * 3 + 2] = axes[a].z;
+            }
+            for (int a = 0; a < 3; a++) {
+                float half = 0.0F;
+                for (int i = 0; i < 8; i++) {
+                    Vector3f d = new Vector3f(corner[i]).sub(centre);
+                    half = Math.max(half, Math.abs(d.dot(axes[a])));
+                }
+                obbHalf[baseC + a] = half;
+            }
+        }
+
+        private void buildGrid(int n) {
+            grid.clear();
+            java.util.HashMap<Long, java.util.ArrayList<Integer>> buckets = new java.util.HashMap<>();
+            for (int i = 0; i < n; i++) {
+                int base = i * 3;
+                int x0 = cell(boxMin[base]), x1 = cell(boxMax[base]);
+                int y0 = cell(boxMin[base + 1]), y1 = cell(boxMax[base + 1]);
+                int z0 = cell(boxMin[base + 2]), z1 = cell(boxMax[base + 2]);
+                for (int x = x0; x <= x1; x++) {
+                    for (int y = y0; y <= y1; y++) {
+                        for (int z = z0; z <= z1; z++) {
+                            buckets.computeIfAbsent(key(x, y, z), k -> new java.util.ArrayList<>()).add(i);
+                        }
+                    }
+                }
+            }
+            for (java.util.Map.Entry<Long, java.util.ArrayList<Integer>> entry : buckets.entrySet()) {
+                int[] values = new int[entry.getValue().size()];
+                for (int i = 0; i < values.length; i++) {
+                    values[i] = entry.getValue().get(i);
+                }
+                grid.put(entry.getKey(), values);
+            }
+        }
+
+        private static int cell(float value) {
+            return (int) Math.floor(value / CELL);
+        }
+
+        private static long key(int x, int y, int z) {
+            return ((long) (x & 0x1FFFFF) << 42) | ((long) (y & 0x1FFFFF) << 21) | (z & 0x1FFFFF);
+        }
+
+        private float boxMinY() {
+            float min = Float.MAX_VALUE;
+            for (int i = 0; i < boxMin.length / 3; i++) {
+                min = Math.min(min, boxMin[i * 3 + 1]);
+            }
+            return min;
+        }
+
+        private float boxMaxY() {
+            float max = -Float.MAX_VALUE;
+            for (int i = 0; i < boxMin.length / 3; i++) {
+                max = Math.max(max, boxMax[i * 3 + 1]);
+            }
+            return max;
+        }
+
+        /** Height of the middle particle of every fourth row: shows at a glance whether the sheet sagged. */
+        private String rowHeights() {
+            StringBuilder out = new StringBuilder();
+            for (int row = 0; row < ROWS; row += 4) {
+                if (out.length() > 0) {
+                    out.append(' ');
+                }
+                out.append(fmt(now[row * COLS + COLS / 2].y));
+            }
+            return out.toString();
+        }
+
+        private Vec3 boxCentroid() {
+            int n = boxMin.length / 3;
+            if (n == 0) {
+                return Vec3.ZERO;
+            }
+            double x = 0, y = 0, z = 0;
+            for (int i = 0; i < n; i++) {
+                int base = i * 3;
+                x += (boxMin[base] + boxMax[base]) * 0.5D;
+                y += (boxMin[base + 1] + boxMax[base + 1]) * 0.5D;
+                z += (boxMin[base + 2] + boxMax[base + 2]) * 0.5D;
+            }
+            return new Vec3(x / n, y / n, z / n);
+        }
+
+        /** How far the sheet spans along the bed, measured from the bed centre, in blocks. */
+        private String alongSpan() {
+            float min = Float.MAX_VALUE;
+            float max = -Float.MAX_VALUE;
+            for (Vector3f p : now) {
+                double offset = (p.x - anchor.x) * along.x + (p.z - anchor.z) * along.z;
+                min = (float) Math.min(min, offset);
+                max = (float) Math.max(max, offset);
+            }
+            return String.format(Locale.ROOT, "%.2f..%.2f", min, max);
+        }
+
+        private Vec3 centroid() {
+            double x = 0, y = 0, z = 0;
+            for (Vector3f p : now) {
+                x += p.x;
+                y += p.y;
+                z += p.z;
+            }
+            return new Vec3(x / count, y / count, z / count);
+        }
+
+        private float minY() {
+            float min = Float.MAX_VALUE;
+            for (Vector3f p : now) {
+                min = Math.min(min, p.y);
+            }
+            return min;
+        }
+
+        private float maxY() {
+            float max = -Float.MAX_VALUE;
+            for (Vector3f p : now) {
+                max = Math.max(max, p.y);
+            }
+            return max;
+        }
+
+        private void draw(PoseStack pose, MultiBufferSource.BufferSource buffers, DyeColor color) {
+            // 染色被子把床的色号烘进顶点色：不依赖着色器全局状态，绘制顺序再乱也不会漏色。
+            if (style.dyeTinted) {
+                int rgb = color.getTextColor();
+                quiltTintR = ((rgb >> 16) & 0xFF) / 255.0F;
+                quiltTintG = ((rgb >> 8) & 0xFF) / 255.0F;
+                quiltTintB = (rgb & 0xFF) / 255.0F;
+            } else {
+                quiltTintR = 1.0F;
+                quiltTintG = 1.0F;
+                quiltTintB = 1.0F;
+            }
+            VertexConsumer consumer = buffers.getBuffer(
+                    RenderType.entityCutoutNoCull(QuiltTextures.texture(style, border)));
+            PoseStack.Pose entry = pose.last();
+            // Sample the light where each particle actually is. FULL_BRIGHT ignored the world entirely, which is
+            // why the quilt stayed daytime-bright at night and in the rain.
+            net.minecraft.client.multiplayer.ClientLevel level = net.minecraft.client.Minecraft.getInstance().level;
+            int[] lights = new int[count];
+            for (int i = 0; i < count; i++) {
+                lights[i] = level == null
+                        ? net.minecraft.client.renderer.LightTexture.FULL_BRIGHT
+                        : net.minecraft.client.renderer.LevelRenderer.getLightColor(level,
+                                net.minecraft.core.BlockPos.containing(now[i].x, now[i].y + 0.05F, now[i].z));
+            }
+            float[] nx = new float[count];
+            float[] ny = new float[count];
+            float[] nz = new float[count];
+            // A sheet with no underside reads as a decal no matter how it is shaded, so the quilt is drawn as
+            // a shell: the simulated surface, the same surface pushed down along its normals, and a rim of
+            // quads joining them at the border. The solver is untouched - thickness is purely a drawing fact.
+            for (int row = 0; row < ROWS; row++) {
+                for (int col = 0; col < COLS; col++) {
+                    int i = row * COLS + col;
+                    Vector3f left = now[row * COLS + Math.max(0, col - 1)];
+                    Vector3f right = now[row * COLS + Math.min(COLS - 1, col + 1)];
+                    Vector3f up = now[Math.max(0, row - 1) * COLS + col];
+                    Vector3f down = now[Math.min(ROWS - 1, row + 1) * COLS + col];
+                    float ux = right.x - left.x, uy = right.y - left.y, uz = right.z - left.z;
+                    float vx = down.x - up.x, vy = down.y - up.y, vz = down.z - up.z;
+                    float cx = uy * vz - uz * vy;
+                    float cy = uz * vx - ux * vz;
+                    float cz = ux * vy - uy * vx;
+                    float len = (float) Math.sqrt(cx * cx + cy * cy + cz * cz);
+                    if (len < 1.0E-6F || cy < 0.0F) {
+                        cx = 0.0F;
+                        cy = 1.0F;
+                        cz = 0.0F;
+                        len = 1.0F;
+                    }
+                    nx[i] = cx / len;
+                    ny[i] = cy / len;
+                    nz[i] = cz / len;
+                }
+            }
+            for (int row = 0; row + 1 < ROWS; row++) {
+                for (int col = 0; col + 1 < COLS; col++) {
+                    int a = row * COLS + col;
+                    int b = a + 1;
+                    int c = a + COLS + 1;
+                    int d = a + COLS;
+                    float u0 = (float) col / (COLS - 1) * tileU();
+                    float u1 = (float) (col + 1) / (COLS - 1) * tileU();
+                    float v0 = (float) row / (ROWS - 1) * tileV();
+                    float v1 = (float) (row + 1) / (ROWS - 1) * tileV();
+                    // Lit by the surface normal: folds and the head of the bed now read as shape.
+                    float shade = 0.55F + 0.45F * Math.min(1.0F, Math.max(0.0F, ny[a]));
+                    vertex(consumer, entry, now[a].x, now[a].y, now[a].z, u0, v0, lights[a], shade);
+                    vertex(consumer, entry, now[b].x, now[b].y, now[b].z, u1, v0, lights[b], shade);
+                    vertex(consumer, entry, now[c].x, now[c].y, now[c].z, u1, v1, lights[c], shade);
+                    vertex(consumer, entry, now[d].x, now[d].y, now[d].z, u0, v1, lights[d], shade);
+                    // Underside, one thickness below, wound the other way.
+                    float under = shade * style.underShade;
+                    vertex(consumer, entry, now[d].x - nx[d] * style.shell, now[d].y - ny[d] * style.shell,
+                            now[d].z - nz[d] * style.shell, u0, v1, lights[d], under);
+                    vertex(consumer, entry, now[c].x - nx[c] * style.shell, now[c].y - ny[c] * style.shell,
+                            now[c].z - nz[c] * style.shell, u1, v1, lights[c], under);
+                    vertex(consumer, entry, now[b].x - nx[b] * style.shell, now[b].y - ny[b] * style.shell,
+                            now[b].z - nz[b] * style.shell, u1, v0, lights[b], under);
+                    vertex(consumer, entry, now[a].x - nx[a] * style.shell, now[a].y - ny[a] * style.shell,
+                            now[a].z - nz[a] * style.shell, u0, v0, lights[a], under);
+                }
+            }
+            // Rim: the four borders joined top to bottom, which is where thickness is actually visible.
+            float rimShade = style.rimShade;
+            for (int col = 0; col + 1 < COLS; col++) {
+                rim(consumer, entry, rimShade, lights, col, 0, col + 1, 0, nx, ny, nz);
+                rim(consumer, entry, rimShade, lights, col, ROWS - 1, col + 1, ROWS - 1, nx, ny, nz);
+            }
+            for (int row = 0; row + 1 < ROWS; row++) {
+                rim(consumer, entry, rimShade, lights, 0, row, 0, row + 1, nx, ny, nz);
+                rim(consumer, entry, rimShade, lights, COLS - 1, row, COLS - 1, row + 1, nx, ny, nz);
+            }
+            buffers.endBatch(RenderType.entityCutoutNoCull(QuiltTextures.texture(style, border)));
+        }
+
+        /** One border quad: particle p at the top, the same particle sunk along its normal, for two partners. */
+        private void rim(VertexConsumer consumer, PoseStack.Pose entry, float shade, int[] lights,
+                         int colA, int rowA, int colB, int rowB,
+                         float[] nx, float[] ny, float[] nz) {
+            int light = lights[rowA * COLS + colA];
+            int a = rowA * COLS + colA;
+            int b = rowB * COLS + colB;
+            float u0 = (float) colA / (COLS - 1) * tileU();
+            float u1 = (float) colB / (COLS - 1) * tileU();
+            vertex(consumer, entry, now[a].x, now[a].y, now[a].z, u0, 0.0F, light, shade);
+            vertex(consumer, entry, now[b].x, now[b].y, now[b].z, u1, 0.0F, light, shade);
+            vertex(consumer, entry, now[b].x - nx[b] * style.shell, now[b].y - ny[b] * style.shell,
+                    now[b].z - nz[b] * style.shell, u1, style.rimV, light, shade);
+            vertex(consumer, entry, now[a].x - nx[a] * style.shell, now[a].y - ny[a] * style.shell,
+                    now[a].z - nz[a] * style.shell, u0, style.rimV, light, shade);
+        }
+
+        /** 当前绘制批次的被子色调；染色被子取床色，花纹被子恒为 1。渲染线程单批，静态即可。 */
+        private static float quiltTintR = 1.0F;
+        private static float quiltTintG = 1.0F;
+        private static float quiltTintB = 1.0F;
+        private static void vertex(VertexConsumer consumer, PoseStack.Pose entry, float x, float y, float z,
+                                   float u, float v, int light, float shade) {
+            consumer.vertex(entry.pose(), x, y, z)
+                    .color(shade * quiltTintR, shade * quiltTintG, shade * quiltTintB, 1.0F)
+                    .uv(u, v)
+                    .overlayCoords(net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY)
+                    .uv2(light)
+                    .normal(entry.normal(), 0.0F, 1.0F, 0.0F)
+                    .endVertex();
+        }
+    }
+}

@@ -1,0 +1,263 @@
+package com.sleepwell.config;
+
+import com.sleepwell.fire.CampfireFleePolicy;
+import net.minecraftforge.common.ForgeConfigSpec;
+
+import java.util.List;
+
+/**
+ * Common config for Sleep Well.
+ * <p>
+ * Values are read via {@code .get()} at use time, so a config edit applies after Forge reloads the
+ * config file (re-enter the world / restart the server).
+ */
+public final class SleepWellConfig {
+    public static final ForgeConfigSpec SPEC;
+
+    /** Enable the sleep-stuck fallback teleport for kappa-compass-configured maids. */
+    public static final ForgeConfigSpec.BooleanValue SLEEP_FALLBACK_ENABLED;
+    /** Seconds of no progress towards the sleep point before the fallback fires (2..60). */
+    public static final ForgeConfigSpec.IntValue SLEEP_FALLBACK_SECONDS;
+    /** Fallback teleports allowed per nap (0..5). */
+    public static final ForgeConfigSpec.IntValue SLEEP_FALLBACK_MAX_TELEPORTS;
+
+    /** Enable "a maid burned by a campfire runs away from it". */
+    public static final ForgeConfigSpec.BooleanValue CAMPFIRE_FLEE_ENABLED;
+    /** How far the safe-spot search reaches, in blocks (2..12). */
+    public static final ForgeConfigSpec.IntValue CAMPFIRE_FLEE_RADIUS;
+
+    /** Default for the per-maid "do not work in winter" switch. */
+    public static final ForgeConfigSpec.BooleanValue WINTER_SKIP_DEFAULT_ENABLED;
+    /** TLM task ids that count as "work" and are skipped in winter. */
+    public static final ForgeConfigSpec.ConfigValue<List<? extends String>> WINTER_SKIP_TASKS;
+
+    /** Master switch for "sleeps in instead of getting up at the scheduled wake-up". */
+    public static final ForgeConfigSpec.BooleanValue LIE_IN_ENABLED;
+    /**
+     * Lock every non-default quilt. Off by default so the wall can be used immediately; the switch exists
+     * so the locked look can be checked before an unlock condition is designed.
+     */
+    public static final ForgeConfigSpec.BooleanValue QUILT_LOCK_ALL;
+    /** Chance to stay in bed when the schedule says it is time to get up. */
+    public static final ForgeConfigSpec.IntValue LIE_IN_CHANCE_PERCENT;
+    /** Same chance in winter (needs Serene Seasons; without it the plain number is used). */
+    public static final ForgeConfigSpec.IntValue LIE_IN_WINTER_CHANCE_PERCENT;
+    /** Shortest / longest lie-in, in in-game hours. */
+    public static final ForgeConfigSpec.IntValue LIE_IN_MIN_HOURS;
+    public static final ForgeConfigSpec.IntValue LIE_IN_MAX_HOURS;
+
+    /** Master switch for "walks back to bed on her own during the day". */
+    public static final ForgeConfigSpec.BooleanValue NAP_ENABLED;
+    /** Chance per check interval that an awake, idle maid heads back to bed. */
+    public static final ForgeConfigSpec.IntValue NAP_CHANCE_PERCENT;
+    public static final ForgeConfigSpec.IntValue NAP_WINTER_CHANCE_PERCENT;
+    /** Minutes of in-game time between two nap rolls. */
+    public static final ForgeConfigSpec.IntValue NAP_CHECK_MINUTES;
+    public static final ForgeConfigSpec.IntValue NAP_MIN_HOURS;
+    public static final ForgeConfigSpec.IntValue NAP_MAX_HOURS;
+
+    /** Sleeping actually pays out: 干劲 after a proper sleep in her own window, 困倦 when she skipped it. */
+    public static final ForgeConfigSpec.BooleanValue VIGOR_ENABLED;
+    public static final ForgeConfigSpec.IntValue VIGOR_SECONDS;
+    /** Extra seconds for a lie-in wake-up. */
+    public static final ForgeConfigSpec.IntValue VIGOR_LIE_IN_EXTRA_SECONDS;
+    public static final ForgeConfigSpec.BooleanValue DROWSY_ENABLED;
+    public static final ForgeConfigSpec.IntValue DROWSY_SECONDS;
+    /** Heal while asleep. */
+    public static final ForgeConfigSpec.BooleanValue SLEEP_REGEN_ENABLED;
+
+    static {
+        ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
+
+        builder.comment(
+                "Sleep Well: fallback teleport for maids that cannot reach their scheduled sleep point.",
+                "睡个好觉：到不了排班睡觉点的女仆兜底传送。"
+        );
+
+        builder.push("sleepFallback");
+        SLEEP_FALLBACK_ENABLED = builder
+                .comment(
+                        "Fallback teleport when a maid with a kappa-compass sleep point cannot reach it (stuck on ladders, fences, drops).",
+                        "Vanilla only teleports a maid that is outside (restrict radius + 4) and not already walking to the center,",
+                        "so a maid stuck inside her sleep area would retry forever. Vanilla landing is tried once, then a mod-side search.",
+                        "当河童罗盘设置过睡觉点的女仆到不了睡觉点时兜底传送（卡梯子/栅栏/落差）。",
+                        "原版只在据点半径+4以外且未在走向中心时传送，圈内卡死会永远重试。",
+                        "先试一次原版安全落点，失败再用本模组的落点搜索。"
+                )
+                .define("sleepFallbackEnabled", true);
+        SLEEP_FALLBACK_SECONDS = builder
+                .comment(
+                        "Seconds without progress towards the sleep point before the fallback fires.",
+                        "距离睡觉点多久没有进展就开始兜底传送（秒）。"
+                )
+                .defineInRange("sleepFallbackSeconds", 5, 2, 60);
+        SLEEP_FALLBACK_MAX_TELEPORTS = builder
+                .comment(
+                        "Fallback teleports allowed per nap. 0 disables them without touching the switch.",
+                        "每次入睡最多兜底传送几次。0 等于关闭（开关不用动）。"
+                )
+                .defineInRange("sleepFallbackMaxTeleports", 2, 0, 5);
+        builder.pop();
+
+        builder.comment(
+                "A maid that gets burned by a campfire runs a few blocks away from it.",
+                "女仆被篝火烫到就跑开。"
+        );
+        builder.push("campfireFlee");
+        CAMPFIRE_FLEE_ENABLED = builder
+                .comment(
+                        "Whether a maid burned by a campfire tries to run away from it.",
+                        "Vanilla campfires deal plain fire damage while she stands in them, so she keeps burning",
+                        "until something moves her. This makes her pick a safe standing spot 3..radius blocks away",
+                        "and walk there (navigated, not teleported), for up to 5 seconds per burn.",
+                        "女仆被篝火烫到后是否尝试跑开。",
+                        "原版篝火对她只造成普通火焰伤害：站在里面会一直掉血，没人管就不动。",
+                        "开启后她会挑一个 3..半径 格外的安全落点走过去（是走路，不是传送），每次最多 5 秒。"
+                )
+                .define("campfireFleeEnabled", true);
+        CAMPFIRE_FLEE_RADIUS = builder
+                .comment(
+                        "How far the search for a safe standing spot reaches.",
+                        "寻找安全落点的搜索半径（格）。"
+                )
+                .defineInRange("campfireFleeRadius", CampfireFleePolicy.DEFAULT_RADIUS,
+                        CampfireFleePolicy.MIN_RADIUS, CampfireFleePolicy.MAX_RADIUS);
+        builder.pop();
+
+        builder.comment(
+                "Winter work skip (needs Serene Seasons): a maid parked on the idle task instead of working.",
+                "冬天跳过工作（需要静谧四季）：女仆改挂空闲任务，不去工位。"
+        );
+        builder.push("winterSkip");
+        WINTER_SKIP_DEFAULT_ENABLED = builder
+                .comment(
+                        "Default value of the per-maid \"skip work in winter\" switch for newly met maids.",
+                        "新女仆\"冬天不工作\"开关的默认值。"
+                )
+                .define("winterSkipDefaultEnabled", true);
+        WINTER_SKIP_TASKS = builder
+                .comment(
+                        "TLM task ids treated as work. Bare names also match (farm == touhou_little_maid:farm).",
+                        "算作\"工作\"的车万女仆任务 id，写裸名也行（farm 等同 touhou_little_maid:farm）。",
+                        "Defaults: farm, cocoa, melon, sugar_cane, grass, snow, feed_animal, milk, shears, fishing, torch, honey, berries_farm",
+                        "默认：种地、可可、西瓜、甘蔗、割草、扫雪、繁育动物、挤奶、剪羊毛、钓鱼、放火把、采蜂蜜、采浆果"
+                )
+                .defineList("winterSkipTasks",
+                        List.of("farm", "cocoa", "melon", "sugar_cane", "grass", "snow",
+                                "feed_animal", "milk", "shears", "fishing", "torch", "honey", "berries_farm"),
+                        entry -> entry instanceof String);
+        builder.pop();
+
+        builder.comment(
+                "Quilt selection: which quilt covers a maid. Unlocking is not designed yet, so the wall can",
+                "either show every quilt or lock all but the default one."
+        );
+        builder.push("quilt");
+        QUILT_LOCK_ALL = builder
+                .comment(
+                        "Lock every quilt except the default one, to preview the locked wall.",
+                        "锁上除默认以外的全部被子，用来预览\"未解锁\"的界面。",
+                        "Default false: every quilt is selectable.",
+                        "默认 false：全部可选。"
+                )
+                .define("quiltLockAll", false);
+        builder.pop();
+
+        builder.comment(
+                "Sleeping in and daytime naps: a maid stays in bed past her scheduled wake-up,",
+                "and an idle maid now and then walks back to bed on her own.",
+                "赖床与补觉：女仆会在排班起床时继续睡，空闲时也会自己回床补一觉。"
+        );
+        builder.push("lieIn");
+        LIE_IN_ENABLED = builder
+                .comment(
+                        "Whether a maid may stay in bed when her schedule says it is time to get up.",
+                        "At that moment the chance below is rolled once; on a hit she keeps sleeping for a",
+                        "random 2..5 in-game hours. Works for every task, winter is only a boost.",
+                        "排班起床时是否可能继续赖床。",
+                        "那一刻掷一次下面的概率：中了就再睡 2~5 游戏内小时。所有任务都适用，冬天只是提高概率。"
+                )
+                .define("lieInEnabled", true);
+        LIE_IN_CHANCE_PERCENT = builder
+                .comment("Chance to lie in, in percent.", "赖床概率（百分比）。")
+                .defineInRange("lieInChancePercent", 30, 0, 100);
+        LIE_IN_WINTER_CHANCE_PERCENT = builder
+                .comment(
+                        "Lie-in chance in winter. Needs Serene Seasons installed; without it the plain chance is used.",
+                        "冬季赖床概率。需要安装静谧四季；没装就用上面的普通概率。"
+                )
+                .defineInRange("lieInWinterChancePercent", 50, 0, 100);
+        LIE_IN_MIN_HOURS = builder
+                .comment("Shortest lie-in, in in-game hours (1 hour = 1000 ticks).", "最短赖床时长（游戏内小时，1 小时 = 1000 tick）。")
+                .defineInRange("lieInMinHours", 2, 1, 12);
+        LIE_IN_MAX_HOURS = builder
+                .comment("Longest lie-in, in in-game hours.", "最长赖床时长（游戏内小时）。")
+                .defineInRange("lieInMaxHours", 5, 1, 12);
+        NAP_ENABLED = builder
+                .comment(
+                        "Whether an awake maid parked on the idle task may walk back to bed on her own.",
+                        "She rolls every napCheckMinutes while idle; on a hit the rest activity's bed task",
+                        "walks her to the bed and she sleeps for napMinHours..napMaxHours.",
+                        "空闲任务的女仆是否会自己回床补觉。",
+                        "空闲时每 napCheckMinutes 分钟掷一次：中了就交给原版休息行为走回床，睡 napMinHours~napMaxHours 小时。"
+                )
+                .define("napEnabled", true);
+        NAP_CHANCE_PERCENT = builder
+                .comment("Chance per check interval, in percent.", "每次判定的补觉概率（百分比）。")
+                .defineInRange("napChancePercent", 5, 0, 100);
+        NAP_WINTER_CHANCE_PERCENT = builder
+                .comment(
+                        "Nap chance in winter. Needs Serene Seasons installed; without it the plain chance is used.",
+                        "冬季补觉概率。需要安装静谧四季；没装就用普通概率。"
+                )
+                .defineInRange("napWinterChancePercent", 10, 0, 100);
+        NAP_CHECK_MINUTES = builder
+                .comment("Minutes of in-game time between two nap rolls.", "两次补觉判定之间隔多少游戏内分钟。")
+                .defineInRange("napCheckMinutes", 30, 5, 120);
+        NAP_MIN_HOURS = builder
+                .comment("Shortest nap, in in-game hours.", "最短补觉时长（游戏内小时）。")
+                .defineInRange("napMinHours", 2, 1, 12);
+        NAP_MAX_HOURS = builder
+                .comment("Longest nap, in in-game hours.", "最长补觉时长（游戏内小时）。")
+                .defineInRange("napMaxHours", 3, 1, 12);
+        builder.pop();
+
+        builder.comment(
+                "What a night's sleep is worth: +30% movement speed after a real sleep,",
+                "-15% when she skipped her own sleep window.",
+                "睡觉的收益：正常睡够 +30% 移速，没在自己睡觉时段睡 -15%。",
+                "判定按每只女仆自己的作息走，白班夜班各自算。"
+        );
+        builder.push("effects");
+        VIGOR_ENABLED = builder
+                .comment("Grant 干劲 (+30% speed) after a sleep in her own rest window.",
+                        "睡够后给「干劲」（+30% 移速）。")
+                .define("vigorEnabled", true);
+        VIGOR_SECONDS = builder
+                .comment("How long 干劲 lasts, in seconds.",
+                        "「干劲」持续多少秒。")
+                .defineInRange("vigorSeconds", 180, 10, 3600);
+        VIGOR_LIE_IN_EXTRA_SECONDS = builder
+                .comment("Extra seconds of 干劲 when she was still asleep after her window ended (a lie-in).",
+                        "赖床（窗口结束还没起）时「干劲」多给多少秒。")
+                .defineInRange("vigorLieInExtraSeconds", 120, 0, 3600);
+        DROWSY_ENABLED = builder
+                .comment("Grant 困倦 (-15% speed) when her rest window ends without enough sleep.",
+                        "她自己的睡觉时段结束时没睡够，就给「困倦」（-15% 移速）。")
+                .define("drowsyEnabled", true);
+        DROWSY_SECONDS = builder
+                .comment("How long 困倦 lasts, in seconds.",
+                        "「困倦」持续多少秒。")
+                .defineInRange("drowsySeconds", 600, 10, 7200);
+        SLEEP_REGEN_ENABLED = builder
+                .comment("Heal 1 HP every 3 s while she is asleep.",
+                        "睡着时每 3 秒回 1 点血。")
+                .define("sleepRegenEnabled", true);
+        builder.pop();
+
+        SPEC = builder.build();
+    }
+
+    private SleepWellConfig() {
+    }
+}

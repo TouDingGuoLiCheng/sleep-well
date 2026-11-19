@@ -1,0 +1,212 @@
+package com.sleepwell.client.quilt;
+
+import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
+import com.mojang.logging.LogUtils;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.model.EntityModel;
+import net.minecraft.client.renderer.entity.EntityRenderer;
+import net.minecraft.client.renderer.entity.LivingEntityRenderer;
+
+import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+
+/**
+ * The maid's own bones, sampled while she is actually being rendered.
+ * <p>
+ * Reading the bones at any other moment only gives the rest pose, and every maid's rest pose is the same -
+ * that is why every quilt used to look identical. The render event fires after the animation has been applied,
+ * so the sampled bones are the ones of her sleeping pose.
+ */
+public final class MaidSilhouette {
+    private static final org.slf4j.Logger LOGGER = LogUtils.getLogger();
+    public static final int BINS = 24;
+    private static final float PIXELS = 16.0F;
+    private static final int REFRESH_TICKS = 10;
+
+    private static final Map<UUID, float[]> CACHE = new HashMap<>();
+    private static final Map<UUID, Integer> STAMP = new HashMap<>();
+    private static final Map<UUID, Integer> PRINTS = new HashMap<>();
+    private static int FAILURES;
+
+    private MaidSilhouette() {
+    }
+
+    /** Called from the render event: the model holds her animated pose at this point. */
+    public static void capture(EntityMaid maid) {
+        UUID id = maid.getUUID();
+        Integer last = STAMP.get(id);
+        if (last != null && maid.tickCount - last < REFRESH_TICKS) {
+            return;
+        }
+        float[] profile = compute(maid);
+        if (profile != null) {
+            CACHE.put(id, profile);
+            STAMP.put(id, maid.tickCount);
+        }
+    }
+
+    /** @return {height in blocks, radius per slice}, or null when nothing could be sampled. */
+    public static float[] sample(EntityMaid maid) {
+        float[] cached = CACHE.get(maid.getUUID());
+        if (cached != null) {
+            return cached;
+        }
+        float[] profile = compute(maid);
+        if (profile != null) {
+            CACHE.put(maid.getUUID(), profile);
+        }
+        return profile;
+    }
+
+    public static void forget(UUID id) {
+        CACHE.remove(id);
+        STAMP.remove(id);
+        PRINTS.remove(id);
+    }
+
+    private static float[] compute(EntityMaid maid) {
+        try {
+            EntityRenderer<?> renderer = Minecraft.getInstance().getEntityRenderDispatcher().getRenderer(maid);
+            if (!(renderer instanceof LivingEntityRenderer<?, ?> living)) {
+                return null;
+            }
+            EntityModel<?> model = living.getModel();
+            Map<?, ?> parts = bedrockParts(model);
+            if (parts == null || parts.isEmpty()) {
+                if (FAILURES++ < 4) {
+                    LOGGER.info("[sleep_well] no bedrock part map on {}", model.getClass().getName());
+                }
+                return null;
+            }
+            // Bones carry offsets relative to their parent, so the tree has to be walked from the roots.
+            Set<Object> children = Collections.newSetFromMap(new IdentityHashMap<>());
+            for (Object part : parts.values()) {
+                children.addAll(childrenOf(part));
+            }
+            List<float[]> points = new ArrayList<>();
+            for (Object part : parts.values()) {
+                if (part != null && !children.contains(part)) {
+                    walk(part, 0.0F, 0.0F, 0.0F, points);
+                }
+            }
+            if (points.isEmpty()) {
+                for (Object part : parts.values()) {
+                    walk(part, 0.0F, 0.0F, 0.0F, points);
+                }
+            }
+            if (points.isEmpty()) {
+                return null;
+            }
+            float maxY = 0.0F;
+            for (float[] point : points) {
+                maxY = Math.max(maxY, point[1]);
+            }
+            if (maxY < 0.2F) {
+                return null;
+            }
+            float slice = maxY / BINS;
+            float[] radius = new float[BINS];
+            for (float[] point : points) {
+                int bin = Math.min(BINS - 1, Math.max(0, (int) (point[1] / slice)));
+                radius[bin] = Math.max(radius[bin], point[2]);
+            }
+            for (int i = 1; i < BINS; i++) {
+                radius[i] = Math.max(radius[i], radius[i - 1] * 0.85F);
+            }
+            for (int i = BINS - 2; i >= 0; i--) {
+                radius[i] = Math.max(radius[i], radius[i + 1] * 0.85F);
+            }
+            float[] out = new float[BINS + 1];
+            out[0] = maxY;
+            System.arraycopy(radius, 0, out, 1, BINS);
+            debug(maid, model, parts, out);
+            return out;
+        } catch (Throwable error) {
+            if (FAILURES++ < 4) {
+                LOGGER.info("[sleep_well] silhouette sampling failed: {}", error.toString());
+            }
+            return null;
+        }
+    }
+
+    private static void walk(Object part, float parentX, float parentY, float parentZ, List<float[]> points) {
+        float x = parentX + read(part, "x");
+        float y = parentY + read(part, "y");
+        float z = parentZ + read(part, "z");
+        float lateral = (float) Math.sqrt(x * x + z * z) / PIXELS + 0.06F;
+        points.add(new float[]{x / PIXELS, y / PIXELS, lateral});
+        for (Object child : childrenOf(part)) {
+            walk(child, x, y, z, points);
+        }
+    }
+
+    private static float read(Object part, String name) {
+        try {
+            return part.getClass().getField(name).getFloat(part);
+        } catch (Throwable ignored) {
+            return 0.0F;
+        }
+    }
+
+    private static List<?> childrenOf(Object part) {
+        try {
+            Object value = part.getClass().getField("children").get(part);
+            return value instanceof List<?> list ? list : List.of();
+        } catch (Throwable ignored) {
+            return List.of();
+        }
+    }
+
+    private static void debug(EntityMaid maid, Object model, Map<?, ?> parts, float[] profile) {
+        UUID id = maid.getUUID();
+        int printed = PRINTS.getOrDefault(id, 0);
+        if (printed >= 1) {
+            return;
+        }
+        PRINTS.put(id, printed + 1);
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < BINS; i++) {
+            builder.append(String.format("%.2f ", profile[1 + i]));
+        }
+        LOGGER.info("[sleep_well] silhouette maid={} model={} parts={} height={} radius={}", id,
+                model.getClass().getSimpleName(), parts.size(), String.format("%.2f", profile[0]), builder);
+    }
+
+    public static float radiusAt(float[] profile, float bodyY) {
+        float height = Math.max(0.5F, profile[0]);
+        float t = Math.max(0.0F, Math.min(0.999F, bodyY / height));
+        int bin = (int) (t * BINS);
+        return profile[1 + Math.min(BINS - 1, bin)];
+    }
+
+    private static Map<?, ?> bedrockParts(EntityModel<?> model) throws IllegalAccessException {
+        Map<?, ?> fallback = null;
+        Class<?> type = model.getClass();
+        while (type != null) {
+            for (Field field : type.getDeclaredFields()) {
+                if (!Map.class.isAssignableFrom(field.getType())
+                        || !field.getName().toLowerCase().contains("modelmap")) {
+                    continue;
+                }
+                field.setAccessible(true);
+                if (field.get(model) instanceof Map<?, ?> map && !map.isEmpty()) {
+                    if ("modelMap".equals(field.getName())) {
+                        return map;
+                    }
+                    if (fallback == null) {
+                        fallback = map;
+                    }
+                }
+            }
+            type = type.getSuperclass();
+        }
+        return fallback;
+    }
+}
