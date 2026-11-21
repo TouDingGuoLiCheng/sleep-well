@@ -8,6 +8,9 @@ import net.minecraft.nbt.CompoundTag;
  * A built-in quilt is one fixed set of these, baked into a constant. A custom quilt is the same numbers with a
  * player's image in place of our artwork, edited in the quilt screen - so everything the editor changes is here,
  * and nothing the renderer reads lives outside it.
+ * <p>
+ * The picture itself is never stretched: the frame it is cut to has the cloth's own aspect, and the player moves
+ * that frame around the image. {@code cropW == 0} means "as much of the picture as fits without distortion".
  */
 public final class QuiltParams {
     /** Repeat the image across the cloth, or stretch it once over the whole sheet. */
@@ -16,7 +19,7 @@ public final class QuiltParams {
     public final float repeatV;
     /** A third wider than a plain sheet. */
     public final boolean wideAcross;
-    /** Visible thickness, underside and rim brightness, 0..1. */
+    /** Visible thickness, underside and rim brightness. */
     public final float shell;
     public final float underShade;
     public final float rimShade;
@@ -25,9 +28,21 @@ public final class QuiltParams {
     public final float body;
     /** Let the bed's dye tint the cloth. */
     public final boolean dyeTinted;
+    /** Centre of the cut frame in image space, both 0..1. */
+    public final float cropX;
+    public final float cropY;
+    /** How much of the picture's width the frame spans; 0 means "fit without distortion". */
+    public final float cropW;
 
     public QuiltParams(boolean tiled, float repeatU, float repeatV, boolean wideAcross, float shell,
                        float underShade, float rimShade, float loft, float body, boolean dyeTinted) {
+        this(tiled, repeatU, repeatV, wideAcross, shell, underShade, rimShade, loft, body, dyeTinted,
+                0.5F, 0.5F, 0.0F);
+    }
+
+    public QuiltParams(boolean tiled, float repeatU, float repeatV, boolean wideAcross, float shell,
+                       float underShade, float rimShade, float loft, float body, boolean dyeTinted,
+                       float cropX, float cropY, float cropW) {
         this.tiled = tiled;
         this.repeatU = clamp(repeatU, 0.25F, 8.0F);
         this.repeatV = clamp(repeatV, 0.25F, 8.0F);
@@ -38,6 +53,9 @@ public final class QuiltParams {
         this.loft = clamp(loft, 0.0F, 1.0F);
         this.body = clamp(body, 0.0F, 1.0F);
         this.dyeTinted = dyeTinted;
+        this.cropX = clamp(cropX, 0.0F, 1.0F);
+        this.cropY = clamp(cropY, 0.0F, 1.0F);
+        this.cropW = clamp(cropW, 0.0F, 1.0F);
     }
 
     /** A plain sheet: exactly what the default quilt is, so an untouched custom quilt still looks sane. */
@@ -46,22 +64,88 @@ public final class QuiltParams {
 
     public QuiltParams withTiled(boolean tiled) {
         return new QuiltParams(tiled, this.repeatU, this.repeatV, this.wideAcross, this.shell,
-                this.underShade, this.rimShade, this.loft, this.body, this.dyeTinted);
+                this.underShade, this.rimShade, this.loft, this.body, this.dyeTinted,
+                this.cropX, this.cropY, this.cropW);
     }
 
     public QuiltParams withRepeat(float repeatU, float repeatV) {
         return new QuiltParams(this.tiled, repeatU, repeatV, this.wideAcross, this.shell,
-                this.underShade, this.rimShade, this.loft, this.body, this.dyeTinted);
+                this.underShade, this.rimShade, this.loft, this.body, this.dyeTinted,
+                this.cropX, this.cropY, this.cropW);
     }
 
     public QuiltParams withWide(boolean wideAcross) {
         return new QuiltParams(this.tiled, this.repeatU, this.repeatV, wideAcross, this.shell,
-                this.underShade, this.rimShade, this.loft, this.body, this.dyeTinted);
+                this.underShade, this.rimShade, this.loft, this.body, this.dyeTinted,
+                this.cropX, this.cropY, this.cropW);
     }
 
     public QuiltParams withTint(boolean dyeTinted) {
         return new QuiltParams(this.tiled, this.repeatU, this.repeatV, this.wideAcross, this.shell,
-                this.underShade, this.rimShade, this.loft, this.body, dyeTinted);
+                this.underShade, this.rimShade, this.loft, this.body, dyeTinted,
+                this.cropX, this.cropY, this.cropW);
+    }
+
+    public QuiltParams withLoft(float loft) {
+        return new QuiltParams(this.tiled, this.repeatU, this.repeatV, this.wideAcross, this.shell,
+                this.underShade, this.rimShade, loft, this.body, this.dyeTinted,
+                this.cropX, this.cropY, this.cropW);
+    }
+
+    public QuiltParams withBody(float body) {
+        return new QuiltParams(this.tiled, this.repeatU, this.repeatV, this.wideAcross, this.shell,
+                this.underShade, this.rimShade, this.loft, body, this.dyeTinted,
+                this.cropX, this.cropY, this.cropW);
+    }
+
+    public QuiltParams withShell(float shell) {
+        return new QuiltParams(this.tiled, this.repeatU, this.repeatV, this.wideAcross, shell,
+                this.underShade, this.rimShade, this.loft, this.body, this.dyeTinted,
+                this.cropX, this.cropY, this.cropW);
+    }
+
+    public QuiltParams withHand(float shell, float underShade, float rimShade, float loft, float body) {
+        return new QuiltParams(this.tiled, this.repeatU, this.repeatV, this.wideAcross, shell,
+                underShade, rimShade, loft, body, this.dyeTinted, this.cropX, this.cropY, this.cropW);
+    }
+
+    /** Moves the cut frame; values outside the picture are clamped by the constructor. */
+    public QuiltParams withCrop(float cropX, float cropY, float cropW) {
+        return new QuiltParams(this.tiled, this.repeatU, this.repeatV, this.wideAcross, this.shell,
+                this.underShade, this.rimShade, this.loft, this.body, this.dyeTinted,
+                cropX, cropY, cropW);
+    }
+
+    /** The frame the picture is cut to, as width over height: 4/3 on a whole sheet, 1 on a square tile. */
+    public static float frameAspect(QuiltParams params) {
+        float width = 2.0F * (params.wideAcross ? 4.0F / 3.0F : 1.0F) / Math.max(0.25F, params.repeatU);
+        float height = 1.5F / Math.max(0.25F, params.repeatV);
+        return width / height;
+    }
+
+    /** How much of the picture's width the frame takes. */
+    public float effectiveCropW(float imageWidth, float imageHeight) {
+        if (this.cropW > 0.01F) {
+            return Math.min(1.0F, this.cropW);
+        }
+        float widthForHeight = imageHeight * frameAspect(this) / imageWidth;
+        return Math.min(1.0F, widthForHeight);
+    }
+
+    public float effectiveCropH(float imageWidth, float imageHeight) {
+        float cropWidth = effectiveCropW(imageWidth, imageHeight);
+        return Math.min(1.0F, cropWidth * imageWidth / (frameAspect(this) * imageHeight));
+    }
+
+    /** Left edge of the frame, 0..1 across the picture, kept inside it. */
+    public float cropLeft(float imageWidth, float imageHeight) {
+        float width = effectiveCropW(imageWidth, imageHeight);
+        return Math.max(0.0F, Math.min(1.0F - width, this.cropX - width * 0.5F));
+    }
+
+    public float cropTop(float imageWidth, float imageHeight) {
+        float height = effectiveCropH(imageWidth, imageHeight);
+        return Math.max(0.0F, Math.min(1.0F - height, this.cropY - height * 0.5F));
     }
 
     /** Every hand pulled from a built-in quilt: picking 羽绒被 here means picking its numbers. */
@@ -82,6 +166,9 @@ public final class QuiltParams {
         tag.putFloat("Loft", this.loft);
         tag.putFloat("Body", this.body);
         tag.putBoolean("Tint", this.dyeTinted);
+        tag.putFloat("CropX", this.cropX);
+        tag.putFloat("CropY", this.cropY);
+        tag.putFloat("CropW", this.cropW);
         return tag;
     }
 
@@ -91,7 +178,10 @@ public final class QuiltParams {
         }
         return new QuiltParams(tag.getBoolean("Tiled"), tag.getFloat("RepeatU"), tag.getFloat("RepeatV"),
                 tag.getBoolean("Wide"), tag.getFloat("Shell"), tag.getFloat("Under"), tag.getFloat("Rim"),
-                tag.getFloat("Loft"), tag.getFloat("Body"), tag.getBoolean("Tint"));
+                tag.getFloat("Loft"), tag.getFloat("Body"), tag.getBoolean("Tint"),
+                tag.contains("CropX") ? tag.getFloat("CropX") : 0.5F,
+                tag.contains("CropY") ? tag.getFloat("CropY") : 0.5F,
+                tag.contains("CropW") ? tag.getFloat("CropW") : 0.0F);
     }
 
     private static float clamp(float value, float min, float max) {

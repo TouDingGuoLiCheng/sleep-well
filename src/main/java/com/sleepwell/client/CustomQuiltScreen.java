@@ -11,25 +11,23 @@ import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 
+import java.nio.file.Path;
 import java.util.List;
 import java.util.function.Function;
 
 /**
- * The quilt editor: the player's own picture on the left, every number that shapes it on the right.
+ * The quilt editor: the player's own picture on the left with the cut frame over it, the numbers on the right.
  * <p>
- * A custom quilt is not a fixed sheet, so this screen is where the numbers a built-in quilt keeps in its source
- * file become player choices: whole sheet or tiled, how many repeats, a third wider or not, which hand to borrow
- * and the three numbers that hand is made of.
- * <p>
- * The preview comes from {@link QuiltTextures#preview} using the same sampling the renderer uses - a preview that
- * rounded differently from the bed would be worse than none.
+ * The picture is never stretched. The frame has the cloth's own aspect, and dragging it picks which part of the
+ * picture is used; the mouse wheel tightens or widens it. What sits inside the frame is exactly what the quilt
+ * sampling will use, because both the preview and the texture go through the same cut.
  */
 public class CustomQuiltScreen extends Screen {
     private static final int PANEL_W = 300;
     private static final int PANEL_H = 216;
-    /** The hands a player may borrow, cycled by one button instead of six that would not fit. */
     private static final String[] PRESETS = {"cotton", "down", "silk", "synthetic", "summer_cool", "thick_gingham"};
     private static final String[] PRESET_NAMES = {"棉被", "羽绒被", "蚕丝被", "化纤被", "夏凉被", "厚实格"};
 
@@ -40,6 +38,15 @@ public class CustomQuiltScreen extends Screen {
     private QuiltParams params;
     private int left;
     private int top;
+
+    // Where the frame sits on screen, and how big the picture is drawn under it: drag maths needs both.
+    private int boxX;
+    private int boxY;
+    private int boxW;
+    private int boxH;
+    private float drawW = 1.0F;
+    private float drawH = 1.0F;
+    private boolean dragging;
 
     public CustomQuiltScreen(int entityId, String currentId, QuiltParams params) {
         super(Component.literal("被子编辑"));
@@ -57,7 +64,7 @@ public class CustomQuiltScreen extends Screen {
         this.left = (this.width - PANEL_W) / 2;
         this.top = (this.height - PANEL_H) / 2;
         int x = this.left + 122;
-        int y = this.top + 24;
+        int y = this.top + 22;
         int wide = 78;
         int full = wide * 2 + 4;
 
@@ -69,6 +76,7 @@ public class CustomQuiltScreen extends Screen {
         addRenderableWidget(Button.builder(Component.literal(this.params.wideAcross ? "加宽" : "标准"), button -> {
             this.params = this.params.withWide(!this.params.wideAcross);
             button.setMessage(Component.literal(this.params.wideAcross ? "加宽" : "标准"));
+            this.rebuildWidgets();
         }).bounds(x + wide + 4, y, wide, 18).build());
 
         y += 22;
@@ -93,7 +101,8 @@ public class CustomQuiltScreen extends Screen {
             this.presetIndex = (this.presetIndex + 1) % PRESETS.length;
             QuiltStyle hand = QuiltStyle.of(PRESETS[this.presetIndex]);
             if (hand != null) {
-                this.params = borrowHand(this.params, hand);
+                this.params = this.params.withHand(hand.shell, hand.underShade, hand.rimShade, hand.loft,
+                        hand.body);
             }
             button.setMessage(Component.literal("手感 " + PRESET_NAMES[this.presetIndex]));
             this.rebuildWidgets();
@@ -103,54 +112,54 @@ public class CustomQuiltScreen extends Screen {
         addRenderableWidget(new PctSlider(x, y, full, 18, this.params.loft, value -> "蓬松 " + Math.round(value * 100) + "%") {
             @Override
             protected void apply(float value) {
-                params = new QuiltParams(params.tiled, params.repeatU, params.repeatV, params.wideAcross,
-                        params.shell, params.underShade, params.rimShade, value, params.body, params.dyeTinted);
+                params = params.withLoft(value);
             }
         });
         y += 22;
         addRenderableWidget(new PctSlider(x, y, full, 18, this.params.body, value -> "挺括 " + Math.round(value * 100) + "%") {
             @Override
             protected void apply(float value) {
-                params = new QuiltParams(params.tiled, params.repeatU, params.repeatV, params.wideAcross,
-                        params.shell, params.underShade, params.rimShade, params.loft, value, params.dyeTinted);
+                params = params.withBody(value);
             }
         });
         y += 22;
         addRenderableWidget(new PctSlider(x, y, full, 18, this.params.shell / 0.12F, value -> "厚度 " + Math.round(value * 100) + "%") {
             @Override
             protected void apply(float value) {
-                params = new QuiltParams(params.tiled, params.repeatU, params.repeatV, params.wideAcross,
-                        value * 0.12F, params.underShade, params.rimShade, params.loft, params.body,
-                        params.dyeTinted);
+                params = params.withShell(value * 0.12F);
             }
         });
 
         int bottom = this.top + PANEL_H - 24;
-        addRenderableWidget(Button.builder(Component.literal("打开图片文件夹"), button -> openFolder())
-                .bounds(this.left + 10, bottom, 106, 18).build());
+        addRenderableWidget(Button.builder(Component.literal("打开文件夹"), button -> openFolder())
+                .bounds(this.left + 10, bottom, 68, 18).build());
+        addRenderableWidget(Button.builder(Component.literal("重置裁剪"),
+                button -> {
+                    this.params = this.params.withCrop(0.5F, 0.5F, 0.0F);
+                    this.rebuildWidgets();
+                }).bounds(this.left + 12, this.top + PANEL_H - 46, 64, 18).build());
         addRenderableWidget(Button.builder(Component.literal("<"), button -> shift(-1))
                 .bounds(x, bottom, 20, 18).build());
         addRenderableWidget(Button.builder(Component.literal(">"), button -> shift(1))
                 .bounds(x + 24, bottom, 20, 18).build());
         addRenderableWidget(Button.builder(Component.literal("完成"), button -> apply())
                 .bounds(x + 48, bottom, 54, 18).build());
-        addRenderableWidget(Button.builder(Component.literal("预览"), button -> {
+        addRenderableWidget(Button.builder(Component.literal("刷新"), button -> {
                     CustomQuiltLibrary.rescan();
                     this.rebuildWidgets();
                 }).bounds(x + 106, bottom, 54, 18).build());
     }
 
-    private static QuiltParams borrowHand(QuiltParams params, QuiltStyle hand) {
-        return new QuiltParams(params.tiled, params.repeatU, params.repeatV, params.wideAcross, hand.shell,
-                hand.underShade, hand.rimShade, hand.loft, hand.body, params.dyeTinted);
+    private Path currentFile() {
+        return this.files.isEmpty() ? null : CustomQuiltLibrary.path(this.files.get(this.index));
     }
 
-    /** Same hand, current numbers kept: the three sliders stay where the player put them. */
     private void shift(int delta) {
         if (this.files.isEmpty()) {
             return;
         }
         this.index = Mth.positiveModulo(this.index + delta, this.files.size());
+        this.params = this.params.withCrop(0.5F, 0.5F, 0.0F);
         this.rebuildWidgets();
     }
 
@@ -165,7 +174,7 @@ public class CustomQuiltScreen extends Screen {
     }
 
     private void openFolder() {
-        java.nio.file.Path folder = CustomQuiltLibrary.folder();
+        Path folder = CustomQuiltLibrary.folder();
         try {
             java.nio.file.Files.createDirectories(folder);
         } catch (java.io.IOException ignored) {
@@ -182,29 +191,99 @@ public class CustomQuiltScreen extends Screen {
         graphics.drawString(this.font, "自定义被子", this.left + 10, this.top + 7, 0xFFF2E27A, false);
 
         String name = this.files.isEmpty() ? "（文件夹里还没有图片）" : this.files.get(this.index);
-        graphics.drawString(this.font, name, this.left + 10, this.top + 20, 0xFFF2EEE4, false);
+        graphics.drawString(this.font, name, this.left + 10, this.top + 19, 0xFFF2EEE4, false);
 
-        int boxH = 128;
-        int boxW = 96;
-        int px = this.left + 12;
-        int py = this.top + 34;
-        graphics.fill(px - 2, py - 2, px + boxW + 2, py + boxH + 2, 0xFF0B0F18);
-        if (!this.files.isEmpty()) {
-            QuiltStyle style = CustomQuiltLibrary.style(this.files.get(this.index), this.params);
-            if (style != null) {
+        float aspect = QuiltParams.frameAspect(this.params);
+        this.boxW = 100;
+        this.boxH = Math.max(56, Math.min(132, Math.round(this.boxW / aspect)));
+        this.boxX = this.left + 12;
+        this.boxY = this.top + 34;
+
+        graphics.fill(this.boxX - 1, this.boxY - 1, this.boxX + this.boxW + 1, this.boxY + this.boxH + 1,
+                0xFF0B0F18);
+        Path file = currentFile();
+        if (file != null) {
+            ResourceLocation source = QuiltTextures.sourceTexture(file);
+            if (source != null) {
+                int[] size = QuiltTextures.pictureSize(file);
+                float fracW = this.params.effectiveCropW(size[0], size[1]);
+                float fracH = this.params.effectiveCropH(size[0], size[1]);
+                this.drawW = this.boxW / fracW;
+                this.drawH = this.boxH / fracH;
+                float drawX = this.boxX + this.boxW * 0.5F - this.params.cropX * this.drawW;
+                float drawY = this.boxY + this.boxH * 0.5F - this.params.cropY * this.drawH;
                 com.mojang.blaze3d.vertex.PoseStack pose = graphics.pose();
                 pose.pushPose();
-                pose.translate(px, py, 0.0F);
-                pose.scale(boxW / 192.0F, boxH / 256.0F, 1.0F);
-                graphics.blit(QuiltTextures.preview(style), 0, 0, 0, 0, 192, 256, 192, 256);
+                pose.translate(drawX, drawY, 0.0F);
+                pose.scale(this.drawW / size[0], this.drawH / size[1], 1.0F);
+                graphics.blit(source, 0, 0, 0, 0, size[0], size[1], size[0], size[1]);
                 pose.popPose();
             }
         }
+        // The frame: everything outside it is what the quilt will not use.
+        graphics.fill(this.boxX, this.boxY, this.boxX + this.boxW, this.boxY + this.boxH, 0x22141A2B);
+        graphics.renderOutline(this.boxX, this.boxY, this.boxW, this.boxH, 0xEEF2E27A);
+
         graphics.drawString(this.font, (this.index + 1) + "/" + Math.max(1, this.files.size()),
-                px, py + boxH + 6, 0xFFB9C0CC, false);
-        graphics.drawString(this.font, this.params.tiled ? "平铺 x" + String.format(java.util.Locale.ROOT, "%.1f", this.params.repeatU)
-                        : "整张一次", px, py + boxH + 18, 0xFF8E97A6, false);
+                this.boxX, this.boxY + this.boxH + 4, 0xFFB9C0CC, false);
+        graphics.drawString(this.font, "拖动图片取景 · 滚轮缩放", this.boxX, this.boxY + this.boxH + 15,
+                0xFF8E97A6, false);
         super.render(graphics, mouseX, mouseY, partialTick);
+    }
+
+    private void dragTo(double mouseX, double mouseY) {
+        Path file = currentFile();
+        if (file == null) {
+            return;
+        }
+        int[] size = QuiltTextures.pictureSize(file);
+        float fracW = this.params.effectiveCropW(size[0], size[1]);
+        float fracH = this.params.effectiveCropH(size[0], size[1]);
+        float centreX = Mth.clamp((float) ((mouseX - this.boxX) / this.drawW), fracW * 0.5F, 1.0F - fracW * 0.5F);
+        float centreY = Mth.clamp((float) ((mouseY - this.boxY) / this.drawH), fracH * 0.5F, 1.0F - fracH * 0.5F);
+        this.params = this.params.withCrop(centreX, centreY, this.params.cropW);
+    }
+
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (button == 0 && mouseX >= this.boxX && mouseX < this.boxX + this.boxW
+                && mouseY >= this.boxY && mouseY < this.boxY + this.boxH) {
+            this.dragging = true;
+            dragTo(mouseX, mouseY);
+            return true;
+        }
+        return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        this.dragging = false;
+        return super.mouseReleased(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+        if (this.dragging) {
+            dragTo(mouseX, mouseY);
+            return true;
+        }
+        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+        if (mouseX >= this.boxX && mouseX < this.boxX + this.boxW
+                && mouseY >= this.boxY && mouseY < this.boxY + this.boxH) {
+            Path file = currentFile();
+            if (file != null) {
+                int[] size = QuiltTextures.pictureSize(file);
+                float auto = this.params.effectiveCropW(size[0], size[1]);
+                float width = Mth.clamp(auto * (float) Math.pow(0.9D, delta), 0.1F, 1.0F);
+                this.params = this.params.withCrop(this.params.cropX, this.params.cropY, width);
+                return true;
+            }
+        }
+        return super.mouseScrolled(mouseX, mouseY, delta);
     }
 
     @Override

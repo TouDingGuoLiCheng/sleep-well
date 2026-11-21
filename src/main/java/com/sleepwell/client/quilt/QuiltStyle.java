@@ -60,6 +60,8 @@ public final class QuiltStyle {
     public final Print print;
     /** Set only for a quilt built from a player's own image file; null for every built-in sheet. */
     public final java.nio.file.Path file;
+    /** The numbers this custom quilt was built with, crop included; null for built-in sheets. */
+    public QuiltParams custom;
 
     /**
      * A print: a vanilla sprite stamped across a cloth of ours. The sprite's bytes stay in the player's own jar,
@@ -136,10 +138,12 @@ public final class QuiltStyle {
         // Repeat count is what the geometry multiplies the UV by, so "whole sheet" has to mean exactly 1 here.
         float repeatU = params.tiled ? params.repeatU : 1.0F;
         float repeatV = params.tiled ? params.repeatV : 1.0F;
-        return new QuiltStyle(id, displayName, null, params.dyeTinted,
+        QuiltStyle style = new QuiltStyle(id, displayName, null, params.dyeTinted,
                 params.tiled ? Tiling.TILED : Tiling.WHOLE, repeatU, repeatV,
                 params.wideAcross, params.shell, params.underShade, params.rimShade, 0.16F,
                 params.loft, params.body, null, file);
+        style.custom = params;
+        return style;
     }
 
     /** True for a player's own sheet, whose picture is read from disk instead of the jar. */

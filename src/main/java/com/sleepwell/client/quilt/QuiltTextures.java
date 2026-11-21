@@ -258,6 +258,8 @@ public final class QuiltTextures {
     /** The sheet this quilt draws from: a drawn file, or a print built on the spot. */
     private static NativeImage faceOf(QuiltStyle style) {
         if (style.file != null) {
+            // The cut frame is part of what this quilt looks like, so it goes into the map before cutting.
+            CUSTOM_PARAMS.put(style.file, style.custom == null ? QuiltParams.DEFAULT : style.custom);
             return readFile(style.file);
         }
         return style.print == null ? read(style.texture()) : buildPrint(style);
@@ -271,16 +273,109 @@ public final class QuiltTextures {
      * larger than {@link #MAX_CUSTOM_SIDE} are halved with a smooth filter rather than a nearest sample, which is
      * what turned photos into a mosaic.
      */
+    /**
+     * The player's picture, cut to the frame the cloth actually has and scaled to the sheet - never squashed.
+     * <p>
+     * Doing the cut here rather than in UVs is what keeps the tiled mode honest: a frame cut out of the source can
+     * be repeated by the ordinary UV maths, while an offset inside a repeating texture cannot.
+     */
     private static NativeImage readFile(java.nio.file.Path file) {
         try {
-            java.awt.image.BufferedImage picture = decode(file);
+            java.awt.image.BufferedImage source = picture(file);
+            if (source == null) {
+                return null;
+            }
+            java.awt.image.BufferedImage cut = cut(source, file);
+            java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+            javax.imageio.ImageIO.write(cut, "png", bytes);
+            return NativeImage.read(new java.io.ByteArrayInputStream(bytes.toByteArray()));
+        } catch (Exception failure) {
+            return null;
+        }
+    }
+
+    /** Cuts the frame {@code params} describes out of the picture, keeping the cloth's aspect. */
+    private static java.awt.image.BufferedImage cut(java.awt.image.BufferedImage source, java.nio.file.Path file) {
+        QuiltParams params = CUSTOM_PARAMS.getOrDefault(file, QuiltParams.DEFAULT);
+        float width = source.getWidth();
+        float height = source.getHeight();
+        float frameAspect = QuiltParams.frameAspect(params);
+        int left = Math.round(params.cropLeft(width, height) * width);
+        int top = Math.round(params.cropTop(width, height) * height);
+        int cutW = Math.max(1, Math.round(params.effectiveCropW(width, height) * width));
+        int cutH = Math.max(1, Math.round(params.effectiveCropH(width, height) * height));
+        int outW;
+        int outH;
+        if (frameAspect >= 1.0F) {
+            outW = MAX_CUSTOM_SIDE;
+            outH = Math.max(1, Math.round(MAX_CUSTOM_SIDE / frameAspect));
+        } else {
+            outH = MAX_CUSTOM_SIDE;
+            outW = Math.max(1, Math.round(MAX_CUSTOM_SIDE * frameAspect));
+        }
+        java.awt.image.BufferedImage out = new java.awt.image.BufferedImage(outW, outH,
+                java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        java.awt.Graphics2D graphics = out.createGraphics();
+        graphics.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION,
+                java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        graphics.setRenderingHint(java.awt.RenderingHints.KEY_RENDERING,
+                java.awt.RenderingHints.VALUE_RENDER_QUALITY);
+        graphics.drawImage(source, 0, 0, outW, outH, left, top, left + cutW, top + cutH, null);
+        graphics.dispose();
+        return out;
+    }
+
+    /** Decoded pictures, kept small: re-cutting for a dragged frame must not re-read a 10 MB file. */
+    private static final Map<java.nio.file.Path, java.awt.image.BufferedImage> PICTURES =
+            new java.util.concurrent.ConcurrentHashMap<>();
+    /** The numbers each file is currently cut with; a plain map so the texture code stays readable. */
+    private static final Map<java.nio.file.Path, QuiltParams> CUSTOM_PARAMS =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    private static java.awt.image.BufferedImage picture(java.nio.file.Path file) {
+        java.awt.image.BufferedImage cached = PICTURES.get(file);
+        if (cached != null) {
+            return cached;
+        }
+        java.awt.image.BufferedImage decoded = decode(file);
+        if (decoded == null) {
+            return null;
+        }
+        if (PICTURES.size() > 8) {
+            PICTURES.clear();
+        }
+        PICTURES.put(file, decoded);
+        return decoded;
+    }
+
+    /** Pixel size of a player's picture, so the editor can lay its frame over the real image. */
+    public static int[] pictureSize(java.nio.file.Path file) {
+        java.awt.image.BufferedImage picture = picture(file);
+        return picture == null ? new int[]{1, 1} : new int[]{picture.getWidth(), picture.getHeight()};
+    }
+
+    /** The uncut picture as a texture, for the editor's drag surface. */
+    public static ResourceLocation sourceTexture(java.nio.file.Path file) {
+        String key = "source|" + file;
+        ResourceLocation cached = CACHE.get(key);
+        if (cached != null) {
+            return cached;
+        }
+        try {
+            java.awt.image.BufferedImage picture = picture(file);
             if (picture == null) {
                 return null;
             }
-            picture = downscale(picture, MAX_CUSTOM_SIDE);
             java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
             javax.imageio.ImageIO.write(picture, "png", bytes);
-            return NativeImage.read(new java.io.ByteArrayInputStream(bytes.toByteArray()));
+            NativeImage image = NativeImage.read(new java.io.ByteArrayInputStream(bytes.toByteArray()));
+            ResourceLocation id = new ResourceLocation(SleepWellMod.MOD_ID,
+                    "textures/quilt/source_" + Math.abs(key.hashCode()));
+            DynamicTexture texture = new DynamicTexture(image);
+            Minecraft.getInstance().getTextureManager().register(id, texture);
+            texture.upload();
+            CACHE.put(key, id);
+            return id;
         } catch (Exception failure) {
             return null;
         }
@@ -347,7 +442,9 @@ public final class QuiltTextures {
 
     /** A player's image registered as a texture, cached once per quilt id. */
     private static ResourceLocation fileTile(QuiltStyle style) {
-        String key = style.id + "|file";
+        QuiltParams params = style.custom == null ? QuiltParams.DEFAULT : style.custom;
+        String key = style.id + "|file|" + Math.round(params.cropX * 64) + "," + Math.round(params.cropY * 64)
+                + "," + Math.round(params.cropW * 64) + "," + Math.round(QuiltParams.frameAspect(params) * 16);
         ResourceLocation cached = CACHE.get(key);
         if (cached != null) {
             return cached;
@@ -355,6 +452,7 @@ public final class QuiltTextures {
         if (FAILED.contains(key)) {
             return style.texture();
         }
+        CUSTOM_PARAMS.put(style.file, params);
         NativeImage image = readFile(style.file);
         if (image == null) {
             FAILED.add(key);
