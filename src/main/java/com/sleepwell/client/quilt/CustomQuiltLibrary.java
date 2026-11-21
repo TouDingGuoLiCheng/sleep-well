@@ -26,8 +26,11 @@ public final class CustomQuiltLibrary {
     private static final Logger LOGGER = LoggerFactory.getLogger("sleep_well/custom");
     public static final String ID_PREFIX = "custom:";
     /** Bigger than this and the editor's preview gets slow and the upload would be wasteful. */
-    /** One megabyte per picture. The pixel guard below still decides what may be decoded at all. */
-    public static final int MAX_BYTES = 1024 * 1024;
+    /**
+     * Ten megabytes per picture: a 7 MB photo already worked before the cap existed, and the real guard against a
+     * memory blow-up is the pixel count below, not the file size.
+     */
+    public static final int MAX_BYTES = 10 * 1024 * 1024;
     public static final int MAX_SIDE = 1024;
     /** Anything past this many pixels is refused outright rather than decoded. */
     public static final long MAX_PIXELS = 200_000_000L;
