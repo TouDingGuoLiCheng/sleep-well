@@ -186,11 +186,15 @@ public final class SleepEffectsHandler {
         int seconds = SleepWellConfig.VIGOR_SECONDS.get()
                 + (lieIn ? SleepWellConfig.VIGOR_LIE_IN_EXTRA_SECONDS.get() : 0);
         maid.addEffect(new MobEffectInstance(SleepWellEffects.VIGOR.get(), seconds * 20, 0, false, true, true));
+        com.sleepwell.advancement.Achievements.award(maid,
+                com.sleepwell.advancement.Achievements.VIGOR, 1);
     }
 
     private static void applyDrowsy(EntityMaid maid, Track track) {
         maid.addEffect(new MobEffectInstance(SleepWellEffects.DROWSY.get(),
                 SleepWellConfig.DROWSY_SECONDS.get() * 20, 0, false, true, true));
+        com.sleepwell.advancement.Achievements.award(maid,
+                com.sleepwell.advancement.Achievements.DROWSY, 1);
         log(maid, "困倦", track, 0L, false, false);
     }
 

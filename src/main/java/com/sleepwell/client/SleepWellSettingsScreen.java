@@ -6,6 +6,7 @@ import com.sleepwell.config.SleepWellConfig;
 import com.sleepwell.gui.SleepWellContainer;
 import com.sleepwell.network.SaveSettingPacket;
 import com.sleepwell.client.quilt.CustomQuiltLibrary;
+import com.sleepwell.client.ClientUnlocks;
 import com.sleepwell.client.quilt.QuiltBorder;
 import com.sleepwell.client.quilt.QuiltStyle;
 import com.sleepwell.client.quilt.QuiltTextures;
@@ -134,6 +135,10 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
     private int quiltPage;
     private String chosenQuilt;
     private String chosenBorder;
+    /** Set while drawing a locked plate, so the hover text is drawn once above everything else. */
+    private Component lockedHover;
+    private int lockedHoverX;
+    private int lockedHoverY;
 
     /** The border the server currently has for this maid, as far as the client mirror knows. */
     private String currentBorder() {
@@ -232,15 +237,17 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
             boolean customCell = i >= styles.size() && !editor;
             com.sleepwell.quilt.SavedQuilt entry = customCell ? saved.get(i - styles.size()) : null;
             QuiltStyle style = editor || customCell ? null : styles.get(i);
-            boolean locked = this.menu.quiltLocked() && (editor || customCell || !style.isDefault());
+            boolean locked = !editor && !customCell && quiltLocked(style);
             boolean selected = editor ? current.startsWith("custom:") && !wearsSaved(saved, current)
                     : customCell ? ("custom:" + entry.hash()).equals(current)
                     : style.id.equals(current);
             int x = wallCellX(i);
             int y = wallCellY(i);
-            boolean hovered = !locked && mouseX >= x && mouseX < x + WALL_CELL_W
+            boolean hovered = mouseX >= x && mouseX < x + WALL_CELL_W
                     && mouseY >= y && mouseY < y + WALL_CELL_H;
-            graphics.fill(x, y, x + WALL_CELL_W, y + WALL_CELL_H, hovered ? 0x8C33405E : 0x66141A2B);
+            graphics.fill(x, y, x + WALL_CELL_W, y + WALL_CELL_H,
+                    locked ? (hovered ? 0xCC3A3F4A : 0xCC1E2229)
+                            : (hovered ? 0x8C33405E : 0x66141A2B));
             graphics.fill(x, y, x + WALL_CELL_W, y + 1, 0x55FFFFFF);
             graphics.renderOutline(x, y, WALL_CELL_W, WALL_CELL_H,
                     selected ? 0xFFF2E27A : (hovered ? 0xD8FFFFFF : 0x77FFFFFF));
@@ -261,13 +268,22 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
                 graphics.drawString(this.font, (selected ? "✔" : "")
                                 + this.font.plainSubstrByWidth(entry.name(), WALL_CELL_W - THUMB - 12),
                         x + THUMB + 7, y + 9, locked ? 0x8C8C8C : 0xF2EEE4, false);
+            } else if (locked) {
+                // A locked face shows neither art nor its full name: the hover text says what opens it.
+                graphics.drawString(this.font, "？？", x + 6, y + 9, 0x9A9A9A, false);
+                drawLock(graphics, x + WALL_CELL_W - 10, y + WALL_CELL_H - 11);
+                if (hovered) {
+                    this.lockedHover = lockHint(style.id);
+                    this.lockedHoverX = mouseX;
+                    this.lockedHoverY = mouseY;
+                }
             } else {
                 // The face itself as the plate's art: a player picks by look, not by reading names.
                 int[] size = QuiltTextures.dimensions(style, currentBorder);
                 blitScaled(graphics, QuiltTextures.texture(style, currentBorder), x + 4,
                         y + (WALL_CELL_H - THUMB) / 2, THUMB, size[0], size[1]);
                 graphics.drawString(this.font, (selected ? "✔" : "") + wallName(style.displayName),
-                        x + THUMB + 7, y + 9, locked ? 0x8C8C8C : 0xF2EEE4, false);
+                        x + THUMB + 7, y + 9, 0xF2EEE4, false);
             }
         }
         graphics.drawString(this.font, Component.translatable("gui.sleep_well.quilt_title"),
@@ -311,6 +327,38 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
                     x + 21, y + 7, locked ? 0x8C8C8C : 0xF2EEE4, false);
         }
         RenderSystem.disableBlend();
+        if (this.lockedHover != null) {
+            graphics.renderTooltip(this.font, this.lockedHover, this.lockedHoverX, this.lockedHoverY);
+            this.lockedHover = null;
+        }
+    }
+
+    /** True when this face has not been unlocked yet (or the debug lock is on). */
+    private boolean quiltLocked(QuiltStyle style) {
+        if (style.isDefault()) {
+            return false;
+        }
+        return this.menu.quiltLocked() || !ClientUnlocks.isUnlocked(style.id);
+    }
+
+    /** "吃掉 3 片西瓜片（1/3）": the hint key plus the progress the server last sent. */
+    private static Component lockHint(String target) {
+        Component hint = Component.translatable("unlock.sleep_well." + target);
+        int[] progress = ClientUnlocks.progressOf(target);
+        if (progress != null && progress[1] > 1) {
+            hint = hint.copy().append("（" + progress[0] + "/" + progress[1] + "）");
+        }
+        return hint;
+    }
+
+    /** A tiny padlock, drawn from rectangles: the default font has no emoji for it. */
+    private static void drawLock(GuiGraphics graphics, int x, int y) {
+        int body = 0xFFD9CDB4;
+        graphics.fill(x + 1, y + 4, x + 7, y + 10, body);
+        graphics.fill(x + 2, y + 2, x + 3, y + 5, body);
+        graphics.fill(x + 5, y + 2, x + 6, y + 5, body);
+        graphics.fill(x + 3, y + 2, x + 5, y + 3, body);
+        graphics.fill(x + 3, y + 6, x + 5, y + 8, 0xFF23272E);
     }
 
     /**
@@ -385,7 +433,7 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
                 if (i >= styles.size()) {
                     com.sleepwell.quilt.SavedQuilt entry = saved.get(i - styles.size());
                     String id = "custom:" + entry.hash();
-                    if (!this.menu.quiltLocked() && CustomQuiltLibrary.styleByHash(entry.hash(), entry.params()) != null) {
+                    if (CustomQuiltLibrary.styleByHash(entry.hash(), entry.params()) != null) {
                         this.chosenQuilt = id;
                         SleepWellNetwork.CHANNEL.sendToServer(
                                 new SaveQuiltStylePacket(this.menu.entityId(), id, entry.params()));
@@ -396,12 +444,16 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
                     return true;
                 }
                 QuiltStyle style = styles.get(i);
-                boolean locked = this.menu.quiltLocked() && !style.isDefault();
-                if (!locked) {
-                    this.chosenQuilt = style.id;
-                    SleepWellNetwork.CHANNEL.sendToServer(
-                            new SaveQuiltStylePacket(this.menu.entityId(), style.id));
+                if (quiltLocked(style)) {
+                    // Locked: do not switch, just repeat the hover line on the action bar.
+                    if (Minecraft.getInstance().player != null) {
+                        Minecraft.getInstance().player.displayClientMessage(lockHint(style.id), true);
+                    }
+                    return true;
                 }
+                this.chosenQuilt = style.id;
+                SleepWellNetwork.CHANNEL.sendToServer(
+                        new SaveQuiltStylePacket(this.menu.entityId(), style.id));
                 this.closeQuiltWall();
                 return true;
             }

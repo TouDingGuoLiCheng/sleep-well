@@ -63,10 +63,13 @@ public final class SaveQuiltStylePacket {
                     && packet.styleId.indexOf('/') < 0
                     && packet.styleId.indexOf('\\') < 0;
             String id = custom ? packet.styleId : QuiltStyle.of(packet.styleId).id;
-            boolean locked = SleepWellConfig.QUILT_LOCK_ALL.get() && !"solid".equals(id);
-            if (locked) {
+            boolean locked = !"solid".equals(id)
+                    && (SleepWellConfig.QUILT_LOCK_ALL.get()
+                    || !com.sleepwell.unlock.UnlockRules.isUnlocked(player, id));
+            if (locked && !player.hasPermissions(2)) {
                 return;
             }
+            String before = MaidCapabilities.of(maid).quiltStyle();
             MaidCapabilities.of(maid).setQuiltStyle(id);
             MaidCapabilities.of(maid).setQuiltParams(packet.params);
             // The capability does not sync itself, so push the new value to everyone who can see her.
@@ -74,6 +77,20 @@ public final class SaveQuiltStylePacket {
                     net.minecraftforge.network.PacketDistributor.TRACKING_ENTITY.with(() -> maid),
                     new SyncQuiltStylePacket(maid.getId(), id,
                             MaidCapabilities.of(maid).quiltBorder(), packet.params));
+            if (!id.equals(before)) {
+                com.sleepwell.advancement.Achievements.award(player,
+                        com.sleepwell.advancement.Achievements.CHANGE_STYLE, 1);
+            }
+            if (softHand(packet.params)) {
+                com.sleepwell.advancement.Achievements.award(player,
+                        com.sleepwell.advancement.Achievements.SOFT_HAND, 1);
+            }
+            com.sleepwell.unlock.UnlockHandler.evaluate(player);
         });
+    }
+
+    /** 蓬松 / 挺括 / 厚度 all the way up: the editor's own sliders, not a hidden number. */
+    private static boolean softHand(com.sleepwell.client.quilt.QuiltParams params) {
+        return params.loft >= 0.999F && params.body >= 0.999F && params.shell >= 0.1195F;
     }
 }

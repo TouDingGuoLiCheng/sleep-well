@@ -1,0 +1,27 @@
+{
+  "display": {
+    "icon": {
+      "item": "minecraft:painting"
+    },
+    "title": {
+      "translate": "advancements.sleep_well.all_faces.title"
+    },
+    "description": {
+      "translate": "advancements.sleep_well.all_faces.description"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "parent": "sleep_well:change_style",
+  "criteria": {
+    "all_faces": {
+      "trigger": "sleep_well:sleepwell",
+      "conditions": {
+        "kind": "all_faces",
+        "value": 1
+      }
+    }
+  }
+}

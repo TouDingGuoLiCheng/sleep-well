@@ -1,0 +1,27 @@
+{
+  "display": {
+    "icon": {
+      "item": "minecraft:red_bed"
+    },
+    "title": {
+      "translate": "advancements.sleep_well.root.title"
+    },
+    "description": {
+      "translate": "advancements.sleep_well.root.description"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false,
+    "background": "minecraft:textures/block/white_wool.png"
+  },
+  "criteria": {
+    "root_sleep": {
+      "trigger": "sleep_well:sleepwell",
+      "conditions": {
+        "kind": "root_sleep",
+        "value": 1
+      }
+    }
+  }
+}

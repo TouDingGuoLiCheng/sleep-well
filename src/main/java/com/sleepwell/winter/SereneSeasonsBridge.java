@@ -16,4 +16,9 @@ final class SereneSeasonsBridge {
     static boolean isWinter(Level level) {
         return SeasonHelper.getSeasonState(level).getSeason() == Season.WINTER;
     }
+
+    static String season(Level level) {
+        Season season = SeasonHelper.getSeasonState(level).getSeason();
+        return season == null ? null : season.name().toLowerCase(java.util.Locale.ROOT);
+    }
 }

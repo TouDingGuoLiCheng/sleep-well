@@ -1,0 +1,27 @@
+{
+  "display": {
+    "icon": {
+      "item": "minecraft:cookie"
+    },
+    "title": {
+      "translate": "advancements.sleep_well.first_drowsy.title"
+    },
+    "description": {
+      "translate": "advancements.sleep_well.first_drowsy.description"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "parent": "sleep_well:root",
+  "criteria": {
+    "drowsy": {
+      "trigger": "sleep_well:sleepwell",
+      "conditions": {
+        "kind": "drowsy",
+        "value": 1
+      }
+    }
+  }
+}

@@ -150,6 +150,8 @@ public final class LieInHandler {
                 long ticks = LieInPolicy.durationTicks(SleepWellConfig.LIE_IN_MIN_HOURS.get(),
                         SleepWellConfig.LIE_IN_MAX_HOURS.get(), maid.getRandom().nextInt(1000));
                 state.begin(LieInState.Kind.LIE_IN, now, ticks, taskUid);
+                com.sleepwell.advancement.Achievements.award(maid,
+                        com.sleepwell.advancement.Achievements.LIE_IN, 1);
                 LOGGER.info("Lie-in: maid {} stays in bed for {} ticks (until {})", id, ticks, now + ticks);
             }
             return;
@@ -183,6 +185,8 @@ public final class LieInHandler {
                 long ticks = LieInPolicy.durationTicks(SleepWellConfig.NAP_MIN_HOURS.get(),
                         SleepWellConfig.NAP_MAX_HOURS.get(), maid.getRandom().nextInt(1000));
                 state.begin(LieInState.Kind.NAP, now, ticks, taskUid, configuredArea);
+                com.sleepwell.advancement.Achievements.award(maid,
+                        com.sleepwell.advancement.Achievements.NAP, 1);
                 // A nap that ends after dawn must not chain straight into a lie-in.
                 state.markRolled(day);
                 LOGGER.info("Nap: maid {} heads to her {} for {} ticks (until {})", id,

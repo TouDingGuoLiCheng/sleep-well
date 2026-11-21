@@ -14,5 +14,6 @@ public final class MaidCapabilityRegistration {
     @SubscribeEvent
     public static void onRegisterCapabilities(RegisterCapabilitiesEvent event) {
         event.register(MaidSettings.class);
+        event.register(com.sleepwell.unlock.PlayerUnlocks.class);
     }
 }

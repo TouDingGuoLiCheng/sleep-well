@@ -52,7 +52,13 @@ public final class SaveQuiltBorderPacket {
             if (locked) {
                 return;
             }
+            String beforeBorder = MaidCapabilities.of(maid).quiltBorder();
             MaidCapabilities.of(maid).setQuiltBorder(border.id);
+            if (!border.isNone() && !border.id.equals(beforeBorder)) {
+                com.sleepwell.advancement.Achievements.award(player,
+                        com.sleepwell.advancement.Achievements.FLUFFY, 1);
+            }
+            com.sleepwell.unlock.UnlockHandler.evaluate(player);
             SleepWellNetwork.CHANNEL.send(
                     net.minecraftforge.network.PacketDistributor.TRACKING_ENTITY.with(() -> maid),
                     new SyncQuiltStylePacket(maid.getId(), maidQuilt(maid), border.id,

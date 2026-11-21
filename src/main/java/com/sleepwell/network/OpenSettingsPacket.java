@@ -47,6 +47,8 @@ public final class OpenSettingsPacket {
         boolean sereneSeasons = SeasonBridge.sereneSeasonsLoaded();
         String quiltStyle = MaidCapabilities.of(maid).quiltStyle();
         boolean quiltLocked = SleepWellConfig.QUILT_LOCK_ALL.get();
+        // The wall needs the freshest unlocked set and progress before it opens.
+        com.sleepwell.unlock.UnlockHandler.sync(player);
         context.enqueueWork(() -> NetworkHooks.openScreen(player,
                 SleepWellContainer.create(packet.entityId, sleepFallback, campfireFlee, winterSkip, lieIn,
                         sereneSeasons, quiltStyle, quiltLocked),

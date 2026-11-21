@@ -1,0 +1,27 @@
+{
+  "display": {
+    "icon": {
+      "item": "minecraft:powder_snow_bucket"
+    },
+    "title": {
+      "translate": "advancements.sleep_well.cold_outside.title"
+    },
+    "description": {
+      "translate": "advancements.sleep_well.cold_outside.description"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": true
+  },
+  "parent": "sleep_well:root",
+  "criteria": {
+    "winter_sleep": {
+      "trigger": "sleep_well:sleepwell",
+      "conditions": {
+        "kind": "winter_sleep",
+        "value": 1
+      }
+    }
+  }
+}

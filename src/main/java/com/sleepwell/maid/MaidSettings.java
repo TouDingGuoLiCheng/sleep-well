@@ -14,10 +14,13 @@ public final class MaidSettings implements INBTSerializable<CompoundTag> {
     public static final String TAG_QUILT_STYLE = "QuiltStyle";
     public static final String TAG_QUILT_BORDER = "QuiltBorder";
     public static final String TAG_QUILT_PARAMS = "QuiltParams";
+    public static final String TAG_SLEEP_COUNT = "SleepCount";
     public static final String DEFAULT_QUILT = "solid";
 
     private boolean winterSkip;
     private boolean lieIn = true;
+    /** How many times this maid has gone to sleep and woken up again; read by the achievement page. */
+    private int sleepCount;
     private String savedTaskId = "";
     private String quiltStyle = DEFAULT_QUILT;
     private String quiltBorder = "";
@@ -48,6 +51,15 @@ public final class MaidSettings implements INBTSerializable<CompoundTag> {
 
     public void setLieIn(boolean lieIn) {
         this.lieIn = lieIn;
+    }
+
+    /** One complete sleep. The count is per maid, not per player. */
+    public int sleepCount() {
+        return this.sleepCount;
+    }
+
+    public int incrementSleepCount() {
+        return ++this.sleepCount;
     }
 
     /** Task uid she had before being swapped to the idle task; empty when not swapped. */
@@ -92,6 +104,7 @@ public final class MaidSettings implements INBTSerializable<CompoundTag> {
         tag.putBoolean(TAG_WINTER_SKIP, winterSkip);
         tag.putString(TAG_SAVED_TASK, savedTaskId);
         tag.putBoolean(TAG_LIE_IN, lieIn);
+        tag.putInt(TAG_SLEEP_COUNT, sleepCount);
         tag.putString(TAG_QUILT_STYLE, quiltStyle());
         tag.putString(TAG_QUILT_BORDER, quiltBorder());
         tag.put(TAG_QUILT_PARAMS, quiltParams().save());
@@ -104,6 +117,7 @@ public final class MaidSettings implements INBTSerializable<CompoundTag> {
         savedTaskId = tag.getString(TAG_SAVED_TASK);
         // Missing tag = a maid from before this switch existed: she defaults to allowed.
         lieIn = !tag.contains(TAG_LIE_IN) || tag.getBoolean(TAG_LIE_IN);
+        sleepCount = tag.getInt(TAG_SLEEP_COUNT);
         quiltStyle = tag.contains(TAG_QUILT_STYLE) ? tag.getString(TAG_QUILT_STYLE) : DEFAULT_QUILT;
         // Missing tag = a maid from before borders existed: no border, no visual change.
         quiltBorder = tag.contains(TAG_QUILT_BORDER) ? tag.getString(TAG_QUILT_BORDER) : "";

@@ -19,6 +19,18 @@ public final class SeasonBridge {
         return loaded;
     }
 
+    /** "spring"/"summer"/"autumn"/"winter", or null when Serene Seasons is absent or broken. */
+    public static String season(Level level) {
+        if (level == null || !sereneSeasonsLoaded()) {
+            return null;
+        }
+        try {
+            return SereneSeasonsBridge.season(level);
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
     public static boolean isWinter(Level level) {
         if (level == null || !sereneSeasonsLoaded()) {
             return false;

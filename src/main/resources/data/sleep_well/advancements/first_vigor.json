@@ -1,0 +1,27 @@
+{
+  "display": {
+    "icon": {
+      "item": "minecraft:golden_apple"
+    },
+    "title": {
+      "translate": "advancements.sleep_well.first_vigor.title"
+    },
+    "description": {
+      "translate": "advancements.sleep_well.first_vigor.description"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "parent": "sleep_well:first_drowsy",
+  "criteria": {
+    "vigor": {
+      "trigger": "sleep_well:sleepwell",
+      "conditions": {
+        "kind": "vigor",
+        "value": 1
+      }
+    }
+  }
+}

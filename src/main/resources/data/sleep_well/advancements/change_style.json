@@ -1,0 +1,27 @@
+{
+  "display": {
+    "icon": {
+      "item": "minecraft:white_wool"
+    },
+    "title": {
+      "translate": "advancements.sleep_well.change_style.title"
+    },
+    "description": {
+      "translate": "advancements.sleep_well.change_style.description"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "parent": "sleep_well:root",
+  "criteria": {
+    "style_changed": {
+      "trigger": "sleep_well:sleepwell",
+      "conditions": {
+        "kind": "style_changed",
+        "value": 1
+      }
+    }
+  }
+}

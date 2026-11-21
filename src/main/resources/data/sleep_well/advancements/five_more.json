@@ -1,0 +1,27 @@
+{
+  "display": {
+    "icon": {
+      "item": "minecraft:clock"
+    },
+    "title": {
+      "translate": "advancements.sleep_well.five_more.title"
+    },
+    "description": {
+      "translate": "advancements.sleep_well.five_more.description"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "parent": "sleep_well:first_drowsy",
+  "criteria": {
+    "lie_in": {
+      "trigger": "sleep_well:sleepwell",
+      "conditions": {
+        "kind": "lie_in",
+        "value": 1
+      }
+    }
+  }
+}

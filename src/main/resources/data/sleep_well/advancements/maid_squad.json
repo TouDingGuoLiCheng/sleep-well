@@ -1,0 +1,27 @@
+{
+  "display": {
+    "icon": {
+      "item": "minecraft:armor_stand"
+    },
+    "title": {
+      "translate": "advancements.sleep_well.maid_squad.title"
+    },
+    "description": {
+      "translate": "advancements.sleep_well.maid_squad.description"
+    },
+    "frame": "goal",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": true
+  },
+  "parent": "sleep_well:root",
+  "criteria": {
+    "maid_squad": {
+      "trigger": "sleep_well:sleepwell",
+      "conditions": {
+        "kind": "maid_squad",
+        "value": 10
+      }
+    }
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "display": {
+    "icon": {
+      "item": "minecraft:rabbit_foot"
+    },
+    "title": {
+      "translate": "advancements.sleep_well.soft_hand.title"
+    },
+    "description": {
+      "translate": "advancements.sleep_well.soft_hand.description"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": true
+  },
+  "parent": "sleep_well:change_style",
+  "criteria": {
+    "soft_hand": {
+      "trigger": "sleep_well:sleepwell",
+      "conditions": {
+        "kind": "soft_hand",
+        "value": 1
+      }
+    }
+  }
+}
