@@ -55,7 +55,8 @@ public final class SaveQuiltBorderPacket {
             MaidCapabilities.of(maid).setQuiltBorder(border.id);
             SleepWellNetwork.CHANNEL.send(
                     net.minecraftforge.network.PacketDistributor.TRACKING_ENTITY.with(() -> maid),
-                    new SyncQuiltStylePacket(maid.getId(), maidQuilt(maid), border.id));
+                    new SyncQuiltStylePacket(maid.getId(), maidQuilt(maid), border.id,
+                            MaidCapabilities.of(maid).quiltParams()));
         });
     }
 

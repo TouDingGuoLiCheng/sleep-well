@@ -34,6 +34,39 @@ public final class QuiltDebugCommand {
                 .executes(QuiltDebugCommand::help);
     }
 
+    /** {@code /sleepwell quilt}: opens the editor for the nearest maid, next to her file folder button. */
+    public static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> editorNode() {
+        return net.minecraft.commands.Commands.literal("quilt").executes(QuiltDebugCommand::openEditor);
+    }
+
+    private static int openEditor(CommandContext<CommandSourceStack> context) {
+        net.minecraft.client.Minecraft minecraft = net.minecraft.client.Minecraft.getInstance();
+        if (minecraft.player == null || minecraft.level == null) {
+            return 0;
+        }
+        List<EntityMaid> maids = minecraft.level.getEntitiesOfClass(EntityMaid.class,
+                minecraft.player.getBoundingBox().inflate(16.0D));
+        if (maids.isEmpty()) {
+            say(context, "[被子] 附近没有女仆", ChatFormatting.YELLOW);
+            return 0;
+        }
+        EntityMaid nearest = maids.get(0);
+        double best = Double.MAX_VALUE;
+        for (EntityMaid maid : maids) {
+            double distance = maid.distanceToSqr(minecraft.player);
+            if (distance < best) {
+                best = distance;
+                nearest = maid;
+            }
+        }
+        EntityMaid target = nearest;
+        minecraft.execute(() -> minecraft.setScreen(new com.sleepwell.client.CustomQuiltScreen(
+                target.getId(),
+                com.sleepwell.client.ClientQuiltStyles.of(target),
+                com.sleepwell.client.ClientQuiltStyles.paramsOf(target))));
+        return 1;
+    }
+
     /** {@code /sleepwell status}: capture report for every sleeping maid nearby. */
     public static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> statusNode() {
         return Commands.literal("status").executes(QuiltDebugCommand::status);

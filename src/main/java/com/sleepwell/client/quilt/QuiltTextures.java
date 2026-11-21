@@ -131,6 +131,44 @@ public final class QuiltTextures {
     }
 
     /**
+     * The editor's preview: the sheet this quilt would show, sampled with exactly the maths the renderer uses, so
+     * what the player tweaks in the editor is what she gets on the bed.
+     */
+    public static ResourceLocation preview(QuiltStyle style) {
+        String key = "preview|" + style.id + "|" + style.repeatU + "x" + style.repeatV;
+        ResourceLocation cached = CACHE.get(key);
+        if (cached != null) {
+            return cached;
+        }
+        NativeImage face = faceOf(style);
+        if (face == null) {
+            return style.texture();
+        }
+        NativeImage out = null;
+        try {
+            out = new NativeImage(SHEET_W, SHEET_H, true);
+            for (int y = 0; y < SHEET_H; y++) {
+                for (int x = 0; x < SHEET_W; x++) {
+                    out.setPixelRGBA(x, y, sampleTiled(face, style, x, y));
+                }
+            }
+            ResourceLocation id = new ResourceLocation(SleepWellMod.MOD_ID,
+                    "textures/quilt/preview_" + Math.abs(key.hashCode()));
+            DynamicTexture texture = new DynamicTexture(out);
+            Minecraft.getInstance().getTextureManager().register(id, texture);
+            texture.upload();
+            out = null; // the DynamicTexture owns the image now
+            CACHE.put(key, id);
+            return id;
+        } catch (Throwable failure) {
+            return style.texture();
+        } finally {
+            close(face);
+            close(out);
+        }
+    }
+
+    /**
      * The finished print tile: our cloth with the vanilla sprite stamped across it in a grid. Built here rather
      * than shipped, which is what keeps Mojang's art out of the jar and lets a resource pack restyle the quilt.
      */

@@ -15,11 +15,18 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class ClientQuiltStyles {
     private static final Map<Integer, String> STYLES = new ConcurrentHashMap<>();
     private static final Map<Integer, String> BORDERS = new ConcurrentHashMap<>();
+    private static final Map<Integer, com.sleepwell.client.quilt.QuiltParams> PARAMS = new ConcurrentHashMap<>();
 
     private ClientQuiltStyles() {
     }
 
     public static void put(int entityId, String styleId, String borderId) {
+        put(entityId, styleId, borderId, com.sleepwell.client.quilt.QuiltParams.DEFAULT);
+    }
+
+    public static void put(int entityId, String styleId, String borderId,
+                           com.sleepwell.client.quilt.QuiltParams params) {
+        PARAMS.put(entityId, params == null ? com.sleepwell.client.quilt.QuiltParams.DEFAULT : params);
         if (styleId == null || styleId.isEmpty()) {
             STYLES.remove(entityId);
         } else {
@@ -46,6 +53,30 @@ public final class ClientQuiltStyles {
         return Minecraft.getInstance().level == null ? null : STYLES.get(entity.getId());
     }
 
+    /** The numbers this maid's custom quilt was edited to. */
+    public static com.sleepwell.client.quilt.QuiltParams paramsOf(Entity entity) {
+        if (entity == null) {
+            return com.sleepwell.client.quilt.QuiltParams.DEFAULT;
+        }
+        return PARAMS.getOrDefault(entity.getId(), com.sleepwell.client.quilt.QuiltParams.DEFAULT);
+    }
+
+    /**
+     * The quilt the renderer should draw: a built-in one straight from the registry, or a custom one rebuilt from
+     * this maid's own numbers. Falls back to the default quilt when this client does not have the picture.
+     */
+    public static com.sleepwell.client.quilt.QuiltStyle styleFor(Entity entity) {
+        String id = of(entity);
+        if (com.sleepwell.client.quilt.CustomQuiltLibrary.isCustom(id)) {
+            com.sleepwell.client.quilt.QuiltStyle custom =
+                    com.sleepwell.client.quilt.CustomQuiltLibrary.styleById(id, paramsOf(entity));
+            if (custom != null) {
+                return custom;
+            }
+        }
+        return com.sleepwell.client.quilt.QuiltStyle.of(id);
+    }
+
     /** The border id sewn around her quilt, or an empty string when she has none. */
     public static String borderOf(Entity entity) {
         if (entity == null) {
@@ -57,5 +88,6 @@ public final class ClientQuiltStyles {
     public static void clear() {
         STYLES.clear();
         BORDERS.clear();
+        PARAMS.clear();
     }
 }

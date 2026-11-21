@@ -184,7 +184,7 @@ public final class PhysicalQuilt {
         Vec3 middle = new Vec3((head.x + foot.x) * 0.5D, top, (head.z + foot.z) * 0.5D);
 
         // The setting lives on the server; the client mirror is what the renderer can actually see.
-        QuiltStyle shape = QuiltStyle.of(com.sleepwell.client.ClientQuiltStyles.of(maid));
+        QuiltStyle shape = com.sleepwell.client.ClientQuiltStyles.styleFor(maid);
         // The quilt's own parameters belong in the cache key: a wide quilt solved as a plain one is wrong.
         String modelKey = modelKey(maid) + "|" + shape.clothKey();
         Cloth cached = CLOTHS.computeIfAbsent(maid.getUUID(), id -> new Cloth());

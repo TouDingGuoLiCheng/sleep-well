@@ -13,6 +13,7 @@ public final class MaidSettings implements INBTSerializable<CompoundTag> {
     public static final String TAG_LIE_IN = "LieIn";
     public static final String TAG_QUILT_STYLE = "QuiltStyle";
     public static final String TAG_QUILT_BORDER = "QuiltBorder";
+    public static final String TAG_QUILT_PARAMS = "QuiltParams";
     public static final String DEFAULT_QUILT = "solid";
 
     private boolean winterSkip;
@@ -20,6 +21,7 @@ public final class MaidSettings implements INBTSerializable<CompoundTag> {
     private String savedTaskId = "";
     private String quiltStyle = DEFAULT_QUILT;
     private String quiltBorder = "";
+    private com.sleepwell.client.quilt.QuiltParams quiltParams = com.sleepwell.client.quilt.QuiltParams.DEFAULT;
 
     public MaidSettings(boolean winterSkip) {
         this(winterSkip, true);
@@ -66,6 +68,15 @@ public final class MaidSettings implements INBTSerializable<CompoundTag> {
         this.quiltStyle = quiltStyle == null || quiltStyle.isEmpty() ? DEFAULT_QUILT : quiltStyle;
     }
 
+    /** The numbers a player turned on her own quilt; only read when the style id is {@code custom:...}. */
+    public com.sleepwell.client.quilt.QuiltParams quiltParams() {
+        return quiltParams == null ? com.sleepwell.client.quilt.QuiltParams.DEFAULT : quiltParams;
+    }
+
+    public void setQuiltParams(com.sleepwell.client.quilt.QuiltParams quiltParams) {
+        this.quiltParams = quiltParams == null ? com.sleepwell.client.quilt.QuiltParams.DEFAULT : quiltParams;
+    }
+
     /** Which border is sewn around her quilt; empty means none, which is what every old save has. */
     public String quiltBorder() {
         return quiltBorder == null ? "" : quiltBorder;
@@ -83,6 +94,7 @@ public final class MaidSettings implements INBTSerializable<CompoundTag> {
         tag.putBoolean(TAG_LIE_IN, lieIn);
         tag.putString(TAG_QUILT_STYLE, quiltStyle());
         tag.putString(TAG_QUILT_BORDER, quiltBorder());
+        tag.put(TAG_QUILT_PARAMS, quiltParams().save());
         return tag;
     }
 
@@ -95,5 +107,6 @@ public final class MaidSettings implements INBTSerializable<CompoundTag> {
         quiltStyle = tag.contains(TAG_QUILT_STYLE) ? tag.getString(TAG_QUILT_STYLE) : DEFAULT_QUILT;
         // Missing tag = a maid from before borders existed: no border, no visual change.
         quiltBorder = tag.contains(TAG_QUILT_BORDER) ? tag.getString(TAG_QUILT_BORDER) : "";
+        quiltParams = com.sleepwell.client.quilt.QuiltParams.load(tag.getCompound(TAG_QUILT_PARAMS));
     }
 }

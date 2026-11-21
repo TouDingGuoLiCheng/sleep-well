@@ -19,19 +19,28 @@ import java.util.function.Supplier;
 public final class SaveQuiltStylePacket {
     private final int entityId;
     private final String styleId;
+    private final com.sleepwell.client.quilt.QuiltParams params;
 
     public SaveQuiltStylePacket(int entityId, String styleId) {
+        this(entityId, styleId, com.sleepwell.client.quilt.QuiltParams.DEFAULT);
+    }
+
+    public SaveQuiltStylePacket(int entityId, String styleId, com.sleepwell.client.quilt.QuiltParams params) {
         this.entityId = entityId;
         this.styleId = styleId == null ? "" : styleId;
+        this.params = params == null ? com.sleepwell.client.quilt.QuiltParams.DEFAULT : params;
     }
 
     public static void encode(SaveQuiltStylePacket packet, FriendlyByteBuf buf) {
         buf.writeVarInt(packet.entityId);
         buf.writeUtf(packet.styleId, 64);
+        buf.writeNbt(packet.params.save());
     }
 
     public static SaveQuiltStylePacket decode(FriendlyByteBuf buf) {
-        return new SaveQuiltStylePacket(buf.readVarInt(), buf.readUtf(64));
+        int entityId = buf.readVarInt();
+        String styleId = buf.readUtf(64);
+        return new SaveQuiltStylePacket(entityId, styleId, com.sleepwell.client.quilt.QuiltParams.load(buf.readNbt()));
     }
 
     public static void handle(SaveQuiltStylePacket packet, Supplier<NetworkEvent.Context> supplier) {
@@ -47,17 +56,24 @@ public final class SaveQuiltStylePacket {
             return;
         }
         context.enqueueWork(() -> {
-            QuiltStyle style = QuiltStyle.of(packet.styleId);
-            boolean locked = SleepWellConfig.QUILT_LOCK_ALL.get() && !style.isDefault();
+            // A custom id names a player's own picture, which this side cannot resolve - only its shape is checked.
+            // File names may be Chinese, so the check is "no separators and not absurdly long", not ASCII-only.
+            boolean custom = packet.styleId.startsWith("custom:")
+                    && packet.styleId.length() <= 64
+                    && packet.styleId.indexOf('/') < 0
+                    && packet.styleId.indexOf('\\') < 0;
+            String id = custom ? packet.styleId : QuiltStyle.of(packet.styleId).id;
+            boolean locked = SleepWellConfig.QUILT_LOCK_ALL.get() && !"solid".equals(id);
             if (locked) {
                 return;
             }
-            MaidCapabilities.of(maid).setQuiltStyle(style.id);
+            MaidCapabilities.of(maid).setQuiltStyle(id);
+            MaidCapabilities.of(maid).setQuiltParams(packet.params);
             // The capability does not sync itself, so push the new value to everyone who can see her.
             SleepWellNetwork.CHANNEL.send(
                     net.minecraftforge.network.PacketDistributor.TRACKING_ENTITY.with(() -> maid),
-                    new SyncQuiltStylePacket(maid.getId(), style.id,
-                            MaidCapabilities.of(maid).quiltBorder()));
+                    new SyncQuiltStylePacket(maid.getId(), id,
+                            MaidCapabilities.of(maid).quiltBorder(), packet.params));
         });
     }
 }

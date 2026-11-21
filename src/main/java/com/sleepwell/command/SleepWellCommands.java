@@ -33,7 +33,8 @@ public final class SleepWellCommands {
         // The quilt diagnostics read client-side state, so they are only offered where that state exists.
         if (net.minecraftforge.fml.loading.FMLEnvironment.dist.isClient()) {
             root.then(com.sleepwell.client.QuiltDebugCommand.wireframeNode())
-                    .then(com.sleepwell.client.QuiltDebugCommand.statusNode());
+                    .then(com.sleepwell.client.QuiltDebugCommand.statusNode())
+                    .then(com.sleepwell.client.QuiltDebugCommand.editorNode());
         }
         event.getDispatcher().register(root);
     }
