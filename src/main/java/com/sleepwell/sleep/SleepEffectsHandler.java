@@ -54,6 +54,8 @@ public final class SleepEffectsHandler {
      * inside the window leaves only a quarter of the usual 困倦.
      */
     private static final int FULL_NIGHT_TICKS = 10_000;
+    /** Stacking has to stop somewhere, or a long peaceful world turns into a permanent buff. */
+    private static final int MAX_STACK_TICKS = 20 * 60 * 20;
     /** The most 困倦 can be shortened to: even a perfect night leaves something to shake off. */
     private static final float DROWSY_SHORTEN_MAX = 0.75F;
 
@@ -251,10 +253,29 @@ public final class SleepEffectsHandler {
         maid.addEffect(new MobEffectInstance(SleepWellEffects.DROWSY.get(), left, amplifier, ambient, visible, icon));
     }
 
+    /**
+     * Puts an effect on her and <em>adds</em> the time to whatever is left of it, instead of restarting it.
+     * <p>
+     * Vanilla's {@code addEffect} only keeps the better of the two, so a short new buff onto a long running one
+     * did nothing and a long new one threw the rest away. Stacking is what the owner asked for: two good nights in
+     * a row should feel like two good nights.
+     */
+    private static void addStacked(EntityMaid maid, net.minecraft.world.effect.MobEffect effect, int ticks,
+                                   int amplifier) {
+        MobEffectInstance current = maid.getEffect(effect);
+        int left = current == null ? 0 : Math.max(0, current.getDuration());
+        int total = Math.min(MAX_STACK_TICKS, left + ticks);
+        int level = Math.max(amplifier, current == null ? 0 : current.getAmplifier());
+        if (current != null) {
+            maid.removeEffect(effect);
+        }
+        maid.addEffect(new MobEffectInstance(effect, total, level, false, true, true));
+    }
+
     private static void applyVigor(EntityMaid maid, boolean lieIn) {
         int seconds = SleepWellConfig.VIGOR_SECONDS.get()
                 + (lieIn ? SleepWellConfig.VIGOR_LIE_IN_EXTRA_SECONDS.get() : 0);
-        maid.addEffect(new MobEffectInstance(SleepWellEffects.VIGOR.get(), seconds * 20, 0, false, true, true));
+        addStacked(maid, SleepWellEffects.VIGOR.get(), seconds * 20, 0);
         com.sleepwell.advancement.Achievements.award(maid,
                 com.sleepwell.advancement.Achievements.VIGOR, 1);
     }
@@ -274,8 +295,7 @@ public final class SleepEffectsHandler {
         int seconds = drowsySeconds(track);
         LOGGER.info("[睡个好觉] [困倦] maid={} 本次睡眠={}ticks 时长={}s（基准 {}s）",
                 maid.getUUID(), track.windowSleepTicks, seconds, SleepWellConfig.DROWSY_SECONDS.get());
-        maid.addEffect(new MobEffectInstance(SleepWellEffects.DROWSY.get(),
-                seconds * 20, 0, false, true, true));
+        addStacked(maid, SleepWellEffects.DROWSY.get(), seconds * 20, 0);
         com.sleepwell.advancement.Achievements.award(maid,
                 com.sleepwell.advancement.Achievements.DROWSY, 1);
         log(maid, "困倦", track, 0L, false, false);
