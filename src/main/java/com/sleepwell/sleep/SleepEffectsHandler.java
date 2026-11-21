@@ -49,6 +49,14 @@ public final class SleepEffectsHandler {
     private static final int WINDOW_CLOSE_GRACE = 40;
     private static final int REGEN_INTERVAL = 60;
     private static final float REGEN_AMOUNT = 1.0F;
+    /**
+     * How much sleep counts as "a full night's worth" when shortening 困倦: ten in-game hours. Sleeping this much
+     * inside the window leaves only a quarter of the usual 困倦.
+     */
+    private static final int FULL_NIGHT_TICKS = 10_000;
+    /** The most 困倦 can be shortened to: even a perfect night leaves something to shake off. */
+    private static final float DROWSY_SHORTEN_MAX = 0.75F;
+
     /** One 困倦 decay step per real second. */
     private static final int DROWSY_DECAY_INTERVAL = 20;
     private static final Map<UUID, Track> TRACKS = new ConcurrentHashMap<>();
@@ -247,9 +255,23 @@ public final class SleepEffectsHandler {
                 com.sleepwell.advancement.Achievements.VIGOR, 1);
     }
 
+    /**
+     * 困倦 duration by how much she actually slept: a maid who dozed for a few minutes gets the full debuff, one
+     * who spent most of the window in bed shakes most of it off. The night that was skipped by the players counts
+     * as slept time too, so a maid who slept through it wakes up nearly clear.
+     */
+    private static int drowsySeconds(Track track) {
+        int base = SleepWellConfig.DROWSY_SECONDS.get();
+        float share = Math.min(1.0F, Math.max(0.0F, track.windowSleepTicks / (float) FULL_NIGHT_TICKS));
+        return Math.max(1, Math.round(base * (1.0F - DROWSY_SHORTEN_MAX * share)));
+    }
+
     private static void applyDrowsy(EntityMaid maid, Track track) {
+        int seconds = drowsySeconds(track);
+        LOGGER.info("[睡个好觉] [困倦] maid={} 本次睡眠={}ticks 时长={}s（基准 {}s）",
+                maid.getUUID(), track.windowSleepTicks, seconds, SleepWellConfig.DROWSY_SECONDS.get());
         maid.addEffect(new MobEffectInstance(SleepWellEffects.DROWSY.get(),
-                SleepWellConfig.DROWSY_SECONDS.get() * 20, 0, false, true, true));
+                seconds * 20, 0, false, true, true));
         com.sleepwell.advancement.Achievements.award(maid,
                 com.sleepwell.advancement.Achievements.DROWSY, 1);
         log(maid, "困倦", track, 0L, false, false);
