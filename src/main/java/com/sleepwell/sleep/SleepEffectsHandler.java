@@ -104,6 +104,48 @@ public final class SleepEffectsHandler {
         }
         LOGGER.info("[睡个好觉] 玩家睡过整夜：时间跳过 {} ticks，床上睡着的 {} 只记作睡了这一觉，没上床的 {} 只不记",
                 jump, credited, refused);
+
+        // The skipped ticks were ticks she spent asleep, so 困倦 has to come off her for them exactly as it does
+        // one tick at a time. Without this a maid who slept the whole night through the skip woke up still under
+        // the full debuff, which reads as "sleeping does nothing about drowsy".
+        if (SleepWellConfig.DROWSY_SLEEP_DECAY_ENABLED.get()) {
+            int decayed = 0;
+            for (net.minecraft.world.entity.Entity entity : level.getAllEntities()) {
+                if (entity instanceof EntityMaid maid && maid.isSleeping() && decayDrowsyBy(maid, jump)) {
+                    decayed++;
+                }
+            }
+            if (decayed > 0) {
+                LOGGER.info("[睡个好觉] 跳过的 {} ticks 里，{} 只女仆的困倦照常消退", jump, decayed);
+            }
+        }
+    }
+
+    /**
+     * The same decay as {@link #decayDrowsy}, applied to a whole block of ticks at once. True when she actually had
+     * 困倦 to lose, so the caller can report how many maids were touched.
+     */
+    private static boolean decayDrowsyBy(EntityMaid maid, long skippedTicks) {
+        MobEffectInstance drowsy = maid.getEffect(SleepWellEffects.DROWSY.get());
+        if (drowsy == null || drowsy.isInfiniteDuration()) {
+            return false;
+        }
+        long steps = skippedTicks / DROWSY_DECAY_INTERVAL;
+        if (steps <= 0L) {
+            return false;
+        }
+        long removed = steps * (long) SleepWellConfig.DROWSY_SLEEP_DECAY_SECONDS.get() * 20L;
+        int left = (int) Math.max(0L, Math.min(Integer.MAX_VALUE, drowsy.getDuration() - removed));
+        int amplifier = drowsy.getAmplifier();
+        boolean ambient = drowsy.isAmbient();
+        boolean visible = drowsy.isVisible();
+        boolean icon = drowsy.showIcon();
+        maid.removeEffect(SleepWellEffects.DROWSY.get());
+        if (left > 0) {
+            maid.addEffect(new MobEffectInstance(SleepWellEffects.DROWSY.get(), left, amplifier, ambient,
+                    visible, icon));
+        }
+        return true;
     }
 
     /** Per maid, the little that has to survive between ticks. */
