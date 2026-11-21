@@ -59,6 +59,11 @@ public class CustomQuiltScreen extends Screen {
         this.entityId = entityId;
         this.currentId = currentId == null ? "" : currentId;
         this.params = params == null ? QuiltParams.DEFAULT : params;
+        // A fresh picture starts in its own colours: tinting a photo to the bed's dye is never what a player
+        // means on the first try, and 「保持原色」 is one click away if she does want it.
+        if (!CustomQuiltLibrary.isCustom(currentId)) {
+            this.params = this.params.withTint(false);
+        }
         CustomQuiltLibrary.rescan();
         this.files = CustomQuiltLibrary.names();
         String wanted = CustomQuiltLibrary.isCustom(currentId)
@@ -104,14 +109,14 @@ public class CustomQuiltScreen extends Screen {
         });
 
         y += 22;
-        addRenderableWidget(Button.builder(Component.literal("手感 " + PRESET_NAMES[this.presetIndex]), button -> {
+        addRenderableWidget(Button.builder(Component.literal("材质预设 " + PRESET_NAMES[this.presetIndex]), button -> {
             this.presetIndex = (this.presetIndex + 1) % PRESETS.length;
             QuiltStyle hand = QuiltStyle.of(PRESETS[this.presetIndex]);
             if (hand != null) {
                 this.params = this.params.withHand(hand.shell, hand.underShade, hand.rimShade, hand.loft,
                         hand.body);
             }
-            button.setMessage(Component.literal("手感 " + PRESET_NAMES[this.presetIndex]));
+            button.setMessage(Component.literal("材质预设 " + PRESET_NAMES[this.presetIndex]));
             this.rebuildWidgets();
         }).bounds(x, y, full, 18).build());
 
