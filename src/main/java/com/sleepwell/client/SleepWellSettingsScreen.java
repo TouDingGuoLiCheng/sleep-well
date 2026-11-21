@@ -179,7 +179,8 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
 
     /** One page holds {@link #WALL_PER_PAGE} plates; everything below works in page-local slots. */
     private int wallPages() {
-        return Math.max(1, (QuiltStyle.all().size() + WALL_PER_PAGE - 1) / WALL_PER_PAGE);
+        // The wall holds the built-in faces plus one plate that opens the custom-quilt editor.
+        return Math.max(1, (QuiltStyle.all().size() + 1 + WALL_PER_PAGE - 1) / WALL_PER_PAGE);
     }
 
     private int wallSlot(int index) {
@@ -222,10 +223,11 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
         List<QuiltStyle> styles = QuiltStyle.all();
         String current = this.chosenQuilt != null ? this.chosenQuilt : this.menu.quiltStyle();
         String currentBorder = currentBorder();
-        for (int i = pageStart(); i < pageEnd(styles.size()); i++) {
-            QuiltStyle style = styles.get(i);
-            boolean locked = this.menu.quiltLocked() && !style.isDefault();
-            boolean selected = style.id.equals(current);
+        for (int i = pageStart(); i < pageEnd(styles.size() + 1); i++) {
+            boolean customCell = i >= styles.size();
+            QuiltStyle style = customCell ? null : styles.get(i);
+            boolean locked = this.menu.quiltLocked() && (customCell || !style.isDefault());
+            boolean selected = customCell ? current.startsWith("custom:") : style.id.equals(current);
             int x = wallCellX(i);
             int y = wallCellY(i);
             boolean hovered = !locked && mouseX >= x && mouseX < x + WALL_CELL_W
@@ -234,12 +236,18 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
             graphics.fill(x, y, x + WALL_CELL_W, y + 1, 0x55FFFFFF);
             graphics.renderOutline(x, y, WALL_CELL_W, WALL_CELL_H,
                     selected ? 0xFFF2E27A : (hovered ? 0xD8FFFFFF : 0x77FFFFFF));
-            // The face itself as the plate's art: a player picks by look, not by reading names.
-            int[] size = QuiltTextures.dimensions(style, currentBorder);
-            blitScaled(graphics, QuiltTextures.texture(style, currentBorder), x + 4,
-                    y + (WALL_CELL_H - THUMB) / 2, THUMB, size[0], size[1]);
-            graphics.drawString(this.font, (selected ? "✔" : "") + wallName(style.displayName),
-                    x + THUMB + 7, y + 9, locked ? 0x8C8C8C : 0xF2EEE4, false);
+            if (customCell) {
+                // The last plate is not a quilt: it opens the editor where a player brings their own picture.
+                graphics.drawString(this.font, (selected ? "✔" : "") + "自定义…", x + 5, y + 9,
+                        locked ? 0x8C8C8C : 0xF2EEE4, false);
+            } else {
+                // The face itself as the plate's art: a player picks by look, not by reading names.
+                int[] size = QuiltTextures.dimensions(style, currentBorder);
+                blitScaled(graphics, QuiltTextures.texture(style, currentBorder), x + 4,
+                        y + (WALL_CELL_H - THUMB) / 2, THUMB, size[0], size[1]);
+                graphics.drawString(this.font, (selected ? "✔" : "") + wallName(style.displayName),
+                        x + THUMB + 7, y + 9, locked ? 0x8C8C8C : 0xF2EEE4, false);
+            }
         }
         graphics.drawString(this.font, Component.translatable("gui.sleep_well.quilt_title"),
                 wallLeft(), wallTop() + PAGE_ARROW_Y, TITLE_COLOR, false);
@@ -342,11 +350,16 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
             }
         }
         List<QuiltStyle> styles = QuiltStyle.all();
-        for (int i = pageStart(); i < pageEnd(styles.size()); i++) {
-            QuiltStyle style = styles.get(i);
+        for (int i = pageStart(); i < pageEnd(styles.size() + 1); i++) {
             int x = wallCellX(i);
             int y = wallCellY(i);
             if (mouseX >= x && mouseX < x + WALL_CELL_W && mouseY >= y && mouseY < y + WALL_CELL_H) {
+                if (i >= styles.size()) {
+                    openCustomEditor();
+                    this.closeQuiltWall();
+                    return true;
+                }
+                QuiltStyle style = styles.get(i);
                 boolean locked = this.menu.quiltLocked() && !style.isDefault();
                 if (!locked) {
                     this.chosenQuilt = style.id;
@@ -376,6 +389,15 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
         this.closeQuiltWall();
         return true;
     }
+    /** Opens the editor with whatever this maid wears now, so the frame starts where the player left it. */
+    private void openCustomEditor() {
+        net.minecraft.world.entity.Entity entity = this.minecraft.level == null ? null
+                : this.minecraft.level.getEntity(this.menu.entityId());
+        String current = this.chosenQuilt != null ? this.chosenQuilt : this.menu.quiltStyle();
+        net.minecraft.client.Minecraft.getInstance().setScreen(new CustomQuiltScreen(
+                this.menu.entityId(), current, ClientQuiltStyles.paramsOf(entity)));
+    }
+
     private Button addToggle(int key, boolean initial, String labelKey, int y, int width) {
         this.state[key] = initial;
         Button button = new SoftButton(this.leftPos + ROW_X, this.topPos + y, width, ROW_H,
