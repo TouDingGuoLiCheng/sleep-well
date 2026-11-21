@@ -74,20 +74,29 @@ public final class SleepEffectsHandler {
             return;
         }
         int credited = 0;
+        int refused = 0;
         long capped = Math.min(Integer.MAX_VALUE, jump);
         for (Track track : TRACKS.values()) {
-            if (!track.sleeping) {
+            // The jump is not a gift handed to whoever happens to be lying down at that instant: it is the rest
+            // of a night she has to have spent in bed. So three things must already hold - she is asleep right
+            // now, she has genuinely slept through the evening up to here (an in-game hour inside the window),
+            // and she has not got up once since the window opened.
+            boolean wholeNight = track.sleeping && track.inWindow
+                    && track.windowSleepTicks >= MIN_WINDOW_SLEEP_TICKS && !track.wokeInWindow;
+            if (!wholeNight) {
+                if (track.sleeping) {
+                    refused++;
+                }
                 continue;
             }
-            if (track.inWindow) {
-                track.windowSleepTicks += (int) capped;
-                track.sleptInWindow = true;
-            }
+            track.windowSleepTicks += (int) capped;
+            track.sleptInWindow = true;
             // "How long she slept" is measured from when she lay down, so the skipped night belongs inside it.
             track.sleepStart -= jump;
             credited++;
         }
-        LOGGER.info("[睡个好觉] 玩家睡过整夜：时间跳过 {} ticks，已记入 {} 只睡着女仆的本次睡眠", jump, credited);
+        LOGGER.info("[睡个好觉] 玩家睡过整夜：时间跳过 {} ticks，整夜都在睡的 {} 只已记账，睡得不完整的 {} 只不记",
+                jump, credited, refused);
     }
 
     /** Per maid, the little that has to survive between ticks. */
@@ -108,6 +117,8 @@ public final class SleepEffectsHandler {
         private boolean judged;
         /** Ticks of sleep accumulated towards the next 困倦 decay step. */
         private int drowsyTimer;
+        /** Set when she got up at any point inside the window: a night with a hole in it is not a whole night. */
+        private boolean wokeInWindow;
     }
 
     @SubscribeEvent
@@ -133,6 +144,7 @@ public final class SleepEffectsHandler {
                 track.sleptInWindow = false;
                 track.closedWhileAsleep = false;
                 track.judged = false;
+                track.wokeInWindow = false;
             }
         } else if (!napping && track.inWindow && ++track.outOfWindow >= WINDOW_CLOSE_GRACE) {
             track.inWindow = false;
@@ -175,6 +187,10 @@ public final class SleepEffectsHandler {
 
         // 3) She just got up.
         track.sleeping = false;
+        if (track.inWindow) {
+            // A hole in the night: the skip at dawn must not patch over it.
+            track.wokeInWindow = true;
+        }
         track.regenTimer = 0;
         track.drowsyTimer = 0;
         long slept = now - track.sleepStart;
