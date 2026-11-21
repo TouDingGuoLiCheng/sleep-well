@@ -202,8 +202,9 @@ public class CustomQuiltScreen extends Screen {
         graphics.drawString(this.font, name, this.left + 10, this.top + 19, 0xFFF2EEE4, false);
 
         float aspect = QuiltParams.frameAspect(this.params);
-        this.boxW = 100;
-        this.boxH = Math.max(56, Math.min(132, Math.round(this.boxW / aspect)));
+        // Height first so the box never reaches the crop buttons, width follows the cloth's shape.
+        this.boxH = 116;
+        this.boxW = Math.max(40, Math.min(104, Math.round(this.boxH * aspect)));
         this.boxX = this.left + 12;
         this.boxY = this.top + 34;
 
@@ -250,9 +251,7 @@ public class CustomQuiltScreen extends Screen {
         }
 
         graphics.drawString(this.font, (this.index + 1) + "/" + Math.max(1, this.files.size()),
-                this.boxX, this.boxY + this.boxH + 4, 0xFFB9C0CC, false);
-        graphics.drawString(this.font, this.framing ? "拖动图片取景 · 滚轮缩放" : "成品预览 · 与实际被子同一套取样",
-                this.boxX, this.boxY + this.boxH + 15, 0xFF8E97A6, false);
+                this.left + PANEL_W - 34, this.top + 7, 0xFFB9C0CC, false);
         super.render(graphics, mouseX, mouseY, partialTick);
     }
 

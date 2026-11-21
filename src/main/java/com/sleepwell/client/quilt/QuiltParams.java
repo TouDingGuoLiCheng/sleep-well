@@ -117,14 +117,18 @@ public final class QuiltParams {
     }
 
     /**
-     * The frame the picture is cut to, as width over height, taken from the art this mod already ships: a whole
-     * sheet is authored 192x256 (a third wider when the quilt is widened), and one tiled repeat is a square cell.
+     * The frame the picture is cut to, as width over height.
+     * <p>
+     * This is the cloth's own shape, not the artwork's: the sheet runs about 1.0 block across and 1.6 along, so a
+     * whole sheet is 5:8. The shipped art happens to be drawn 3:4, which is why those faces have always read a
+     * little wide on the bed - a custom picture gets the real shape and therefore no stretch at all. One tiled
+     * repeat is a square cell by construction.
      */
     public static float frameAspect(QuiltParams params) {
         if (params.tiled) {
             return 1.0F;
         }
-        return params.wideAcross ? 1.0F : 0.75F;
+        return params.wideAcross ? 0.833F : 0.625F;
     }
 
     /** How much of the picture's width the frame takes. */
