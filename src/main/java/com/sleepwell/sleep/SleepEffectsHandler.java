@@ -57,6 +57,39 @@ public final class SleepEffectsHandler {
     private SleepEffectsHandler() {
     }
 
+    /**
+     * Everyone sleeping through the night does not tick away: the clock jumps forward by thousands of ticks in one
+     * server tick. Counting ticks one by one therefore saw a maid who slept the whole night as "slept almost
+     * nothing", because only the handful of ticks before the jump had been added up - and the morning handed her
+     * 困倦 while she had just slept eight hours. This is also how players are detected: the event fires when the
+     * bed vote succeeds, which works the same in single player and with a dozen players, without watching anyone.
+     */
+    @SubscribeEvent
+    public static void onSleepFinished(net.minecraftforge.event.level.SleepFinishedTimeEvent event) {
+        if (!(event.getLevel() instanceof ServerLevel level)) {
+            return;
+        }
+        long jump = Math.max(0L, event.getNewTime() - level.getDayTime());
+        if (jump <= 0L) {
+            return;
+        }
+        int credited = 0;
+        long capped = Math.min(Integer.MAX_VALUE, jump);
+        for (Track track : TRACKS.values()) {
+            if (!track.sleeping) {
+                continue;
+            }
+            if (track.inWindow) {
+                track.windowSleepTicks += (int) capped;
+                track.sleptInWindow = true;
+            }
+            // "How long she slept" is measured from when she lay down, so the skipped night belongs inside it.
+            track.sleepStart -= jump;
+            credited++;
+        }
+        LOGGER.info("[睡个好觉] 玩家睡过整夜：时间跳过 {} ticks，已记入 {} 只睡着女仆的本次睡眠", jump, credited);
+    }
+
     /** Per maid, the little that has to survive between ticks. */
     private static final class Track {
         private boolean sleeping;
