@@ -17,6 +17,14 @@ public final class QuiltStyleSync {
     private QuiltStyleSync() {
     }
 
+    /** The shelf of named quilts is world state, so it arrives once on join and again whenever it changes. */
+    @SubscribeEvent
+    public static void onLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            com.sleepwell.quilt.QuiltCatalog.sendTo(player);
+        }
+    }
+
     @SubscribeEvent
     public static void onStartTracking(PlayerEvent.StartTracking event) {
         if (!(event.getTarget() instanceof EntityMaid maid) || !(event.getEntity() instanceof ServerPlayer player)) {

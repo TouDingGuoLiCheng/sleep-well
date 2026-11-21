@@ -32,7 +32,11 @@ public class CustomQuiltScreen extends Screen {
     private static final String[] PRESET_NAMES = {"棉被", "羽绒被", "蚕丝被", "化纤被", "夏凉被", "厚实格"};
 
     private final int entityId;
+    /** What the maid wears right now, so the name field can start from the name already given to that picture. */
+    private final String currentId;
     private final List<String> files;
+    private net.minecraft.client.gui.components.EditBox nameBox;
+    private String quiltName;
     private int index;
     private int presetIndex;
     private QuiltParams params;
@@ -53,6 +57,7 @@ public class CustomQuiltScreen extends Screen {
     public CustomQuiltScreen(int entityId, String currentId, QuiltParams params) {
         super(Component.literal("被子编辑"));
         this.entityId = entityId;
+        this.currentId = currentId == null ? "" : currentId;
         this.params = params == null ? QuiltParams.DEFAULT : params;
         CustomQuiltLibrary.rescan();
         this.files = CustomQuiltLibrary.names();
@@ -156,6 +161,37 @@ public class CustomQuiltScreen extends Screen {
                     CustomQuiltLibrary.rescan();
                     this.rebuildWidgets();
                 }).bounds(x + 106, bottom, 54, 18).build());
+
+        // The name is what the wall will list, so it sits right above the crop buttons, not buried in a dialog.
+        if (this.nameBox != null) {
+            this.quiltName = this.nameBox.getValue();
+        }
+        if (this.quiltName == null) {
+            this.quiltName = suggestedName();
+        }
+        this.nameBox = new net.minecraft.client.gui.components.EditBox(this.font, this.left + 10,
+                this.top + 152, 104, 16, Component.literal("被子名称"));
+        this.nameBox.setMaxLength(32);
+        this.nameBox.setHint(Component.literal("被子名称"));
+        this.nameBox.setValue(this.quiltName);
+        addRenderableWidget(this.nameBox);
+    }
+
+    /** A starting name: the name this picture already has, else the file's own name without its extension. */
+    private String suggestedName() {
+        if (CustomQuiltLibrary.isCustom(this.currentId)) {
+            String known = ClientQuiltCatalog.nameOf(
+                    this.currentId.substring(CustomQuiltLibrary.ID_PREFIX.length()));
+            if (!known.isEmpty()) {
+                return known;
+            }
+        }
+        if (this.files.isEmpty()) {
+            return "自定义被子";
+        }
+        String name = this.files.get(this.index);
+        int dot = name.lastIndexOf('.');
+        return com.sleepwell.quilt.SavedQuilt.clean(dot > 0 ? name.substring(0, dot) : name);
     }
 
     private Path currentFile() {
@@ -177,10 +213,21 @@ public class CustomQuiltScreen extends Screen {
             return;
         }
         Path file = currentFile();
+        String name = com.sleepwell.quilt.SavedQuilt.clean(this.nameBox == null ? "" : this.nameBox.getValue());
         // Publish first: the id every other client sees is the picture's content hash, not a local file name.
         String hash = file == null ? "" : QuiltImageCache.publish(file);
-        String id = CustomQuiltLibrary.ID_PREFIX + (hash.isEmpty() ? this.files.get(this.index) : hash);
-        SleepWellNetwork.CHANNEL.sendToServer(new SaveQuiltStylePacket(this.entityId, id, this.params));
+        if (hash.isEmpty()) {
+            // The picture could not be read or was too heavy: it still works on this client alone.
+            String id = CustomQuiltLibrary.ID_PREFIX + this.files.get(this.index);
+            SleepWellNetwork.CHANNEL.sendToServer(new SaveQuiltStylePacket(this.entityId, id, this.params));
+            this.onClose();
+            return;
+        }
+        // Saving is two things: the quilt joins the wall under its name, and the maid puts it on.
+        SleepWellNetwork.CHANNEL.sendToServer(
+                new com.sleepwell.network.QuiltCatalogAddPacket(hash, name, this.params.save()));
+        SleepWellNetwork.CHANNEL.sendToServer(
+                new SaveQuiltStylePacket(this.entityId, "custom:" + hash, this.params));
         this.onClose();
     }
 
