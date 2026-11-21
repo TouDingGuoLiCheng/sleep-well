@@ -125,10 +125,10 @@ public final class QuiltParams {
      * repeat is a square cell by construction.
      */
     public static float frameAspect(QuiltParams params) {
-        if (params.tiled) {
-            return 1.0F;
-        }
-        return params.wideAcross ? 0.833F : 0.625F;
+        // The cloth is 5:8 (a third wider when widened). Each repeat divides it, so unequal repeat counts change
+        // the shape of one cell - and equal counts do not, which is why tiled and whole must agree at 格数 1.
+        float cloth = params.wideAcross ? 0.833F : 0.625F;
+        return cloth * params.repeatV / params.repeatU;
     }
 
     /** How much of the picture's width the frame takes. */
