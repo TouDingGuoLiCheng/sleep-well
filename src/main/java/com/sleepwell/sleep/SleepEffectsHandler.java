@@ -204,10 +204,14 @@ public final class SleepEffectsHandler {
         boolean napSleep = napping;
         // A skipped night is a whole night: she was in bed for it, so the morning owes her 干劲 whatever the
         // window counters managed to add up before the clock jumped.
+        // A nap that ran into the night skip settles like any other night sleep: she was in bed while the clock
+        // jumped, so the morning pays her 干劲. Only a nap that ended on its own, in the middle of the day, is
+        // settled as "neither paid nor punished".
         boolean enough = track.skippedNight || (!napSleep && track.sleptInWindow
                 && track.windowSleepTicks >= MIN_WINDOW_SLEEP_TICKS
                 && slept >= MIN_SLEEP_TICKS);
-        boolean lieIn = !track.inWindow;
+        // A nap is not a lie-in, even though it never opens the window: no extra minutes for it.
+        boolean lieIn = !napSleep && !track.inWindow;
         if (enough && SleepWellConfig.VIGOR_ENABLED.get()) {
             track.judged = true;
             applyVigor(maid, lieIn);
