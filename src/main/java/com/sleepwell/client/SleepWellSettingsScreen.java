@@ -224,9 +224,8 @@ public class SleepWellSettingsScreen extends AbstractMaidContainerGui<SleepWellC
     private void renderQuiltWall(GuiGraphics graphics, int mouseX, int mouseY) {
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
-        // Dim the page behind the plates: without it the sunny bed art shows through and everything reads as mush.
-        graphics.fill(this.leftPos + PANEL_X, this.topPos + PANEL_Y,
-                this.leftPos + PANEL_X + PANEL_W, this.topPos + PANEL_Y + PANEL_H, 0xE6141A2B);
+        // No sheet behind the wall any more: the page's own sunny bed art stays visible, and the plates sit on it
+        // as translucent cards. The owner asked for exactly that - the wall is part of the page, not a black popup.
         List<QuiltStyle> styles = QuiltStyle.all();
         String current = this.chosenQuilt != null ? this.chosenQuilt : this.menu.quiltStyle();
         String currentBorder = currentBorder();
