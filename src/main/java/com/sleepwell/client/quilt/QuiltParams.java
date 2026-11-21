@@ -119,15 +119,15 @@ public final class QuiltParams {
     /**
      * The frame the picture is cut to, as width over height.
      * <p>
-     * This is the cloth's own shape, not the artwork's: the sheet runs about 1.0 block across and 1.6 along, so a
-     * whole sheet is 5:8. The shipped art happens to be drawn 3:4, which is why those faces have always read a
-     * little wide on the bed - a custom picture gets the real shape and therefore no stretch at all. One tiled
-     * repeat is a square cell by construction.
+     * This is the cloth's own shape, measured from the sheet {@code PhysicalQuilt} actually solves: it spans
+     * 1.92 blocks across the bed (over both sides, not just the mattress) and 1.43 blocks along it, so the top
+     * face is 1.343:1, wider than it is long. A sheet cut to any other shape can only be painted on that face by
+     * squashing it, which is exactly what a portrait crop did: it reached the bed roughly twice as wide as the
+     * frame the player had dragged. Each repeat divides the cloth, so unequal repeat counts change one cell.
      */
     public static float frameAspect(QuiltParams params) {
-        // The cloth is 5:8 (a third wider when widened). Each repeat divides it, so unequal repeat counts change
-        // the shape of one cell - and equal counts do not, which is why tiled and whole must agree at 格数 1.
-        float cloth = params.wideAcross ? 0.833F : 0.625F;
+        // 1.92 / 1.43, and a widened quilt takes a third more across without getting any longer.
+        float cloth = params.wideAcross ? 1.790F : 1.343F;
         return cloth * params.repeatV / params.repeatU;
     }
 

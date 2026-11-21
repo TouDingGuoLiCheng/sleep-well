@@ -252,9 +252,15 @@ public class CustomQuiltScreen extends Screen {
         graphics.drawString(this.font, name, this.left + 10, this.top + 19, 0xFFF2EEE4, false);
 
         float aspect = QuiltParams.frameAspect(this.params);
-        // Height first so the box never reaches the crop buttons, width follows the cloth's shape.
-        this.boxH = 116;
-        this.boxW = Math.max(40, Math.min(104, Math.round(this.boxH * aspect)));
+        // Fill whichever side of the column is the tighter one: a wide frame is laid out by width, a tall one by
+        // height, so the box always keeps the cloth's shape instead of being clamped into the wrong one.
+        if (aspect >= 1.0F) {
+            this.boxW = 104;
+            this.boxH = Math.max(40, Math.min(116, Math.round(this.boxW / aspect)));
+        } else {
+            this.boxH = 116;
+            this.boxW = Math.max(40, Math.min(104, Math.round(this.boxH * aspect)));
+        }
         this.boxX = this.left + 12;
         this.boxY = this.top + 34;
 
