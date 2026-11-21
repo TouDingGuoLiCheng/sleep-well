@@ -6,6 +6,7 @@
   "refmap": "sleep_well.refmap.json",
   "mixins": [
     "EntityMaidScheduleMixin",
+    "MaidStopSleepingTraceMixin",
     "MaidClearSleepTaskMixin",
     "SchedulePosMixin"
   ],

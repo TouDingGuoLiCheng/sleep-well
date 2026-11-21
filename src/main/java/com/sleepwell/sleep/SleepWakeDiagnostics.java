@@ -95,6 +95,8 @@ public final class SleepWakeDiagnostics {
         track.wakesInWindow = track.lastWake > 0L && now - track.lastWake <= REPEAT_WINDOW
                 ? track.wakesInWindow + 1 : 1;
         track.lastWake = now;
+        LOGGER.info("[诊断] 入睡 maid={} 日程={} 任务={} 主人距离={}",
+                name(maid), maid.getScheduleDetail().getName(), taskUid(maid), ownerDistance(maid));
         LOGGER.info("[诊断] 起身 maid={} 睡了={}秒 日程={} 任务={} 主人距离={} 传送={} 受伤={} 窗口内第{}次",
                 name(maid), (now - track.sleptFrom) / 20L, maid.getScheduleDetail().getName(), taskUid(maid),
                 ownerDistance(maid), track.teleported, track.damage.isEmpty() ? "无" : track.damage,
