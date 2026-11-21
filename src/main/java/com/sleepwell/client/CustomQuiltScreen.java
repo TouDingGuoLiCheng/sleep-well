@@ -176,7 +176,10 @@ public class CustomQuiltScreen extends Screen {
             this.onClose();
             return;
         }
-        String id = CustomQuiltLibrary.ID_PREFIX + this.files.get(this.index);
+        Path file = currentFile();
+        // Publish first: the id every other client sees is the picture's content hash, not a local file name.
+        String hash = file == null ? "" : QuiltImageCache.publish(file);
+        String id = CustomQuiltLibrary.ID_PREFIX + (hash.isEmpty() ? this.files.get(this.index) : hash);
         SleepWellNetwork.CHANNEL.sendToServer(new SaveQuiltStylePacket(this.entityId, id, this.params));
         this.onClose();
     }

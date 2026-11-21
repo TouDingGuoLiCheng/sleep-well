@@ -48,5 +48,20 @@ public final class SleepWellNetwork {
                 .decoder(SyncQuiltStylePacket::decode)
                 .consumerMainThread(SyncQuiltStylePacket::handle)
                 .add();
+        CHANNEL.messageBuilder(QuiltImageUploadPacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(QuiltImageUploadPacket::encode)
+                .decoder(QuiltImageUploadPacket::decode)
+                .consumerMainThread(QuiltImageUploadPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(QuiltImageRequestPacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(QuiltImageRequestPacket::encode)
+                .decoder(QuiltImageRequestPacket::decode)
+                .consumerMainThread(QuiltImageRequestPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(QuiltImagePacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(QuiltImagePacket::encode)
+                .decoder(QuiltImagePacket::decode)
+                .consumerMainThread(QuiltImagePacket::handle)
+                .add();
     }
 }

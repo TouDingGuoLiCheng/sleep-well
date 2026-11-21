@@ -114,6 +114,33 @@ public final class CustomQuiltLibrary {
         return QuiltStyle.runtime(ID_PREFIX + name, name, path, safe);
     }
 
+    /** A picture the server handed us, or one of the player's own files, by content hash. */
+    public static Path pathForHash(String hash) {
+        if (hash == null || hash.isEmpty()) {
+            return null;
+        }
+        Path cached = com.sleepwell.client.QuiltImageCache.file(hash);
+        if (Files.isRegularFile(cached)) {
+            return cached;
+        }
+        for (Map.Entry<String, Path> entry : FILES.entrySet()) {
+            if (hash.equals(com.sleepwell.client.QuiltImageCache.hashOf(entry.getValue()))) {
+                return entry.getValue();
+            }
+        }
+        return null;
+    }
+
+    /** The quilt for a {@code custom:<hash>} id, or null when this client has no such picture yet. */
+    public static QuiltStyle styleByHash(String hash, QuiltParams params) {
+        Path path = pathForHash(hash);
+        if (path == null) {
+            return null;
+        }
+        QuiltParams safe = params == null ? QuiltParams.DEFAULT : params;
+        return QuiltStyle.runtime(ID_PREFIX + hash, hash, path, safe);
+    }
+
     /** Resolves a stored id back to a style, or null when this client does not have that picture. */
     public static QuiltStyle styleById(String id, QuiltParams params) {
         if (id == null || !id.startsWith(ID_PREFIX)) {

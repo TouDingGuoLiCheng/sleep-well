@@ -68,11 +68,18 @@ public final class ClientQuiltStyles {
     public static com.sleepwell.client.quilt.QuiltStyle styleFor(Entity entity) {
         String id = of(entity);
         if (com.sleepwell.client.quilt.CustomQuiltLibrary.isCustom(id)) {
+            String rest = id.substring(com.sleepwell.client.quilt.CustomQuiltLibrary.ID_PREFIX.length());
             com.sleepwell.client.quilt.QuiltStyle custom =
-                    com.sleepwell.client.quilt.CustomQuiltLibrary.styleById(id, paramsOf(entity));
+                    com.sleepwell.client.quilt.CustomQuiltLibrary.styleByHash(rest, paramsOf(entity));
+            if (custom == null) {
+                // Older saves named the file directly; keep them working.
+                custom = com.sleepwell.client.quilt.CustomQuiltLibrary.styleById(id, paramsOf(entity));
+            }
             if (custom != null) {
                 return custom;
             }
+            // Somebody else's picture: ask the server once, and wear the default until it lands.
+            QuiltImageCache.request(rest);
         }
         return com.sleepwell.client.quilt.QuiltStyle.of(id);
     }

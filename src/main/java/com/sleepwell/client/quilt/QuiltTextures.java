@@ -360,6 +360,21 @@ public final class QuiltTextures {
         return decoded;
     }
 
+    /** The picture as png bytes at sheet scale: the form that travels to the server and gets hashed. */
+    public static byte[] normalisedPng(java.nio.file.Path file) {
+        try {
+            java.awt.image.BufferedImage source = picture(file);
+            if (source == null) {
+                return null;
+            }
+            java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+            javax.imageio.ImageIO.write(source, "png", bytes);
+            return bytes.toByteArray();
+        } catch (Exception failure) {
+            return null;
+        }
+    }
+
     /** Pixel size of a player's picture, so the editor can lay its frame over the real image. */
     public static int[] pictureSize(java.nio.file.Path file) {
         java.awt.image.BufferedImage picture = picture(file);
