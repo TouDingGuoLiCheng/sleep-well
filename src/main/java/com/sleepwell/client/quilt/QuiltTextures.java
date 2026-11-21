@@ -38,9 +38,14 @@ public final class QuiltTextures {
     public static ResourceLocation texture(QuiltStyle style, String borderId) {
         QuiltBorder border = QuiltBorder.of(borderId);
         if (border.isNone()) {
+            if (style.file != null) {
+                return fileTile(style);
+            }
             return style.print == null ? style.texture() : printTile(style);
         }
-        String key = style.id + "|" + border.id;
+        // A player's numbers decide how the picture lies on the sheet, so they belong in the cache key.
+        String key = style.id + "|" + border.id + (style.file == null ? ""
+                : "@" + style.repeatU + "x" + style.repeatV);
         ResourceLocation built = CACHE.get(key);
         if (built != null) {
             return built;
@@ -201,7 +206,51 @@ public final class QuiltTextures {
 
     /** The sheet this quilt draws from: a drawn file, or a print built on the spot. */
     private static NativeImage faceOf(QuiltStyle style) {
+        if (style.file != null) {
+            return readFile(style.file);
+        }
         return style.print == null ? read(style.texture()) : buildPrint(style);
+    }
+
+    /** The picture straight off the player's disk; the file is the only source a custom quilt has. */
+    private static NativeImage readFile(java.nio.file.Path file) {
+        try (InputStream stream = java.nio.file.Files.newInputStream(file)) {
+            return NativeImage.read(stream);
+        } catch (Exception failure) {
+            return null;
+        }
+    }
+
+    /** A player's image registered as a texture, cached once per quilt id. */
+    private static ResourceLocation fileTile(QuiltStyle style) {
+        String key = style.id + "|file";
+        ResourceLocation cached = CACHE.get(key);
+        if (cached != null) {
+            return cached;
+        }
+        if (FAILED.contains(key)) {
+            return style.texture();
+        }
+        NativeImage image = readFile(style.file);
+        if (image == null) {
+            FAILED.add(key);
+            return style.texture();
+        }
+        try {
+            ResourceLocation id = new ResourceLocation(SleepWellMod.MOD_ID,
+                    "textures/quilt/custom_" + Math.abs(style.id.hashCode()));
+            DynamicTexture texture = new DynamicTexture(image);
+            Minecraft.getInstance().getTextureManager().register(id, texture);
+            texture.upload();
+            image = null; // the DynamicTexture owns the image now
+            CACHE.put(key, id);
+            return id;
+        } catch (Throwable failure) {
+            FAILED.add(key);
+            return style.texture();
+        } finally {
+            close(image);
+        }
     }
 
     /** One pixel of the flattened sheet: the face sampled where the quilt's own repeat count would land. */

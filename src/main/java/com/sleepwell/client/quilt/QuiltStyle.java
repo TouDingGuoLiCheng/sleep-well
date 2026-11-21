@@ -58,6 +58,8 @@ public final class QuiltStyle {
     public final float body;
     /** Non-null when the cloth is printed at runtime with a vanilla sprite instead of our own artwork. */
     public final Print print;
+    /** Set only for a quilt built from a player's own image file; null for every built-in sheet. */
+    public final java.nio.file.Path file;
 
     /**
      * A print: a vanilla sprite stamped across a cloth of ours. The sprite's bytes stay in the player's own jar,
@@ -101,6 +103,13 @@ public final class QuiltStyle {
     private QuiltStyle(String id, String displayName, String textureId, boolean dyeTinted, Tiling tiling,
                        float repeatU, float repeatV, boolean wideAcross, float shell, float underShade,
                        float rimShade, float rimV, float loft, float body, Print print) {
+        this(id, displayName, textureId, dyeTinted, tiling, repeatU, repeatV, wideAcross, shell, underShade,
+                rimShade, rimV, loft, body, print, null);
+    }
+
+    private QuiltStyle(String id, String displayName, String textureId, boolean dyeTinted, Tiling tiling,
+                       float repeatU, float repeatV, boolean wideAcross, float shell, float underShade,
+                       float rimShade, float rimV, float loft, float body, Print print, java.nio.file.Path file) {
         this.id = id;
         this.displayName = displayName;
         this.textureId = textureId;
@@ -116,6 +125,23 @@ public final class QuiltStyle {
         this.loft = loft;
         this.body = body;
         this.print = print;
+        this.file = file;
+    }
+
+    /**
+     * A quilt built from a player's own image and that player's numbers. Never registered: two maids may wear the
+     * same picture with different numbers, so a shared registry entry would be wrong.
+     */
+    public static QuiltStyle runtime(String id, String displayName, java.nio.file.Path file, QuiltParams params) {
+        return new QuiltStyle(id, displayName, null, params.dyeTinted,
+                params.tiled ? Tiling.TILED : Tiling.WHOLE, params.repeatU, params.repeatV,
+                params.wideAcross, params.shell, params.underShade, params.rimShade, 0.16F,
+                params.loft, params.body, null, file);
+    }
+
+    /** True for a player's own sheet, whose picture is read from disk instead of the jar. */
+    public boolean isCustom() {
+        return this.file != null;
     }
 
     // Declared before the quilts themselves: the constant below registers into this map while the class is
@@ -299,6 +325,10 @@ public final class QuiltStyle {
 
     /** Every quilt owns exactly one texture; the bed's dye is no longer involved. */
     public ResourceLocation texture() {
+        if (this.file != null) {
+            // A player's image is not a resource; the renderer loads the file and registers it dynamically.
+            return new ResourceLocation("sleep_well", "textures/quilt/custom_" + this.id.replace(':', '_'));
+        }
         return new ResourceLocation("sleep_well", "textures/quilt/" + textureId + ".png");
     }
 }
