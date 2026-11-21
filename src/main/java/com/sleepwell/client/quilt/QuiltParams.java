@@ -131,13 +131,19 @@ public final class QuiltParams {
         return cloth * params.repeatV / params.repeatU;
     }
 
-    /** How much of the picture's width the frame takes. */
+    /**
+     * How much of the picture's width the frame takes.
+     * <p>
+     * Never more than keeps the frame inside the picture: if the cloth changed shape (wider quilt, different
+     * repeat count) while a wide crop was stored, honouring that width would need a frame taller than the
+     * picture, and clamping the height afterwards would squash the picture instead of re-cutting it.
+     */
     public float effectiveCropW(float imageWidth, float imageHeight) {
+        float widestThatFits = Math.min(1.0F, frameAspect(this) * imageHeight / imageWidth);
         if (this.cropW > 0.01F) {
-            return Math.min(1.0F, this.cropW);
+            return Math.min(this.cropW, widestThatFits);
         }
-        float widthForHeight = imageHeight * frameAspect(this) / imageWidth;
-        return Math.min(1.0F, widthForHeight);
+        return widestThatFits;
     }
 
     public float effectiveCropH(float imageWidth, float imageHeight) {
