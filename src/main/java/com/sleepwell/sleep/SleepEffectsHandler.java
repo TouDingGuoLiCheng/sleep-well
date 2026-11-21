@@ -84,7 +84,11 @@ public final class SleepEffectsHandler {
         }
         Track track = TRACKS.computeIfAbsent(maid.getUUID(), key -> new Track());
         long now = level.getGameTime();
-        boolean rest = maid.getScheduleDetail() == Activity.REST;
+        // A nap forces the rest schedule onto her brain, so asking the schedule alone would let a ten-minute
+        // afternoon nap open - and then close - her night window. That is what handed 困倦 to maids who had
+        // just taken a nap. The nap is not a night: it neither opens nor closes the window.
+        boolean napping = com.sleepwell.liein.LieInHandler.isNapping(maid);
+        boolean rest = !napping && maid.getScheduleDetail() == Activity.REST;
         boolean sleeping = maid.isSleeping();
 
         // 1) Window bookkeeping. Opening on REST, closing only after the grace period.
@@ -97,7 +101,7 @@ public final class SleepEffectsHandler {
                 track.closedWhileAsleep = false;
                 track.judged = false;
             }
-        } else if (track.inWindow && ++track.outOfWindow >= WINDOW_CLOSE_GRACE) {
+        } else if (!napping && track.inWindow && ++track.outOfWindow >= WINDOW_CLOSE_GRACE) {
             track.inWindow = false;
             if (sleeping) {
                 // Still in bed after her window ended: a lie-in. Judge it when she gets up.
@@ -141,14 +145,15 @@ public final class SleepEffectsHandler {
         track.regenTimer = 0;
         track.drowsyTimer = 0;
         long slept = now - track.sleepStart;
-        boolean enough = track.sleptInWindow
+        boolean napSleep = napping;
+        boolean enough = !napSleep && track.sleptInWindow
                 && track.windowSleepTicks >= MIN_WINDOW_SLEEP_TICKS
                 && slept >= MIN_SLEEP_TICKS;
         boolean lieIn = !track.inWindow;
         if (enough && SleepWellConfig.VIGOR_ENABLED.get()) {
             track.judged = true;
             applyVigor(maid, lieIn);
-        } else if (!enough && track.closedWhileAsleep && SleepWellConfig.DROWSY_ENABLED.get()) {
+        } else if (!enough && !napSleep && track.closedWhileAsleep && SleepWellConfig.DROWSY_ENABLED.get()) {
             // Slept through most of the window but still too little: same verdict as never lying down.
             track.judged = true;
             applyDrowsy(maid, track);

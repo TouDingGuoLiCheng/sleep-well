@@ -114,7 +114,11 @@ public final class LieInHandler {
         String idleUid = idleTaskUid();
         String taskUid = taskUid(maid);
         Activity activity = maid.getScheduleDetail();
-        boolean resting = activity == Activity.REST;
+        // While a nap runs the brain is held on our own REST schedule, so the schedule she reports is the one
+        // we forced, not hers. Reading it as "the night has arrived" released every nap on its second tick,
+        // which is the maid who climbs into bed and stands straight back up.
+        boolean forcedRest = maid.getBrain().getSchedule() == FORCED_REST;
+        boolean resting = !forcedRest && activity == Activity.REST;
         logTransition(id, state, activity, maid.isSleeping());
 
         if (state.active()) {
@@ -131,7 +135,9 @@ public final class LieInHandler {
         }
 
         if (state.until() > 0L && now - state.started() > MAX_STATE_TICKS) {
-            state.clear();
+            // Dropped without restoring, this left her brain stuck on our own REST schedule for the rest of
+            // the session: every later nap then looked like "the night has arrived" and ended on its next tick.
+            release(maid, state, "stale state");
         }
 
         long day = level.getDayTime() / DAY_LENGTH;
@@ -313,6 +319,12 @@ public final class LieInHandler {
             return;
         }
         Schedule original = state.originalSchedule();
+        if (original == null && maid.getBrain().getSchedule() == FORCED_REST) {
+            // Nothing recorded, and she is still on our schedule: say so, because guessing a replacement
+            // would silently rewrite her real schedule.
+            LOGGER.warn("Lie-in: maid {} dropped while held on REST with no original schedule ({})",
+                    maid.getUUID(), reason);
+        }
         if (original != null) {
             maid.getBrain().setSchedule(original);
             LOGGER.info("Lie-in: maid {} brain schedule restored ({})", maid.getUUID(), reason);
