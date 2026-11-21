@@ -23,10 +23,10 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class QuiltTextures {
     /** The finished sheet every composited cover is laid out on: the size the whole-sheet art uses. */
-    private static final int SHEET_W = 192;
+    public static final int SHEET_W = 192;
     /** A custom picture keeps this many pixels on its longest side: enough for a close-up, cheap in memory. */
     private static final int MAX_CUSTOM_SIDE = 768;
-    private static final int SHEET_H = 256;
+    public static final int SHEET_H = 256;
     private static final Map<String, ResourceLocation> CACHE = new ConcurrentHashMap<>();
     /** Pairs whose images could not be read, so a missing file does not retry every frame. */
     private static final Set<String> FAILED = ConcurrentHashMap.newKeySet();
@@ -140,7 +140,10 @@ public final class QuiltTextures {
      * what the player tweaks in the editor is what she gets on the bed.
      */
     public static ResourceLocation preview(QuiltStyle style) {
-        String key = "preview|" + style.id + "|" + style.repeatU + "x" + style.repeatV;
+        QuiltParams shown = style.custom == null ? QuiltParams.DEFAULT : style.custom;
+        String key = "preview|" + style.id + "|" + style.repeatU + "x" + style.repeatV
+                + "|" + Math.round(shown.cropX * 96) + "," + Math.round(shown.cropY * 96)
+                + "," + Math.round(shown.cropW * 96);
         ResourceLocation cached = CACHE.get(key);
         if (cached != null) {
             return cached;

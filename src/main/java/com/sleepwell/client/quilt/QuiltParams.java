@@ -116,11 +116,15 @@ public final class QuiltParams {
                 cropX, cropY, cropW);
     }
 
-    /** The frame the picture is cut to, as width over height: 4/3 on a whole sheet, 1 on a square tile. */
+    /**
+     * The frame the picture is cut to, as width over height, taken from the art this mod already ships: a whole
+     * sheet is authored 192x256 (a third wider when the quilt is widened), and one tiled repeat is a square cell.
+     */
     public static float frameAspect(QuiltParams params) {
-        float width = 2.0F * (params.wideAcross ? 4.0F / 3.0F : 1.0F) / Math.max(0.25F, params.repeatU);
-        float height = 1.5F / Math.max(0.25F, params.repeatV);
-        return width / height;
+        if (params.tiled) {
+            return 1.0F;
+        }
+        return params.wideAcross ? 1.0F : 0.75F;
     }
 
     /** How much of the picture's width the frame takes. */

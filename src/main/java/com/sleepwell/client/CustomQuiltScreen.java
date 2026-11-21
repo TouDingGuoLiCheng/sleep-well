@@ -47,6 +47,8 @@ public class CustomQuiltScreen extends Screen {
     private float drawW = 1.0F;
     private float drawH = 1.0F;
     private boolean dragging;
+    /** True while the picture with its frame is shown; false once the finished quilt preview takes over. */
+    private boolean framing = true;
 
     public CustomQuiltScreen(int entityId, String currentId, QuiltParams params) {
         super(Component.literal("被子编辑"));
@@ -137,7 +139,13 @@ public class CustomQuiltScreen extends Screen {
                 button -> {
                     this.params = this.params.withCrop(0.5F, 0.5F, 0.0F);
                     this.rebuildWidgets();
-                }).bounds(this.left + 12, this.top + PANEL_H - 46, 64, 18).build());
+                }).bounds(this.left + 12, this.top + PANEL_H - 46, 46, 18).build());
+        addRenderableWidget(Button.builder(
+                Component.literal(this.framing ? "确定取景" : "重新取景"), button -> {
+                    this.framing = !this.framing;
+                    button.setMessage(Component.literal(this.framing ? "确定取景" : "重新取景"));
+                    this.rebuildWidgets();
+                }).bounds(this.left + 62, this.top + PANEL_H - 46, 54, 18).build());
         addRenderableWidget(Button.builder(Component.literal("<"), button -> shift(-1))
                 .bounds(x, bottom, 20, 18).build());
         addRenderableWidget(Button.builder(Component.literal(">"), button -> shift(1))
@@ -202,7 +210,22 @@ public class CustomQuiltScreen extends Screen {
         graphics.fill(this.boxX - 1, this.boxY - 1, this.boxX + this.boxW + 1, this.boxY + this.boxH + 1,
                 0xFF0B0F18);
         Path file = currentFile();
-        if (file != null) {
+        if (!this.framing && !this.files.isEmpty()) {
+            // The finished sheet: the same sampling the bed will use, tiling and crop included.
+            QuiltStyle style = CustomQuiltLibrary.style(this.files.get(this.index), this.params);
+            if (style != null) {
+                com.mojang.blaze3d.vertex.PoseStack pose = graphics.pose();
+                pose.pushPose();
+                pose.translate(this.boxX, this.boxY, 0.0F);
+                pose.scale(this.boxW / (float) QuiltTextures.SHEET_W, this.boxH / (float) QuiltTextures.SHEET_H,
+                        1.0F);
+                graphics.blit(QuiltTextures.preview(style), 0, 0, 0, 0,
+                        QuiltTextures.SHEET_W, QuiltTextures.SHEET_H,
+                        QuiltTextures.SHEET_W, QuiltTextures.SHEET_H);
+                pose.popPose();
+            }
+        }
+        if (this.framing && file != null) {
             ResourceLocation source = QuiltTextures.sourceTexture(file);
             if (source != null) {
                 int[] size = QuiltTextures.pictureSize(file);
@@ -221,13 +244,15 @@ public class CustomQuiltScreen extends Screen {
             }
         }
         // The frame: everything outside it is what the quilt will not use.
-        graphics.fill(this.boxX, this.boxY, this.boxX + this.boxW, this.boxY + this.boxH, 0x22141A2B);
-        graphics.renderOutline(this.boxX, this.boxY, this.boxW, this.boxH, 0xEEF2E27A);
+        if (this.framing) {
+            graphics.fill(this.boxX, this.boxY, this.boxX + this.boxW, this.boxY + this.boxH, 0x22141A2B);
+            graphics.renderOutline(this.boxX, this.boxY, this.boxW, this.boxH, 0xEEF2E27A);
+        }
 
         graphics.drawString(this.font, (this.index + 1) + "/" + Math.max(1, this.files.size()),
                 this.boxX, this.boxY + this.boxH + 4, 0xFFB9C0CC, false);
-        graphics.drawString(this.font, "拖动图片取景 · 滚轮缩放", this.boxX, this.boxY + this.boxH + 15,
-                0xFF8E97A6, false);
+        graphics.drawString(this.font, this.framing ? "拖动图片取景 · 滚轮缩放" : "成品预览 · 与实际被子同一套取样",
+                this.boxX, this.boxY + this.boxH + 15, 0xFF8E97A6, false);
         super.render(graphics, mouseX, mouseY, partialTick);
     }
 
@@ -246,7 +271,7 @@ public class CustomQuiltScreen extends Screen {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (button == 0 && mouseX >= this.boxX && mouseX < this.boxX + this.boxW
+        if (this.framing && button == 0 && mouseX >= this.boxX && mouseX < this.boxX + this.boxW
                 && mouseY >= this.boxY && mouseY < this.boxY + this.boxH) {
             this.dragging = true;
             dragTo(mouseX, mouseY);
@@ -272,7 +297,7 @@ public class CustomQuiltScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
-        if (mouseX >= this.boxX && mouseX < this.boxX + this.boxW
+        if (this.framing && mouseX >= this.boxX && mouseX < this.boxX + this.boxW
                 && mouseY >= this.boxY && mouseY < this.boxY + this.boxH) {
             Path file = currentFile();
             if (file != null) {
