@@ -26,8 +26,10 @@ public final class CustomQuiltLibrary {
     private static final Logger LOGGER = LoggerFactory.getLogger("sleep_well/custom");
     public static final String ID_PREFIX = "custom:";
     /** Bigger than this and the editor's preview gets slow and the upload would be wasteful. */
-    public static final int MAX_BYTES = 256 * 1024;
-    public static final int MAX_SIDE = 512;
+    public static final int MAX_BYTES = 512 * 1024;
+    public static final int MAX_SIDE = 1024;
+    /** Formats ImageIO can decode on this JVM; jpg matters most, it is what a phone photo is. */
+    private static final java.util.List<String> EXTENSIONS = java.util.List.of(".png", ".jpg", ".jpeg", ".bmp", ".gif");
 
     private static final Map<String, Path> FILES = new LinkedHashMap<>();
 
@@ -50,7 +52,10 @@ public final class CustomQuiltLibrary {
         }
         try (Stream<Path> stream = Files.list(folder)) {
             stream.filter(Files::isRegularFile)
-                    .filter(path -> path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".png"))
+                    .filter(path -> {
+                        String name = path.getFileName().toString().toLowerCase(Locale.ROOT);
+                        return EXTENSIONS.stream().anyMatch(name::endsWith);
+                    })
                     .sorted()
                     .forEach(path -> FILES.put(nameOf(path), path));
         } catch (IOException failure) {
@@ -73,7 +78,8 @@ public final class CustomQuiltLibrary {
     /** The file name without extension, which is what the id carries. */
     public static String nameOf(Path path) {
         String file = path.getFileName().toString();
-        return file.substring(0, file.length() - 4);
+        int dot = file.lastIndexOf('.');
+        return dot <= 0 ? file : file.substring(0, dot);
     }
 
     /**

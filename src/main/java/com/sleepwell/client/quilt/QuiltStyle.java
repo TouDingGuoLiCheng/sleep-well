@@ -133,8 +133,11 @@ public final class QuiltStyle {
      * same picture with different numbers, so a shared registry entry would be wrong.
      */
     public static QuiltStyle runtime(String id, String displayName, java.nio.file.Path file, QuiltParams params) {
+        // Repeat count is what the geometry multiplies the UV by, so "whole sheet" has to mean exactly 1 here.
+        float repeatU = params.tiled ? params.repeatU : 1.0F;
+        float repeatV = params.tiled ? params.repeatV : 1.0F;
         return new QuiltStyle(id, displayName, null, params.dyeTinted,
-                params.tiled ? Tiling.TILED : Tiling.WHOLE, params.repeatU, params.repeatV,
+                params.tiled ? Tiling.TILED : Tiling.WHOLE, repeatU, repeatV,
                 params.wideAcross, params.shell, params.underShade, params.rimShade, 0.16F,
                 params.loft, params.body, null, file);
     }

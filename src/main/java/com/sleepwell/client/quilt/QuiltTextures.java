@@ -24,10 +24,15 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class QuiltTextures {
     /** The finished sheet every composited cover is laid out on: the size the whole-sheet art uses. */
     private static final int SHEET_W = 192;
+    /** A custom picture keeps this many pixels on its longest side: enough for a close-up, cheap in memory. */
+    private static final int MAX_CUSTOM_SIDE = 768;
     private static final int SHEET_H = 256;
     private static final Map<String, ResourceLocation> CACHE = new ConcurrentHashMap<>();
     /** Pairs whose images could not be read, so a missing file does not retry every frame. */
     private static final Set<String> FAILED = ConcurrentHashMap.newKeySet();
+    /** Preview textures are thrown away as the player drags a slider; keep only the recent ones alive. */
+    private static final java.util.Deque<ResourceLocation> PREVIEWS = new java.util.ArrayDeque<>();
+    private static final int MAX_PREVIEWS = 12;
     /** Source pixel sizes, so the GUI can draw a 32x32 gingham and a 192x256 scene at their own shapes. */
     private static final Map<String, int[]> SIZES = new ConcurrentHashMap<>();
 
@@ -159,6 +164,14 @@ public final class QuiltTextures {
             texture.upload();
             out = null; // the DynamicTexture owns the image now
             CACHE.put(key, id);
+            synchronized (PREVIEWS) {
+                PREVIEWS.addLast(id);
+                while (PREVIEWS.size() > MAX_PREVIEWS) {
+                    ResourceLocation oldest = PREVIEWS.removeFirst();
+                    CACHE.values().remove(oldest);
+                    Minecraft.getInstance().getTextureManager().release(oldest);
+                }
+            }
             return id;
         } catch (Throwable failure) {
             return style.texture();
@@ -250,13 +263,47 @@ public final class QuiltTextures {
         return style.print == null ? read(style.texture()) : buildPrint(style);
     }
 
-    /** The picture straight off the player's disk; the file is the only source a custom quilt has. */
+    /**
+     * The picture straight off the player's disk, in any format ImageIO understands - a phone jpg included.
+     * <p>
+     * Decoding goes through {@link java.awt.image.BufferedImage} because it is the only reader that handles jpg;
+     * the result is re-encoded as png bytes so {@code NativeImage.read} keeps doing the channel handling. Images
+     * larger than {@link #MAX_CUSTOM_SIDE} are halved with a smooth filter rather than a nearest sample, which is
+     * what turned photos into a mosaic.
+     */
     private static NativeImage readFile(java.nio.file.Path file) {
-        try (InputStream stream = java.nio.file.Files.newInputStream(file)) {
-            return NativeImage.read(stream);
+        try {
+            java.awt.image.BufferedImage picture = javax.imageio.ImageIO.read(file.toFile());
+            if (picture == null) {
+                return null;
+            }
+            picture = downscale(picture, MAX_CUSTOM_SIDE);
+            java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+            javax.imageio.ImageIO.write(picture, "png", bytes);
+            return NativeImage.read(new java.io.ByteArrayInputStream(bytes.toByteArray()));
         } catch (Exception failure) {
             return null;
         }
+    }
+
+    /** Longest side kept at most {@code max}, halving until it fits so the filter keeps detail. */
+    private static java.awt.image.BufferedImage downscale(java.awt.image.BufferedImage source, int max) {
+        if (source.getWidth() <= max && source.getHeight() <= max) {
+            return source;
+        }
+        double factor = Math.min((double) max / source.getWidth(), (double) max / source.getHeight());
+        int width = Math.max(1, (int) Math.round(source.getWidth() * factor));
+        int height = Math.max(1, (int) Math.round(source.getHeight() * factor));
+        java.awt.image.BufferedImage out = new java.awt.image.BufferedImage(width, height,
+                java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        java.awt.Graphics2D graphics = out.createGraphics();
+        graphics.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION,
+                java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        graphics.setRenderingHint(java.awt.RenderingHints.KEY_RENDERING,
+                java.awt.RenderingHints.VALUE_RENDER_QUALITY);
+        graphics.drawImage(source, 0, 0, width, height, null);
+        graphics.dispose();
+        return out;
     }
 
     /** A player's image registered as a texture, cached once per quilt id. */

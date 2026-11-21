@@ -14,27 +14,29 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 
 import java.util.List;
+import java.util.function.Function;
 
 /**
  * The quilt editor: the player's own picture on the left, every number that shapes it on the right.
  * <p>
- * A custom quilt is not a fixed sheet, so this screen is where the parameters a built-in quilt keeps in its
- * source file become player choices: whole sheet or tiled, how many repeats, a third wider or not, which hand to
- * borrow (cotton, down, silk...), and the three numbers that hand is made of.
+ * A custom quilt is not a fixed sheet, so this screen is where the numbers a built-in quilt keeps in its source
+ * file become player choices: whole sheet or tiled, how many repeats, a third wider or not, which hand to borrow
+ * and the three numbers that hand is made of.
  * <p>
- * The preview is built by {@link QuiltTextures#preview} with the same sampling the renderer uses - a preview that
+ * The preview comes from {@link QuiltTextures#preview} using the same sampling the renderer uses - a preview that
  * rounded differently from the bed would be worse than none.
  */
 public class CustomQuiltScreen extends Screen {
     private static final int PANEL_W = 300;
-    private static final int PANEL_H = 196;
-    /** The hands a player may borrow, in the order they appear on the row. */
+    private static final int PANEL_H = 216;
+    /** The hands a player may borrow, cycled by one button instead of six that would not fit. */
     private static final String[] PRESETS = {"cotton", "down", "silk", "synthetic", "summer_cool", "thick_gingham"};
     private static final String[] PRESET_NAMES = {"棉被", "羽绒被", "蚕丝被", "化纤被", "夏凉被", "厚实格"};
 
     private final int entityId;
     private final List<String> files;
     private int index;
+    private int presetIndex;
     private QuiltParams params;
     private int left;
     private int top;
@@ -45,7 +47,7 @@ public class CustomQuiltScreen extends Screen {
         this.params = params == null ? QuiltParams.DEFAULT : params;
         CustomQuiltLibrary.rescan();
         this.files = CustomQuiltLibrary.names();
-        String wanted = currentId != null && currentId.startsWith(CustomQuiltLibrary.ID_PREFIX)
+        String wanted = CustomQuiltLibrary.isCustom(currentId)
                 ? currentId.substring(CustomQuiltLibrary.ID_PREFIX.length()) : null;
         this.index = Math.max(0, this.files.indexOf(wanted));
     }
@@ -55,22 +57,30 @@ public class CustomQuiltScreen extends Screen {
         this.left = (this.width - PANEL_W) / 2;
         this.top = (this.height - PANEL_H) / 2;
         int x = this.left + 122;
-        int y = this.top + 26;
-        int wide = 82;
+        int y = this.top + 24;
+        int wide = 78;
+        int full = wide * 2 + 4;
 
-        addRenderableWidget(Button.builder(Component.literal(this.params.tiled ? "平铺" : "整张"),
-                button -> {
-                    this.params = this.params.withTiled(!this.params.tiled);
-                    button.setMessage(Component.literal(this.params.tiled ? "平铺" : "整张"));
-                }).bounds(x, y, wide, 18).build());
-        addRenderableWidget(Button.builder(Component.literal(this.params.wideAcross ? "加宽" : "标准"),
-                button -> {
-                    this.params = this.params.withWide(!this.params.wideAcross);
-                    button.setMessage(Component.literal(this.params.wideAcross ? "加宽" : "标准"));
-                }).bounds(x + wide + 4, y, wide, 18).build());
+        addRenderableWidget(Button.builder(Component.literal(this.params.tiled ? "平铺" : "整张"), button -> {
+            this.params = this.params.withTiled(!this.params.tiled);
+            button.setMessage(Component.literal(this.params.tiled ? "平铺" : "整张"));
+            this.rebuildWidgets();
+        }).bounds(x, y, wide, 18).build());
+        addRenderableWidget(Button.builder(Component.literal(this.params.wideAcross ? "加宽" : "标准"), button -> {
+            this.params = this.params.withWide(!this.params.wideAcross);
+            button.setMessage(Component.literal(this.params.wideAcross ? "加宽" : "标准"));
+        }).bounds(x + wide + 4, y, wide, 18).build());
 
         y += 22;
-        addRenderableWidget(new PctSlider(x, y, wide * 2 + 4, 18, "平铺格数", (this.params.repeatU - 1.0F) / 3.0F) {
+        addRenderableWidget(Button.builder(Component.literal(this.params.dyeTinted ? "跟随床色染色" : "保持原色"),
+                button -> {
+                    this.params = this.params.withTint(!this.params.dyeTinted);
+                    button.setMessage(Component.literal(this.params.dyeTinted ? "跟随床色染色" : "保持原色"));
+                }).bounds(x, y, full, 18).build());
+
+        y += 22;
+        addRenderableWidget(new PctSlider(x, y, full, 18, (this.params.repeatU - 1.0F) / 3.0F,
+                value -> "格数 " + String.format(java.util.Locale.ROOT, "%.1f", 1.0F + value * 3.0F)) {
             @Override
             protected void apply(float value) {
                 float repeat = 1.0F + value * 3.0F;
@@ -79,20 +89,18 @@ public class CustomQuiltScreen extends Screen {
         });
 
         y += 22;
-        for (int i = 0; i < PRESETS.length; i++) {
-            String preset = PRESETS[i];
-            int px = x + (i % 3) * (wide + 4);
-            int py = y + (i / 3) * 20;
-            addRenderableWidget(Button.builder(Component.literal(PRESET_NAMES[i]), button -> {
-                QuiltStyle hand = QuiltStyle.of(preset);
-                if (hand != null) {
-                    params = borrowHand(params, hand);
-                }
-            }).bounds(px, py, wide, 18).build());
-        }
+        addRenderableWidget(Button.builder(Component.literal("手感 " + PRESET_NAMES[this.presetIndex]), button -> {
+            this.presetIndex = (this.presetIndex + 1) % PRESETS.length;
+            QuiltStyle hand = QuiltStyle.of(PRESETS[this.presetIndex]);
+            if (hand != null) {
+                this.params = borrowHand(this.params, hand);
+            }
+            button.setMessage(Component.literal("手感 " + PRESET_NAMES[this.presetIndex]));
+            this.rebuildWidgets();
+        }).bounds(x, y, full, 18).build());
 
-        y += 44;
-        addRenderableWidget(new PctSlider(x, y, wide * 2 + 4, 18, "蓬松", this.params.loft) {
+        y += 22;
+        addRenderableWidget(new PctSlider(x, y, full, 18, this.params.loft, value -> "蓬松 " + Math.round(value * 100) + "%") {
             @Override
             protected void apply(float value) {
                 params = new QuiltParams(params.tiled, params.repeatU, params.repeatV, params.wideAcross,
@@ -100,7 +108,7 @@ public class CustomQuiltScreen extends Screen {
             }
         });
         y += 22;
-        addRenderableWidget(new PctSlider(x, y, wide * 2 + 4, 18, "挺括", this.params.body) {
+        addRenderableWidget(new PctSlider(x, y, full, 18, this.params.body, value -> "挺括 " + Math.round(value * 100) + "%") {
             @Override
             protected void apply(float value) {
                 params = new QuiltParams(params.tiled, params.repeatU, params.repeatV, params.wideAcross,
@@ -108,7 +116,7 @@ public class CustomQuiltScreen extends Screen {
             }
         });
         y += 22;
-        addRenderableWidget(new PctSlider(x, y, wide * 2 + 4, 18, "厚度", this.params.shell / 0.12F) {
+        addRenderableWidget(new PctSlider(x, y, full, 18, this.params.shell / 0.12F, value -> "厚度 " + Math.round(value * 100) + "%") {
             @Override
             protected void apply(float value) {
                 params = new QuiltParams(params.tiled, params.repeatU, params.repeatV, params.wideAcross,
@@ -118,14 +126,18 @@ public class CustomQuiltScreen extends Screen {
         });
 
         int bottom = this.top + PANEL_H - 24;
-        addRenderableWidget(Button.builder(Component.literal("上一张"), button -> shift(-1))
-                .bounds(x, bottom, 54, 18).build());
-        addRenderableWidget(Button.builder(Component.literal("下一张"), button -> shift(1))
-                .bounds(x + 58, bottom, 54, 18).build());
+        addRenderableWidget(Button.builder(Component.literal("打开图片文件夹"), button -> openFolder())
+                .bounds(this.left + 10, bottom, 106, 18).build());
+        addRenderableWidget(Button.builder(Component.literal("<"), button -> shift(-1))
+                .bounds(x, bottom, 20, 18).build());
+        addRenderableWidget(Button.builder(Component.literal(">"), button -> shift(1))
+                .bounds(x + 24, bottom, 20, 18).build());
         addRenderableWidget(Button.builder(Component.literal("完成"), button -> apply())
-                .bounds(x + 116, bottom, 54, 18).build());
-        addRenderableWidget(Button.builder(Component.literal("打开图片文件夹"),
-                button -> openFolder()).bounds(this.left + 10, bottom, 106, 18).build());
+                .bounds(x + 48, bottom, 54, 18).build());
+        addRenderableWidget(Button.builder(Component.literal("预览"), button -> {
+                    CustomQuiltLibrary.rescan();
+                    this.rebuildWidgets();
+                }).bounds(x + 106, bottom, 54, 18).build());
     }
 
     private static QuiltParams borrowHand(QuiltParams params, QuiltStyle hand) {
@@ -133,6 +145,7 @@ public class CustomQuiltScreen extends Screen {
                 hand.underShade, hand.rimShade, hand.loft, hand.body, params.dyeTinted);
     }
 
+    /** Same hand, current numbers kept: the three sliders stay where the player put them. */
     private void shift(int delta) {
         if (this.files.isEmpty()) {
             return;
@@ -166,12 +179,11 @@ public class CustomQuiltScreen extends Screen {
         this.renderBackground(graphics);
         graphics.fill(this.left, this.top, this.left + PANEL_W, this.top + PANEL_H, 0xF0141A2B);
         graphics.renderOutline(this.left, this.top, PANEL_W, PANEL_H, 0x88F2E27A);
-        graphics.drawString(this.font, "自定义被子", this.left + 10, this.top + 8, 0xFFF2E27A, false);
+        graphics.drawString(this.font, "自定义被子", this.left + 10, this.top + 7, 0xFFF2E27A, false);
 
-        String name = this.files.isEmpty() ? "（文件夹里还没有 png）" : this.files.get(this.index);
+        String name = this.files.isEmpty() ? "（文件夹里还没有图片）" : this.files.get(this.index);
         graphics.drawString(this.font, name, this.left + 10, this.top + 20, 0xFFF2EEE4, false);
 
-        // The preview: a 192x256 sheet shrunk to fit the panel, aspect kept.
         int boxH = 128;
         int boxW = 96;
         int px = this.left + 12;
@@ -190,6 +202,8 @@ public class CustomQuiltScreen extends Screen {
         }
         graphics.drawString(this.font, (this.index + 1) + "/" + Math.max(1, this.files.size()),
                 px, py + boxH + 6, 0xFFB9C0CC, false);
+        graphics.drawString(this.font, this.params.tiled ? "平铺 x" + String.format(java.util.Locale.ROOT, "%.1f", this.params.repeatU)
+                        : "整张一次", px, py + boxH + 18, 0xFF8E97A6, false);
         super.render(graphics, mouseX, mouseY, partialTick);
     }
 
@@ -198,13 +212,13 @@ public class CustomQuiltScreen extends Screen {
         return false;
     }
 
-    /** A 0..1 slider that reports its value in words; each one writes straight into the parameters. */
+    /** A 0..1 slider whose label is the player-facing value; each one writes straight into the parameters. */
     private abstract static class PctSlider extends AbstractSliderButton {
-        private final String label;
+        private final Function<Float, String> format;
 
-        PctSlider(int x, int y, int width, int height, String label, float value) {
+        PctSlider(int x, int y, int width, int height, float value, Function<Float, String> format) {
             super(x, y, width, height, Component.empty(), Mth.clamp(value, 0.0F, 1.0F));
-            this.label = label;
+            this.format = format;
             updateMessage();
         }
 
@@ -212,7 +226,7 @@ public class CustomQuiltScreen extends Screen {
 
         @Override
         protected void updateMessage() {
-            setMessage(Component.literal(this.label + " " + Math.round(this.value * 100.0F) + "%"));
+            setMessage(Component.literal(this.format.apply((float) this.value)));
         }
 
         @Override
