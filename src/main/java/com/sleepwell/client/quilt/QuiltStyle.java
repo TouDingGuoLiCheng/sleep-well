@@ -158,6 +158,34 @@ public final class QuiltStyle {
             "winter", false, Tiling.WHOLE, 1.0F, 1.0F, false, 0.038F, 0.76F, 0.66F, 0.16F, 0.50F, 0.70F));
 
     /**
+     * 西瓜被: a thin summer print - round slices packed into a repeating cloth. Watermelon on a hot night, so it
+     * borrows the summer quilt's hand: barely any padding, light and cool.
+     */
+    public static final QuiltStyle WATERMELON = register(new QuiltStyle("watermelon", "西瓜被",
+            "watermelon", false, Tiling.TILED, 4.0F / 3.0F, 1.0F, false, 0.020F, 0.90F, 0.82F, 0.16F, 0.15F, 0.20F));
+
+    /**
+     * 蛋糕被: a sweet print on the down quilt's hand - puffed up and soft, so it reads as a cake you can flop onto
+     * rather than a picture of one.
+     */
+    public static final QuiltStyle CAKE = register(new QuiltStyle("cake", "蛋糕被",
+            "cake", false, Tiling.TILED, 4.0F / 3.0F, 1.0F, false, 0.066F, 0.76F, 0.66F, 0.16F, 1.00F, 0.25F));
+
+    /**
+     * 绵羊被: the fluffiest sheet here - a woolly print over a nearly down-soft body, one notch firmer so the wool
+     * still holds its shape instead of clinging.
+     */
+    public static final QuiltStyle SHEEP = register(new QuiltStyle("sheep", "绵羊被",
+            "sheep", false, Tiling.TILED, 4.0F / 3.0F, 1.0F, false, 0.062F, 0.74F, 0.64F, 0.16F, 0.90F, 0.30F));
+
+    /**
+     * 猫咪被: a cotton-weight print - medium padding, enough body to crease, which is what a cat has already done
+     * to every quilt it has ever slept on.
+     */
+    public static final QuiltStyle CAT = register(new QuiltStyle("cat", "猫咪被",
+            "cat", false, Tiling.TILED, 4.0F / 3.0F, 1.0F, false, 0.048F, 0.74F, 0.64F, 0.16F, 0.50F, 0.60F));
+
+    /**
      * How far the cloth floats above her skin, in blocks: the duvet's own padding. 0.35 loft is the flat sheet
      * this mod shipped with; a down quilt sits three times higher, a silk one practically on her.
      */
