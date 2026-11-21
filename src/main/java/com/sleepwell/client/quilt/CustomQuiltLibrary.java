@@ -26,8 +26,11 @@ public final class CustomQuiltLibrary {
     private static final Logger LOGGER = LoggerFactory.getLogger("sleep_well/custom");
     public static final String ID_PREFIX = "custom:";
     /** Bigger than this and the editor's preview gets slow and the upload would be wasteful. */
-    public static final int MAX_BYTES = 512 * 1024;
+    /** A 10 MB photo is fine locally; the guard against a memory blow-up is pixels, not file size. */
+    public static final int MAX_BYTES = 10 * 1024 * 1024;
     public static final int MAX_SIDE = 1024;
+    /** Anything past this many pixels is refused outright rather than decoded. */
+    public static final long MAX_PIXELS = 200_000_000L;
     /** Formats ImageIO can decode on this JVM; jpg matters most, it is what a phone photo is. */
     private static final java.util.List<String> EXTENSIONS = java.util.List.of(".png", ".jpg", ".jpeg", ".bmp", ".gif");
 
@@ -55,6 +58,19 @@ public final class CustomQuiltLibrary {
                     .filter(path -> {
                         String name = path.getFileName().toString().toLowerCase(Locale.ROOT);
                         return EXTENSIONS.stream().anyMatch(name::endsWith);
+                    })
+                    .filter(path -> {
+                        try {
+                            long size = Files.size(path);
+                            if (size > MAX_BYTES) {
+                                LOGGER.warn("Skipping {}: {} bytes is over the {} byte limit",
+                                        path.getFileName(), size, MAX_BYTES);
+                                return false;
+                            }
+                            return true;
+                        } catch (IOException failure) {
+                            return false;
+                        }
                     })
                     .sorted()
                     .forEach(path -> FILES.put(nameOf(path), path));

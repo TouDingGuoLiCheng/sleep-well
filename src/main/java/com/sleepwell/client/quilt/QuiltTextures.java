@@ -273,7 +273,7 @@ public final class QuiltTextures {
      */
     private static NativeImage readFile(java.nio.file.Path file) {
         try {
-            java.awt.image.BufferedImage picture = javax.imageio.ImageIO.read(file.toFile());
+            java.awt.image.BufferedImage picture = decode(file);
             if (picture == null) {
                 return null;
             }
@@ -281,6 +281,45 @@ public final class QuiltTextures {
             java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
             javax.imageio.ImageIO.write(picture, "png", bytes);
             return NativeImage.read(new java.io.ByteArrayInputStream(bytes.toByteArray()));
+        } catch (Exception failure) {
+            return null;
+        }
+    }
+
+    /**
+     * Decodes without ever holding the full bitmap of a huge photo.
+     * <p>
+     * The header is read first: an image past {@link CustomQuiltLibrary#MAX_PIXELS} is refused, and anything much
+     * larger than the sheet is decoded already subsampled, which is what keeps a 10 MB 4000x3000 photo from
+     * costing a quarter of a gigabyte on the way in.
+     */
+    private static java.awt.image.BufferedImage decode(java.nio.file.Path file) {
+        try (javax.imageio.stream.ImageInputStream stream =
+                     javax.imageio.ImageIO.createImageInputStream(file.toFile())) {
+            if (stream == null) {
+                return null;
+            }
+            java.util.Iterator<javax.imageio.ImageReader> readers = javax.imageio.ImageIO.getImageReaders(stream);
+            if (!readers.hasNext()) {
+                return null;
+            }
+            javax.imageio.ImageReader reader = readers.next();
+            try {
+                reader.setInput(stream, true, true);
+                int width = reader.getWidth(0);
+                int height = reader.getHeight(0);
+                if ((long) width * height > CustomQuiltLibrary.MAX_PIXELS) {
+                    return null;
+                }
+                int step = Math.max(1, (int) Math.ceil(Math.max(width, height) / (double) MAX_CUSTOM_SIDE));
+                javax.imageio.ImageReadParam param = reader.getDefaultReadParam();
+                if (step > 1) {
+                    param.setSourceSubsampling(step, step, 0, 0);
+                }
+                return reader.read(0, param);
+            } finally {
+                reader.dispose();
+            }
         } catch (Exception failure) {
             return null;
         }
