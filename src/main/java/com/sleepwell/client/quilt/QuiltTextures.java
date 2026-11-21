@@ -56,12 +56,13 @@ public final class QuiltTextures {
             return built;
         }
         if (FAILED.contains(key)) {
-            return style.texture();
+            // Degrade to the face without its band rather than to a purple square.
+            return texture(style, "");
         }
         ResourceLocation composite = build(style, border);
         if (composite == null) {
             FAILED.add(key);
-            return style.texture();
+            return texture(style, "");
         }
         CACHE.put(key, composite);
         return composite;
@@ -103,8 +104,10 @@ public final class QuiltTextures {
                     }
                 }
             }
+            // A custom style's id is "custom:<hash>", and a colon is not legal inside a texture path: the id has
+            // to be built from a hash, or the registration throws and the quilt falls back to a missing texture.
             ResourceLocation id = new ResourceLocation(SleepWellMod.MOD_ID,
-                    "textures/quilt/composite_" + style.id + "_" + border.id);
+                    "textures/quilt/composite_" + Math.abs((style.id + "_" + border.id).hashCode()));
             DynamicTexture texture = new DynamicTexture(out);
             Minecraft.getInstance().getTextureManager().register(id, texture);
             texture.upload();
