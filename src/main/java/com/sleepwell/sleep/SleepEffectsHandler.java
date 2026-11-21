@@ -29,6 +29,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  *       longer.</li>
  *   <li><b>困倦</b> - the window ended with her awake and she had either never lain down or slept too little.</li>
  *   <li><b>sleep regen</b> - 1 HP every 3 s while asleep.</li>
+ *   <li><b>困倦 decay</b> - while she is asleep, 困倦 loses {@link SleepWellConfig#DROWSY_SLEEP_DECAY_SECONDS}
+ *       seconds per second, so sleeping actually washes the debuff off.</li>
  * </ul>
  * A nap outside the window neither pays nor punishes: the counters are cleared when she wakes.
  */
@@ -47,6 +49,8 @@ public final class SleepEffectsHandler {
     private static final int WINDOW_CLOSE_GRACE = 40;
     private static final int REGEN_INTERVAL = 60;
     private static final float REGEN_AMOUNT = 1.0F;
+    /** One 困倦 decay step per real second. */
+    private static final int DROWSY_DECAY_INTERVAL = 20;
     private static final Map<UUID, Track> TRACKS = new ConcurrentHashMap<>();
     private static final AtomicInteger LOGS = new AtomicInteger();
 
@@ -69,6 +73,8 @@ public final class SleepEffectsHandler {
          * window closed on an awake maid with the counters already cleared and handed out 困倦 as well.
          */
         private boolean judged;
+        /** Ticks of sleep accumulated towards the next 困倦 decay step. */
+        private int drowsyTimer;
     }
 
     @SubscribeEvent
@@ -119,6 +125,11 @@ public final class SleepEffectsHandler {
                     maid.heal(REGEN_AMOUNT);
                 }
             }
+            if (SleepWellConfig.DROWSY_SLEEP_DECAY_ENABLED.get()
+                    && ++track.drowsyTimer >= DROWSY_DECAY_INTERVAL) {
+                track.drowsyTimer = 0;
+                decayDrowsy(maid);
+            }
             return;
         }
         if (!track.sleeping) {
@@ -128,6 +139,7 @@ public final class SleepEffectsHandler {
         // 3) She just got up.
         track.sleeping = false;
         track.regenTimer = 0;
+        track.drowsyTimer = 0;
         long slept = now - track.sleepStart;
         boolean enough = track.sleptInWindow
                 && track.windowSleepTicks >= MIN_WINDOW_SLEEP_TICKS
@@ -145,6 +157,29 @@ public final class SleepEffectsHandler {
         track.windowSleepTicks = 0;
         track.sleptInWindow = false;
         track.closedWhileAsleep = false;
+    }
+
+    /**
+     * Shortens 困倦 by one step. 1.20.1 has no {@code setDuration}, so the effect is swapped for a shorter copy
+     * that keeps her amplifier and visibility; the swap costs one remove/add per second of sleep at most.
+     */
+    private static void decayDrowsy(EntityMaid maid) {
+        MobEffectInstance drowsy = maid.getEffect(SleepWellEffects.DROWSY.get());
+        if (drowsy == null || drowsy.isInfiniteDuration()) {
+            return;
+        }
+        int left = DrowsySleepDecay.remainingTicks(drowsy.getDuration(),
+                SleepWellConfig.DROWSY_SLEEP_DECAY_SECONDS.get());
+        int amplifier = drowsy.getAmplifier();
+        boolean ambient = drowsy.isAmbient();
+        boolean visible = drowsy.isVisible();
+        boolean icon = drowsy.showIcon();
+        maid.removeEffect(SleepWellEffects.DROWSY.get());
+        if (left <= 0) {
+            LOGGER.debug("[睡个好觉] 困倦在睡眠中消退完毕 maid={}", maid.getUUID());
+            return;
+        }
+        maid.addEffect(new MobEffectInstance(SleepWellEffects.DROWSY.get(), left, amplifier, ambient, visible, icon));
     }
 
     private static void applyVigor(EntityMaid maid, boolean lieIn) {

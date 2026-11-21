@@ -63,6 +63,9 @@ public final class SleepWellConfig {
     public static final ForgeConfigSpec.IntValue VIGOR_LIE_IN_EXTRA_SECONDS;
     public static final ForgeConfigSpec.BooleanValue DROWSY_ENABLED;
     public static final ForgeConfigSpec.IntValue DROWSY_SECONDS;
+    /** While asleep, 困倦 loses this many seconds of remaining time per real second. */
+    public static final ForgeConfigSpec.BooleanValue DROWSY_SLEEP_DECAY_ENABLED;
+    public static final ForgeConfigSpec.IntValue DROWSY_SLEEP_DECAY_SECONDS;
     /** Heal while asleep. */
     public static final ForgeConfigSpec.BooleanValue SLEEP_REGEN_ENABLED;
 
@@ -249,6 +252,14 @@ public final class SleepWellConfig {
                 .comment("How long 困倦 lasts, in seconds.",
                         "「困倦」持续多少秒。")
                 .defineInRange("drowsySeconds", 600, 10, 7200);
+        DROWSY_SLEEP_DECAY_ENABLED = builder
+                .comment("Let 困倦 wear off faster while she sleeps: every second asleep takes seconds off its timer.",
+                        "睡着时「困倦」消退得更快：睡 1 秒，计时减少 drowsySleepDecaySeconds 秒。")
+                .define("drowsySleepDecayEnabled", true);
+        DROWSY_SLEEP_DECAY_SECONDS = builder
+                .comment("Seconds of 困倦 removed per second of sleep, vanilla's own tick-down included (the mod only tops up the difference).",
+                        "睡着时每秒让「困倦」减少多少秒（含原版自然流逝，本模组只补差额）。")
+                .defineInRange("drowsySleepDecaySeconds", 10, 1, 600);
         SLEEP_REGEN_ENABLED = builder
                 .comment("Heal 1 HP every 3 s while she is asleep.",
                         "睡着时每 3 秒回 1 点血。")
