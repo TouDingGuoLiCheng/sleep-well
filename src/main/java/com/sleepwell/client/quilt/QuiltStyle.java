@@ -214,11 +214,13 @@ public final class QuiltStyle {
             new Print("textures/item/cake.png", 0, 0, 16, 16, 16, 4, "cake_cloth")));
 
     /**
-     * 绵羊被: the fluffiest sheet here - a woolly print over a nearly down-soft body, one notch firmer so the wool
-     * still holds its shape instead of clinging.
+     * 绵羊被: the fluffiest and the widest sheet here - a woolly print over a nearly down-soft body, plus the
+     * extra third of width so it hangs down both sides instead of stopping at the mattress. The widened sheet
+     * would stretch the print, so the repeat is raised to 16/9: the wool cells stay square (1.5 blocks each, as
+     * on every other tiled quilt) while the cloth itself is a third wider.
      */
     public static final QuiltStyle SHEEP = register(new QuiltStyle("sheep", "绵羊被",
-            "sheep", false, Tiling.TILED, 4.0F / 3.0F, 1.0F, false, 0.062F, 0.74F, 0.64F, 0.16F, 0.90F, 0.30F));
+            "sheep", false, Tiling.TILED, 16.0F / 9.0F, 1.0F, true, 0.062F, 0.74F, 0.64F, 0.16F, 0.90F, 0.30F));
 
     /**
      * 猫咪被: a cotton-weight print - medium padding, enough body to crease, which is what a cat has already done
