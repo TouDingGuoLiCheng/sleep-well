@@ -38,7 +38,7 @@ public final class QuiltTextures {
     public static ResourceLocation texture(QuiltStyle style, String borderId) {
         QuiltBorder border = QuiltBorder.of(borderId);
         if (border.isNone()) {
-            return style.texture();
+            return style.print == null ? style.texture() : printTile(style);
         }
         String key = style.id + "|" + border.id;
         ResourceLocation built = CACHE.get(key);
@@ -58,7 +58,7 @@ public final class QuiltTextures {
     }
 
     private static ResourceLocation build(QuiltStyle style, QuiltBorder border) {
-        NativeImage face = read(style.texture());
+        NativeImage face = faceOf(style);
         NativeImage band = read(border.texture());
         if (face == null || band == null) {
             close(face);
@@ -114,7 +114,7 @@ public final class QuiltTextures {
         if (known != null) {
             return known;
         }
-        NativeImage image = read(style.texture());
+        NativeImage image = faceOf(style);
         int[] size = image == null ? new int[]{192, 256} : new int[]{image.getWidth(), image.getHeight()};
         close(image);
         if (!border.isNone()) {
@@ -123,6 +123,85 @@ public final class QuiltTextures {
         }
         SIZES.put(key, size);
         return size;
+    }
+
+    /**
+     * The finished print tile: our cloth with the vanilla sprite stamped across it in a grid. Built here rather
+     * than shipped, which is what keeps Mojang's art out of the jar and lets a resource pack restyle the quilt.
+     */
+    private static ResourceLocation printTile(QuiltStyle style) {
+        String key = style.id + "|print";
+        ResourceLocation cached = CACHE.get(key);
+        if (cached != null) {
+            return cached;
+        }
+        if (FAILED.contains(key)) {
+            return style.texture();
+        }
+        NativeImage tile = buildPrint(style);
+        if (tile == null) {
+            FAILED.add(key);
+            return style.texture();
+        }
+        try {
+            ResourceLocation id = new ResourceLocation(SleepWellMod.MOD_ID, "textures/quilt/print_" + style.id);
+            DynamicTexture texture = new DynamicTexture(tile);
+            Minecraft.getInstance().getTextureManager().register(id, texture);
+            texture.upload();
+            tile = null; // the DynamicTexture owns the image now
+            CACHE.put(key, id);
+            return id;
+        } catch (Throwable failure) {
+            FAILED.add(key);
+            return style.texture();
+        } finally {
+            close(tile);
+        }
+    }
+
+    /** Our cloth with the sprite stamped over it; null when either image is missing, so the drawn sheet wins. */
+    private static NativeImage buildPrint(QuiltStyle style) {
+        QuiltStyle.Print print = style.print;
+        NativeImage cloth = read(style.clothTexture());
+        NativeImage sprite = read(new ResourceLocation(print.sprite));
+        if (cloth == null || sprite == null) {
+            close(cloth);
+            close(sprite);
+            return null;
+        }
+        try {
+            for (int gy = 0; gy < print.grid; gy++) {
+                for (int gx = 0; gx < print.grid; gx++) {
+                    for (int y = 0; y < print.cell; y++) {
+                        int dy = gy * print.cell + y;
+                        if (dy >= cloth.getHeight()) {
+                            break;
+                        }
+                        int sy = print.sy + Math.min(print.sh - 1, y * print.sh / print.cell);
+                        for (int x = 0; x < print.cell; x++) {
+                            int dx = gx * print.cell + x;
+                            if (dx >= cloth.getWidth()) {
+                                break;
+                            }
+                            int sx = print.sx + Math.min(print.sw - 1, x * print.sw / print.cell);
+                            int pixel = sprite.getPixelRGBA(sx, sy);
+                            // Item art is cut out on transparent corners: the cloth has to show through there.
+                            if (((pixel >>> 24) & 0xFF) != 0) {
+                                cloth.setPixelRGBA(dx, dy, pixel);
+                            }
+                        }
+                    }
+                }
+            }
+            return cloth;
+        } finally {
+            close(sprite);
+        }
+    }
+
+    /** The sheet this quilt draws from: a drawn file, or a print built on the spot. */
+    private static NativeImage faceOf(QuiltStyle style) {
+        return style.print == null ? read(style.texture()) : buildPrint(style);
     }
 
     /** One pixel of the flattened sheet: the face sampled where the quilt's own repeat count would land. */

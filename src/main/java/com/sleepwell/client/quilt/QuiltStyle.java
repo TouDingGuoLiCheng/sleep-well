@@ -56,10 +56,51 @@ public final class QuiltStyle {
      * down one drapes over every limb.
      */
     public final float body;
+    /** Non-null when the cloth is printed at runtime with a vanilla sprite instead of our own artwork. */
+    public final Print print;
+
+    /**
+     * A print: a vanilla sprite stamped across a cloth of ours. The sprite's bytes stay in the player's own jar,
+     * so nothing of Mojang's ships with this mod - and a resource pack restyles the quilt along with everything
+     * else on screen.
+     */
+    public static final class Print {
+        /** The sprite, without a namespace: vanilla's own art lives under {@code minecraft}. */
+        public final String sprite;
+        /** The crop inside that sprite, in source pixels. */
+        public final int sx;
+        public final int sy;
+        public final int sw;
+        public final int sh;
+        /** Footprint of one motif on the finished tile, in pixels. */
+        public final int cell;
+        /** How many motifs fit across one tile, so {@code grid * cell} fills the sheet exactly. */
+        public final int grid;
+        /** Our cloth under {@code textures/quilt/}; the sprite is stamped over it. */
+        public final String clothId;
+
+        public Print(String sprite, int sx, int sy, int sw, int sh, int cell, int grid, String clothId) {
+            this.sprite = sprite;
+            this.sx = sx;
+            this.sy = sy;
+            this.sw = sw;
+            this.sh = sh;
+            this.cell = cell;
+            this.grid = grid;
+            this.clothId = clothId;
+        }
+    }
 
     private QuiltStyle(String id, String displayName, String textureId, boolean dyeTinted, Tiling tiling,
                        float repeatU, float repeatV, boolean wideAcross, float shell, float underShade,
                        float rimShade, float rimV, float loft, float body) {
+        this(id, displayName, textureId, dyeTinted, tiling, repeatU, repeatV, wideAcross, shell, underShade,
+                rimShade, rimV, loft, body, null);
+    }
+
+    private QuiltStyle(String id, String displayName, String textureId, boolean dyeTinted, Tiling tiling,
+                       float repeatU, float repeatV, boolean wideAcross, float shell, float underShade,
+                       float rimShade, float rimV, float loft, float body, Print print) {
         this.id = id;
         this.displayName = displayName;
         this.textureId = textureId;
@@ -74,6 +115,7 @@ public final class QuiltStyle {
         this.rimV = rimV;
         this.loft = loft;
         this.body = body;
+        this.print = print;
     }
 
     // Declared before the quilts themselves: the constant below registers into this map while the class is
@@ -161,15 +203,15 @@ public final class QuiltStyle {
      * 西瓜被: a thin summer print - round slices packed into a repeating cloth. Watermelon on a hot night, so it
      * borrows the summer quilt's hand: barely any padding, light and cool.
      */
-    public static final QuiltStyle WATERMELON = register(new QuiltStyle("watermelon", "西瓜被",
-            "watermelon", false, Tiling.TILED, 4.0F / 3.0F, 1.0F, false, 0.020F, 0.90F, 0.82F, 0.16F, 0.15F, 0.20F));
+    public static final QuiltStyle WATERMELON = register(printed("watermelon", "西瓜被", "watermelon", SUMMER_COOL,
+            new Print("textures/item/melon_slice.png", 0, 0, 16, 16, 16, 4, "watermelon_cloth")));
 
     /**
      * 蛋糕被: a sweet print on the down quilt's hand - puffed up and soft, so it reads as a cake you can flop onto
      * rather than a picture of one.
      */
-    public static final QuiltStyle CAKE = register(new QuiltStyle("cake", "蛋糕被",
-            "cake", false, Tiling.TILED, 4.0F / 3.0F, 1.0F, false, 0.066F, 0.76F, 0.66F, 0.16F, 1.00F, 0.25F));
+    public static final QuiltStyle CAKE = register(printed("cake", "蛋糕被", "cake", DOWN,
+            new Print("textures/item/cake.png", 0, 0, 16, 16, 16, 4, "cake_cloth")));
 
     /**
      * 绵羊被: the fluffiest sheet here - a woolly print over a nearly down-soft body, one notch firmer so the wool
@@ -208,6 +250,17 @@ public final class QuiltStyle {
         return repeatU != 1.0F || repeatV != 1.0F;
     }
 
+    /**
+     * A quilt whose cloth is ours but whose print is read from vanilla at runtime, keeping one hand and one
+     * fallback sheet: if the sprite cannot be read, the drawn artwork under {@code fallbackTextureId} is used.
+     */
+    private static QuiltStyle printed(String id, String displayName, String fallbackTextureId, QuiltStyle hand,
+                                      Print print) {
+        return new QuiltStyle(id, displayName, fallbackTextureId, hand.dyeTinted, hand.tiling,
+                hand.repeatU, hand.repeatV, hand.wideAcross, hand.shell, hand.underShade,
+                hand.rimShade, hand.rimV, hand.loft, hand.body, print);
+    }
+
     private static QuiltStyle register(QuiltStyle style) {
         REGISTRY.put(style.id, style);
         return style;
@@ -235,6 +288,11 @@ public final class QuiltStyle {
 
     public float tileV() {
         return repeatV;
+    }
+
+    /** Our cloth that a print is stamped onto, under {@code textures/quilt/}. */
+    public ResourceLocation clothTexture() {
+        return new ResourceLocation("sleep_well", "textures/quilt/" + print.clothId + ".png");
     }
 
     /** Every quilt owns exactly one texture; the bed's dye is no longer involved. */

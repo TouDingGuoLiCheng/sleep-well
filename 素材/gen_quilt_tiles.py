@@ -142,6 +142,11 @@ for name, base, fn in QUILTS:
                                          "sheep": "绵羊", "cat": "猫咪"}[name] + ".png"))
     made.append((name, im))
 
+# 印花被面用的布底：只有布纹和绗缝线，图案由游戏运行时从原版贴图上盖（本模组不打包原版素材）
+for name, base in (("watermelon", (236, 242, 228)), ("cake", (251, 236, 228))):
+    cloth(base).save(os.path.join(OUT, name + "_cloth.png"))
+    cloth(base).save(os.path.join(SRC, "布底-" + {"watermelon": "西瓜", "cake": "蛋糕"}[name] + ".png"))
+
 # 预览：每格把贴图平铺 2x2 再放大 3 倍，看接缝和密度
 CELL = 64 * 2 * 3 // 2 * 2
 sheet = Image.new("RGBA", (640, 640), (28, 32, 44, 255))
