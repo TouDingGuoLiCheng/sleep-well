@@ -79,12 +79,15 @@ public final class QuiltTextures {
         try {
             // Everything is laid out on one canonical sheet first. A gingham that tiles 2x2 is flattened here, so
             // the band frames a finished cloth instead of repeating with the pattern.
-            int width = SHEET_W + QuiltBorder.REACH * 2;
-            int height = SHEET_H + QuiltBorder.REACH * 2;
+            int faceW = face.getWidth();
+            int faceH = face.getHeight();
+            int width = faceW + QuiltBorder.REACH * 2;
+            int height = faceH + QuiltBorder.REACH * 2;
             out = new NativeImage(width, height, true);
-            for (int y = 0; y < SHEET_H; y++) {
-                for (int x = 0; x < SHEET_W; x++) {
-                    out.setPixelRGBA(x + QuiltBorder.REACH, y + QuiltBorder.REACH, sampleTiled(face, style, x, y));
+            for (int y = 0; y < faceH; y++) {
+                for (int x = 0; x < faceW; x++) {
+                    out.setPixelRGBA(x + QuiltBorder.REACH, y + QuiltBorder.REACH,
+                            sampleAt(face, style, (double) x / faceW, (double) y / faceH));
                 }
             }
             // The band is drawn last and only where it is opaque: its middle is punched out. It is sampled with a
@@ -154,10 +157,16 @@ public final class QuiltTextures {
         }
         NativeImage out = null;
         try {
-            out = new NativeImage(SHEET_W, SHEET_H, true);
-            for (int y = 0; y < SHEET_H; y++) {
-                for (int x = 0; x < SHEET_W; x++) {
-                    out.setPixelRGBA(x, y, sampleTiled(face, style, x, y));
+            // Preview at the face's own shape, capped so a 768 px custom picture stays cheap on screen.
+            int srcW = face.getWidth();
+            int srcH = face.getHeight();
+            float scale = Math.min(1.0F, 384.0F / Math.max(srcW, srcH));
+            int outW = Math.max(1, Math.round(srcW * scale));
+            int outH = Math.max(1, Math.round(srcH * scale));
+            out = new NativeImage(outW, outH, true);
+            for (int y = 0; y < outH; y++) {
+                for (int x = 0; x < outW; x++) {
+                    out.setPixelRGBA(x, y, sampleAt(face, style, (double) x / outW, (double) y / outH));
                 }
             }
             ResourceLocation id = new ResourceLocation(SleepWellMod.MOD_ID,
@@ -478,10 +487,11 @@ public final class QuiltTextures {
         }
     }
 
-    /** One pixel of the flattened sheet: the face sampled where the quilt's own repeat count would land. */
-    private static int sampleTiled(com.mojang.blaze3d.platform.NativeImage face, QuiltStyle style, int x, int y) {
-        double u = (double) x / SHEET_W * style.repeatU;
-        double v = (double) y / SHEET_H * style.repeatV;
+    /** One pixel of the sheet, taken at normalised coordinates where the quilt's repeat count lands. */
+    private static int sampleAt(com.mojang.blaze3d.platform.NativeImage face, QuiltStyle style,
+                                double uNorm, double vNorm) {
+        double u = uNorm * style.repeatU;
+        double v = vNorm * style.repeatV;
         u -= Math.floor(u);
         v -= Math.floor(v);
         int sx = Math.min((int) (u * face.getWidth()), face.getWidth() - 1);

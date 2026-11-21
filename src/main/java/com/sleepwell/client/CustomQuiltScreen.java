@@ -215,14 +215,12 @@ public class CustomQuiltScreen extends Screen {
             // The finished sheet: the same sampling the bed will use, tiling and crop included.
             QuiltStyle style = CustomQuiltLibrary.style(this.files.get(this.index), this.params);
             if (style != null) {
+                int[] sheet = QuiltTextures.dimensions(style, "");
                 com.mojang.blaze3d.vertex.PoseStack pose = graphics.pose();
                 pose.pushPose();
                 pose.translate(this.boxX, this.boxY, 0.0F);
-                pose.scale(this.boxW / (float) QuiltTextures.SHEET_W, this.boxH / (float) QuiltTextures.SHEET_H,
-                        1.0F);
-                graphics.blit(QuiltTextures.preview(style), 0, 0, 0, 0,
-                        QuiltTextures.SHEET_W, QuiltTextures.SHEET_H,
-                        QuiltTextures.SHEET_W, QuiltTextures.SHEET_H);
+                pose.scale(this.boxW / (float) sheet[0], this.boxH / (float) sheet[1], 1.0F);
+                graphics.blit(QuiltTextures.preview(style), 0, 0, 0, 0, sheet[0], sheet[1], sheet[0], sheet[1]);
                 pose.popPose();
             }
         }
