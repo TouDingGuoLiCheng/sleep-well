@@ -1,5 +1,5 @@
 {
-  "modmenu.nameTranslation.sleep_well": "Touhou Maid: Sleep Well",
+  "modmenu.nameTranslation.touhou_maid_sleep_well": "Touhou Maid: Sleep well",
   "gui.touhou_little_maid.button.sleep_well": "Sleep Well",
   "gui.touhou_little_maid.button.sleep_well.desc": "Sleep path fix, campfire escape, no outdoor work in winter, lie-in & naps",
   "gui.sleep_well.tab": "Sleep Well",
@@ -17,8 +17,8 @@
   "gui.sleep_well.skip_count": "%s of %s selected",
  "gui.sleep_well.quilt_title": "Quilts",
  "gui.sleep_well.border_title": "Borders",
- "effect.sleep_well.vigor": "Vigor",
- "effect.sleep_well.drowsy": "Drowsy",
+ "effect.touhou_maid_sleep_well.vigor": "Vigor",
+ "effect.touhou_maid_sleep_well.drowsy": "Drowsy",
   "toast.sleep_well.unlocked": "New quilt face unlocked",
   "unlock.sleep_well.thick_gingham": "Own 3 maids",
   "unlock.sleep_well.spring_blossom": "Bonemeal a cherry sapling",

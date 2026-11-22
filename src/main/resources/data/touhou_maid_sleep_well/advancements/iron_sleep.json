@@ -14,10 +14,10 @@
     "announce_to_chat": true,
     "hidden": false
   },
-  "parent": "sleep_well:sleep_100",
+  "parent": "touhou_maid_sleep_well:sleep_100",
   "criteria": {
     "iron_sleep": {
-      "trigger": "sleep_well:sleepwell",
+      "trigger": "touhou_maid_sleep_well:sleepwell",
       "conditions": {
         "kind": "iron_sleep",
         "value": 1

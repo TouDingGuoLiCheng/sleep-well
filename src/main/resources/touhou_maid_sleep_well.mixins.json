@@ -3,7 +3,7 @@
   "minVersion": "0.8",
   "package": "com.sleepwell.mixin",
   "compatibilityLevel": "JAVA_17",
-  "refmap": "sleep_well.refmap.json",
+  "refmap": "touhou_maid_sleep_well.refmap.json",
   "mixins": [
     "EntityMaidScheduleMixin",
     "MaidStopSleepingTraceMixin",

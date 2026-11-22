@@ -14,10 +14,10 @@
     "announce_to_chat": true,
     "hidden": false
   },
-  "parent": "sleep_well:first_drowsy",
+  "parent": "touhou_maid_sleep_well:first_drowsy",
   "criteria": {
     "lie_in": {
-      "trigger": "sleep_well:sleepwell",
+      "trigger": "touhou_maid_sleep_well:sleepwell",
       "conditions": {
         "kind": "lie_in",
         "value": 1

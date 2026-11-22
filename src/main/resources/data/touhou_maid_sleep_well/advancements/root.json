@@ -17,7 +17,7 @@
   },
   "criteria": {
     "root_sleep": {
-      "trigger": "sleep_well:sleepwell",
+      "trigger": "touhou_maid_sleep_well:sleepwell",
       "conditions": {
         "kind": "root_sleep",
         "value": 1

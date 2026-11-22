@@ -14,7 +14,7 @@ import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
  */
 @Mod(SleepWellMod.MOD_ID)
 public final class SleepWellMod {
-    public static final String MOD_ID = "sleep_well";
+    public static final String MOD_ID = "touhou_maid_sleep_well";
 
     public SleepWellMod() {
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, SleepWellConfig.SPEC);

@@ -14,10 +14,10 @@
     "announce_to_chat": true,
     "hidden": false
   },
-  "parent": "sleep_well:change_style",
+  "parent": "touhou_maid_sleep_well:change_style",
   "criteria": {
     "fluffy": {
-      "trigger": "sleep_well:sleepwell",
+      "trigger": "touhou_maid_sleep_well:sleepwell",
       "conditions": {
         "kind": "fluffy",
         "value": 1

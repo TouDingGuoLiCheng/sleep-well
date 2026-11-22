@@ -14,10 +14,10 @@
     "announce_to_chat": true,
     "hidden": true
   },
-  "parent": "sleep_well:root",
+  "parent": "touhou_maid_sleep_well:root",
   "criteria": {
     "winter_sleep": {
-      "trigger": "sleep_well:sleepwell",
+      "trigger": "touhou_maid_sleep_well:sleepwell",
       "conditions": {
         "kind": "winter_sleep",
         "value": 1
